@@ -1,0 +1,464 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  ArrowLeft, 
+  Sparkles, 
+  Code2, 
+  FileText, 
+  Library, 
+  Image as ImageIcon, 
+  Plus, 
+  Save, 
+  Zap, 
+  Send,
+  ChevronRight,
+  FolderOpen,
+  FileCode,
+  FileJson,
+  RotateCcw,
+  CheckCircle2,
+  Settings,
+  X
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useMode } from '../contexts/ModeContext';
+import { GlassCard, GameCard, ActionButton } from './ui-shared';
+import { cn } from '../lib/utils';
+
+type SkillFile = {
+  name: string;
+  content: string;
+  type: 'md' | 'js' | 'json' | 'asset';
+};
+
+type SkillStructure = {
+  'SKILL.md': string;
+  'scripts': SkillFile[];
+  'references': SkillFile[];
+  'assets': SkillFile[];
+};
+
+interface SkillEditorProps {
+  onBack: () => void;
+  initialMode?: 'ai' | 'manual';
+}
+
+export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) => {
+  const { mode } = useMode();
+  const [editorMode, setEditorMode] = useState<'ai' | 'manual'>(initialMode);
+  const [prompt, setPrompt] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<string>('SKILL.md');
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  
+  const [skillData, setSkillData] = useState<SkillStructure>({
+    'SKILL.md': '# New Skill\n\nDescribe your skill here...',
+    'scripts': [
+      { name: 'main.js', content: '// Write your skill logic here\nexport default async function run(input) {\n  console.log("Running skill with input:", input);\n  return { success: true };\n}', type: 'js' }
+    ],
+    'references': [
+      { name: 'config.json', content: '{\n  "version": "1.0.0",\n  "permissions": ["web_search"]\n}', type: 'json' }
+    ],
+    'assets': []
+  });
+
+  const steps = [
+    "Analyzing intent...",
+    "Drafting documentation...",
+    "Generating core logic...",
+    "Resolving dependencies...",
+    "Finalizing artifact structure..."
+  ];
+
+  const handleGenerate = () => {
+    if (!prompt.trim()) return;
+    setIsGenerating(true);
+    setGenerationStep(0);
+    
+    // Simulate generation process
+    const interval = setInterval(() => {
+      setGenerationStep(prev => {
+        if (prev >= steps.length - 1) {
+          clearInterval(interval);
+          setTimeout(() => {
+            setIsGenerating(false);
+            setEditorMode('manual');
+            // Mock generated content
+            setSkillData({
+              'SKILL.md': `# ${prompt.split(' ').slice(0, 3).join(' ')} Assistant\n\nGenerated based on: "${prompt}"\n\n## Capabilities\n- Automated processing\n- Intelligent analysis\n- seamless integration`,
+              'scripts': [
+                { name: 'main.js', content: `// Generated logic for ${prompt}\nexport default async function execute(context) {\n  // Implementation here\n  return { status: "success" };\n}`, type: 'js' },
+                { name: 'utils.js', content: 'export const helper = () => true;', type: 'js' }
+              ],
+              'references': [
+                { name: 'api_specs.json', content: '{\n  "endpoint": "https://api.example.com",\n  "method": "POST"\n}', type: 'json' }
+              ],
+              'assets': []
+            });
+          }, 800);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+  };
+
+  const FileIcon = ({ type, className }: { type: string, className?: string }) => {
+    switch (type) {
+      case 'md': return <FileText size={16} className={cn("text-blue-400", className)} />;
+      case 'js': return <FileCode size={16} className={cn("text-yellow-400", className)} />;
+      case 'json': return <FileJson size={16} className={cn("text-purple-400", className)} />;
+      case 'asset': return <ImageIcon size={16} className={cn("text-green-400", className)} />;
+      default: return <FileText size={16} className={className} />;
+    }
+  };
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden">
+      {/* Header */}
+      <div className={cn(
+        "h-16 flex items-center justify-between px-6 border-b shrink-0",
+        mode === 'adventure' ? "bg-[#121225] border-yellow-500/20" : "bg-white/[0.02] border-white/5 backdrop-blur-md"
+      )}>
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={onBack}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-gray-400 hover:text-white"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className={cn(
+              "font-bold",
+              mode === 'adventure' ? "text-yellow-500 uppercase tracking-widest text-sm" : "text-lg"
+            )}>
+              {editorMode === 'ai' ? 'Forge Skill with AI' : 'Skill Editor'}
+            </h2>
+            <p className="text-[10px] text-gray-500 font-mono">/root/skills/new_skill_artifact</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex bg-black/20 rounded-lg p-1 border border-white/5">
+            <button 
+              onClick={() => setEditorMode('ai')}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2",
+                editorMode === 'ai' 
+                  ? (mode === 'adventure' ? "bg-yellow-600 text-white" : "bg-blue-600 text-white") 
+                  : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <Sparkles size={14} />
+              AI Generate
+            </button>
+            <button 
+              onClick={() => setEditorMode('manual')}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2",
+                editorMode === 'manual' 
+                  ? (mode === 'adventure' ? "bg-yellow-600 text-white" : "bg-blue-600 text-white") 
+                  : "text-gray-500 hover:text-gray-300"
+              )}
+            >
+              <Code2 size={14} />
+              Direct Edit
+            </button>
+          </div>
+          
+          <div className="h-8 w-[1px] bg-white/10 mx-2" />
+          
+          <ActionButton className="h-9 px-4 py-0 text-xs">
+            <Save size={14} className="mr-2" />
+            Deploy Skill
+          </ActionButton>
+        </div>
+      </div>
+
+      <div className="flex-1 relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          {editorMode === 'ai' ? (
+            <motion.div 
+              key="ai-mode"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="h-full flex flex-col items-center justify-center p-8 max-w-4xl mx-auto"
+            >
+              {!isGenerating ? (
+                <div className="w-full space-y-8">
+                  <div className="text-center space-y-2">
+                    <div className={cn(
+                      "w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-6",
+                      mode === 'adventure' ? "bg-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.4)]" : "bg-blue-600 shadow-xl"
+                    )}>
+                      <Sparkles size={32} className="text-white" />
+                    </div>
+                    <h1 className={cn(
+                      "text-3xl font-black italic tracking-tighter uppercase",
+                      mode === 'adventure' ? "text-yellow-500" : "text-white"
+                    )}>
+                      Describe your creation
+                    </h1>
+                    <p className="text-gray-400">The AI will generate the documentation, code, and resources needed for your skill.</p>
+                  </div>
+
+                  <div className={cn(
+                    "relative p-1 rounded-2xl border transition-all duration-500",
+                    mode === 'adventure' ? "bg-black/60 border-yellow-500/30" : "bg-white/5 border-white/10"
+                  )}>
+                    <textarea 
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="e.g., A skill that summarizes daily news from tech blogs and formats them into a weekly digest PDF..."
+                      className="w-full h-40 bg-transparent p-6 text-white placeholder:text-gray-600 focus:outline-none resize-none"
+                    />
+                    <div className="absolute bottom-4 right-4 flex items-center gap-3">
+                      <span className="text-[10px] text-gray-600 font-mono">CTRL + ENTER to forge</span>
+                      <button 
+                        onClick={handleGenerate}
+                        disabled={!prompt.trim()}
+                        className={cn(
+                          "flex items-center gap-2 px-6 py-2 rounded-xl font-black uppercase tracking-widest transition-all",
+                          prompt.trim() 
+                            ? (mode === 'adventure' ? "bg-yellow-500 text-black hover:scale-105 active:scale-95" : "bg-blue-600 text-white hover:bg-blue-500") 
+                            : "bg-white/5 text-gray-600 cursor-not-allowed"
+                        )}
+                      >
+                        Forge Artifact
+                        <Zap size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { title: "Smart Summarizer", desc: "Process long documents into concise bullets." },
+                      { title: "Code Auditor", desc: "Review pull requests for security flaws." },
+                      { title: "Market Analyst", desc: "Fetch and visualize stock trends." }
+                    ].map((example, i) => (
+                      <button 
+                        key={i}
+                        onClick={() => setPrompt(example.desc)}
+                        className="p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 transition-all text-left group"
+                      >
+                        <p className="text-xs font-bold text-gray-400 group-hover:text-blue-400 mb-1">{example.title}</p>
+                        <p className="text-[10px] text-gray-500 line-clamp-1">{example.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-8">
+                  <div className="relative">
+                    <div className={cn(
+                      "w-32 h-32 rounded-full border-4 border-t-transparent animate-spin",
+                      mode === 'adventure' ? "border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.2)]" : "border-blue-600 shadow-xl"
+                    )} />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Zap size={40} className={cn(
+                        "animate-pulse",
+                        mode === 'adventure' ? "text-yellow-500" : "text-blue-500"
+                      )} />
+                    </div>
+                  </div>
+                  
+                  <div className="text-center space-y-4">
+                    <h3 className={cn(
+                      "text-xl font-black italic tracking-widest uppercase",
+                      mode === 'adventure' ? "text-yellow-500" : "text-white"
+                    )}>
+                      {steps[generationStep]}
+                    </h3>
+                    <div className="flex gap-2 justify-center">
+                      {steps.map((_, i) => (
+                        <div 
+                          key={i} 
+                          className={cn(
+                            "w-8 h-1 rounded-full transition-all duration-500",
+                            i <= generationStep 
+                              ? (mode === 'adventure' ? "bg-yellow-500" : "bg-blue-600") 
+                              : "bg-white/10"
+                          )} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="manual-mode"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full flex"
+            >
+              {/* Sidebar File Tree */}
+              <div className={cn(
+                "w-64 border-r shrink-0 flex flex-col",
+                mode === 'adventure' ? "bg-[#0c0c1a] border-yellow-500/10" : "bg-black/20 border-white/5"
+              )}>
+                <div className="p-4 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Explorer</span>
+                  <Plus size={14} className="text-gray-500 hover:text-white cursor-pointer" />
+                </div>
+                
+                <div className="flex-1 overflow-y-auto px-2 space-y-1">
+                  {/* Root Files */}
+                  <button 
+                    onClick={() => { setSelectedFile('SKILL.md'); setSelectedFolder(null); }}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all",
+                      selectedFile === 'SKILL.md' ? "bg-white/10 text-white" : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
+                    )}
+                  >
+                    <FileText size={14} className="text-blue-400" />
+                    SKILL.md
+                  </button>
+
+                  {/* Folders */}
+                  {(['scripts', 'references', 'assets'] as const).map(folder => (
+                    <div key={folder} className="space-y-1">
+                      <button 
+                        onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-all"
+                      >
+                        <FolderOpen size={14} className={selectedFolder === folder ? "text-yellow-500" : "text-gray-600"} />
+                        <span className="capitalize">{folder}</span>
+                        <ChevronRight size={12} className={cn("ml-auto transition-transform", selectedFolder === folder && "rotate-90")} />
+                      </button>
+                      
+                      {selectedFolder === folder && (
+                        <div className="pl-6 space-y-1">
+                          {skillData[folder].map(file => (
+                            <button 
+                              key={file.name}
+                              onClick={() => setSelectedFile(`${folder}/${file.name}`)}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] transition-all",
+                                selectedFile === `${folder}/${file.name}` ? "bg-white/10 text-white" : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
+                              )}
+                            >
+                              <FileIcon type={file.type} />
+                              {file.name}
+                            </button>
+                          ))}
+                          <button className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] text-gray-600 hover:text-gray-400 italic">
+                            <Plus size={12} />
+                            Add item...
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 border-t border-white/5">
+                  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                      <Settings size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold text-white truncate">Skill Settings</p>
+                      <p className="text-[9px] text-gray-500 truncate">Metadata & Env</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Editor Area */}
+              <div className="flex-1 flex flex-col relative">
+                {/* Editor Tabs */}
+                <div className="h-10 flex items-center bg-black/40 border-b border-white/5 px-2">
+                  <div className="flex items-center gap-1 h-full">
+                    <div className="bg-white/5 border-t-2 border-blue-500 px-4 h-full flex items-center gap-2 text-xs font-medium text-white">
+                      {selectedFile.split('/').pop()}
+                      <X size={12} className="text-gray-500 hover:text-white cursor-pointer" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Editor Surface */}
+                <div className="flex-1 relative">
+                  <textarea 
+                    value={
+                      selectedFile === 'SKILL.md' 
+                        ? skillData['SKILL.md'] 
+                        : skillData[selectedFile.split('/')[0] as 'scripts' | 'references'].find(f => f.name === selectedFile.split('/')[1])?.content || ''
+                    }
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      if (selectedFile === 'SKILL.md') {
+                        setSkillData(prev => ({ ...prev, 'SKILL.md': newValue }));
+                      } else {
+                        const [folder, name] = selectedFile.split('/');
+                        setSkillData(prev => ({
+                          ...prev,
+                          [folder]: prev[folder as 'scripts' | 'references'].map(f => f.name === name ? { ...f, content: newValue } : f)
+                        }));
+                      }
+                    }}
+                    className="w-full h-full bg-transparent p-8 text-sm font-mono text-gray-300 focus:outline-none resize-none"
+                    spellCheck={false}
+                  />
+                  
+                  {/* Line Numbers Simulation */}
+                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-black/20 border-r border-white/5 flex flex-col items-center pt-8 text-[10px] text-gray-600 font-mono select-none">
+                    {Array.from({ length: 30 }).map((_, i) => (
+                      <div key={i} className="h-5 flex items-center">{i + 1}</div>
+                    ))}
+                  </div>
+                  
+                  {/* Floating AI Assistant for Editing */}
+                  <div className="absolute bottom-6 right-6 w-96 max-w-[calc(100vw-400px)]">
+                    <div className={cn(
+                      "p-4 rounded-2xl border shadow-2xl backdrop-blur-xl",
+                      mode === 'adventure' ? "bg-[#121225]/90 border-yellow-500/30" : "bg-gray-900/90 border-white/10"
+                    )}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={cn(
+                          "w-6 h-6 rounded-lg flex items-center justify-center",
+                          mode === 'adventure' ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
+                        )}>
+                          <Sparkles size={12} />
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">AI Artifact Assistant</span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 mb-4 italic">"I can help you modify the code, add dependencies, or write documentation for this skill."</p>
+                      
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          placeholder="e.g., Add a retry logic with exponential backoff..."
+                          className="w-full bg-black/40 border border-white/10 rounded-xl py-2 pl-3 pr-10 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                        />
+                        <button className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300">
+                          <Send size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Bar */}
+                <div className="h-6 flex items-center justify-between px-4 bg-black/60 border-t border-white/5 text-[10px] text-gray-500 font-mono">
+                  <div className="flex items-center gap-4">
+                    <span className="flex items-center gap-1"><CheckCircle2 size={10} className="text-green-500" /> Ready</span>
+                    <span>UTF-8</span>
+                    <span>JavaScript (Node.js)</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span>Line 12, Column 45</span>
+                    <span>2 Spaces</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+};
