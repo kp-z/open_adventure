@@ -1,0 +1,73 @@
+"""FastAPI application entry point."""
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats
+from app.api import dashboard, auth, terminal
+from app.config.settings import settings
+from app.core.database import init_db, close_db
+from app.core.logging import setup_logging, get_logger
+
+# Setup logging
+setup_logging()
+logger = get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    # Startup
+    logger.info("Starting Claude Manager Backend...")
+    await init_db()
+    logger.info("Database initialized")
+    yield
+    # Shutdown
+    logger.info("Shutting down Claude Manager Backend...")
+    await close_db()
+    logger.info("Database connections closed")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title=settings.app_name,
+    description="AI Configuration and Management Tool for Claude - Backend API",
+    version=settings.app_version,
+    lifespan=lifespan,
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(auth.router, prefix=f"{settings.api_prefix}")
+app.include_router(health.router, prefix=f"{settings.api_prefix}/system")
+app.include_router(claude.router, prefix=f"{settings.api_prefix}")
+app.include_router(skills.router, prefix=f"{settings.api_prefix}")
+app.include_router(agents.router, prefix=f"{settings.api_prefix}")
+app.include_router(agent_teams.router, prefix=f"{settings.api_prefix}")
+app.include_router(workflows.router, prefix=f"{settings.api_prefix}")
+app.include_router(workflow_templates.router, prefix=f"{settings.api_prefix}")
+app.include_router(tasks.router, prefix=f"{settings.api_prefix}")
+app.include_router(executions.router, prefix=f"{settings.api_prefix}")
+app.include_router(stats.router, prefix=f"{settings.api_prefix}")
+app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
+app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
+
+
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {
+        "message": f"Welcome to {settings.app_name} API",
+        "version": settings.app_version,
+        "docs": "/docs",
+        "health": f"{settings.api_prefix}/system/health",
+    }
