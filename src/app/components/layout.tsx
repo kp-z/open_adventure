@@ -18,11 +18,13 @@ import {
   User,
   Menu,
   X,
+  Sparkles,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
+import imgEsports from "figma:asset/46c7531e4886b7b49890d99d64d86e9ce62c198a.png";
 
 const Navigation = () => {
   const { mode } = useMode();
@@ -134,24 +136,46 @@ export const Layout = () => {
         >
           <div
             className={`
-              w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg
+              w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
               ${
                 mode === "adventure"
                   ? "bg-gradient-to-br from-yellow-400 to-orange-600 shadow-yellow-500/20"
-                  : "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/20"
+                  : "bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10"
               }
             `}
           >
             {mode === "adventure" ? (
-              <Sword
-                size={24}
-                className="text-white drop-shadow-md"
-              />
+              <>
+                <div className="absolute inset-0 flex items-center justify-center opacity-40">
+                   <img src={imgEsports} alt="" className="w-10 h-10 object-contain scale-125 rotate-12" />
+                </div>
+                <div className="relative z-10 flex items-center justify-center">
+                  <Sword
+                    size={24}
+                    className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                  />
+                  <motion.div
+                    animate={{ 
+                      scale: [1, 1.5, 1],
+                      opacity: [0.3, 0.8, 0.3],
+                      rotate: [0, 90, 180] 
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    className="absolute -top-1 -right-1 text-yellow-200"
+                  >
+                    <Sparkles size={12} fill="currentColor" />
+                  </motion.div>
+                </div>
+              </>
             ) : (
-              <Zap
-                size={24}
-                className="text-white drop-shadow-md"
-              />
+              <div className="relative">
+                <Zap
+                  size={24}
+                  fill="currentColor"
+                  className="text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] animate-pulse"
+                />
+                <div className="absolute inset-0 bg-blue-400/20 blur-xl scale-150 rounded-full" />
+              </div>
             )}
           </div>
 

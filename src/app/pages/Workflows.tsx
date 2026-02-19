@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
+import { WorkflowEditor } from '../components/WorkflowEditor';
 
 const mockWorkflows = [
   { id: 1, name: 'Code Review Pipeline', desc: 'Automated multi-step process for analyzing pull requests.', nodes: 5, difficulty: 3, success: 92, status: 'active', color: 'blue' },
@@ -27,18 +28,22 @@ const mockWorkflows = [
 
 const Workflows = () => {
   const { mode } = useMode();
+  const [isEditorOpen, setIsEditorOpen] = React.useState(false);
 
   if (mode === 'adventure') {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 relative">
+        <AnimatePresence>
+          {isEditorOpen && <WorkflowEditor onClose={() => setIsEditorOpen(false)} />}
+        </AnimatePresence>
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-600 uppercase">
+            <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-600 uppercase leading-[0.8]">
               Dungeon Hall: Missions
             </h1>
             <p className="text-gray-400 font-medium">Embark on legendary automation quests and reap the rewards.</p>
           </div>
-          <ActionButton onClick={() => {}}>Create New Map</ActionButton>
+          <ActionButton onClick={() => setIsEditorOpen(true)}>Create New Map</ActionButton>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -97,7 +102,10 @@ const Workflows = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      <AnimatePresence>
+        {isEditorOpen && <WorkflowEditor onClose={() => setIsEditorOpen(false)} />}
+      </AnimatePresence>
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
@@ -105,7 +113,7 @@ const Workflows = () => {
         </div>
         <div className="flex gap-3">
           <ActionButton variant="secondary">Import Template</ActionButton>
-          <ActionButton onClick={() => {}}>New Workflow</ActionButton>
+          <ActionButton onClick={() => setIsEditorOpen(true)}>New Workflow</ActionButton>
         </div>
       </header>
 
