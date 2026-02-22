@@ -17,7 +17,9 @@ import {
   RotateCcw,
   CheckCircle2,
   Settings,
-  X
+  X,
+  MessageSquare,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
@@ -369,7 +371,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
               </div>
 
               {/* Main Editor Area */}
-              <div className="flex-1 flex flex-col relative">
+              <div className="flex-1 flex flex-col relative border-r border-white/5">
                 {/* Editor Tabs */}
                 <div className="h-10 flex items-center bg-black/40 border-b border-white/5 px-2">
                   <div className="flex items-center gap-1 h-full">
@@ -381,78 +383,108 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
                 </div>
 
                 {/* Editor Surface */}
-                <div className="flex-1 relative">
-                  <textarea 
-                    value={
-                      selectedFile === 'SKILL.md' 
-                        ? skillData['SKILL.md'] 
-                        : skillData[selectedFile.split('/')[0] as 'scripts' | 'references'].find(f => f.name === selectedFile.split('/')[1])?.content || ''
-                    }
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (selectedFile === 'SKILL.md') {
-                        setSkillData(prev => ({ ...prev, 'SKILL.md': newValue }));
-                      } else {
-                        const [folder, name] = selectedFile.split('/');
-                        setSkillData(prev => ({
-                          ...prev,
-                          [folder]: prev[folder as 'scripts' | 'references'].map(f => f.name === name ? { ...f, content: newValue } : f)
-                        }));
+                <div className="flex-1 relative overflow-hidden flex flex-col">
+                  <div className="flex-1 relative overflow-hidden">
+                    <textarea 
+                      value={
+                        selectedFile === 'SKILL.md' 
+                          ? skillData['SKILL.md'] 
+                          : skillData[selectedFile.split('/')[0] as 'scripts' | 'references'].find(f => f.name === selectedFile.split('/')[1])?.content || ''
                       }
-                    }}
-                    className="w-full h-full bg-transparent p-8 text-sm font-mono text-gray-300 focus:outline-none resize-none"
-                    spellCheck={false}
-                  />
-                  
-                  {/* Line Numbers Simulation */}
-                  <div className="absolute left-0 top-0 bottom-0 w-12 bg-black/20 border-r border-white/5 flex flex-col items-center pt-8 text-[10px] text-gray-600 font-mono select-none">
-                    {Array.from({ length: 30 }).map((_, i) => (
-                      <div key={i} className="h-5 flex items-center">{i + 1}</div>
-                    ))}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        if (selectedFile === 'SKILL.md') {
+                          setSkillData(prev => ({ ...prev, 'SKILL.md': newValue }));
+                        } else {
+                          const [folder, name] = selectedFile.split('/');
+                          setSkillData(prev => ({
+                            ...prev,
+                            [folder]: prev[folder as 'scripts' | 'references'].map(f => f.name === name ? { ...f, content: newValue } : f)
+                          }));
+                        }
+                      }}
+                      className="w-full h-full bg-transparent p-8 pl-16 text-sm font-mono text-gray-300 focus:outline-none resize-none leading-relaxed"
+                      spellCheck={false}
+                    />
+                    
+                    {/* Line Numbers Simulation */}
+                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-black/20 border-r border-white/5 flex flex-col items-center pt-8 text-[10px] text-gray-600 font-mono select-none">
+                      {Array.from({ length: 50 }).map((_, i) => (
+                        <div key={i} className="h-[1.625rem] flex items-center">{i + 1}</div>
+                      ))}
+                    </div>
                   </div>
-                  
-                  {/* Floating AI Assistant for Editing */}
-                  <div className="absolute bottom-6 right-6 w-96 max-w-[calc(100vw-400px)]">
-                    <div className={cn(
-                      "p-4 rounded-2xl border shadow-2xl backdrop-blur-xl",
-                      mode === 'adventure' ? "bg-[#121225]/90 border-yellow-500/30" : "bg-gray-900/90 border-white/10"
-                    )}>
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className={cn(
-                          "w-6 h-6 rounded-lg flex items-center justify-center",
-                          mode === 'adventure' ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
-                        )}>
-                          <Sparkles size={12} />
-                        </div>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-white">AI Artifact Assistant</span>
-                      </div>
-                      <p className="text-[11px] text-gray-400 mb-4 italic">"I can help you modify the code, add dependencies, or write documentation for this skill."</p>
-                      
-                      <div className="relative">
-                        <input 
-                          type="text" 
-                          placeholder="e.g., Add a retry logic with exponential backoff..."
-                          className="w-full bg-black/40 border border-white/10 rounded-xl py-2 pl-3 pr-10 text-xs text-white focus:outline-none focus:border-blue-500/50"
-                        />
-                        <button className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-300">
-                          <Send size={14} />
+
+                  {/* Status Bar */}
+                  <div className="h-6 flex items-center justify-between px-4 bg-black/60 border-t border-white/5 text-[10px] text-gray-500 font-mono shrink-0">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1"><CheckCircle2 size={10} className="text-green-500" /> Ready</span>
+                      <span>UTF-8</span>
+                      <span>{selectedFile.endsWith('.js') ? 'JavaScript (Node.js)' : selectedFile.endsWith('.md') ? 'Markdown' : 'JSON'}</span>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <span>Line 12, Column 45</span>
+                      <span>2 Spaces</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dedicated AI Assistant Panel */}
+              <div className={cn(
+                "w-80 shrink-0 flex flex-col",
+                mode === 'adventure' ? "bg-[#0c0c1a]" : "bg-black/20"
+              )}>
+                <div className="p-4 border-b border-white/5 flex items-center gap-2">
+                  <div className={cn(
+                    "w-6 h-6 rounded-lg flex items-center justify-center",
+                    mode === 'adventure' ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
+                  )}>
+                    <Sparkles size={12} />
+                  </div>
+                  <span className="text-xs font-black uppercase tracking-widest text-white">Artifact Assistant</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div className={cn(
+                    "p-4 rounded-xl border leading-relaxed",
+                    mode === 'adventure' ? "bg-[#121225] border-yellow-500/20" : "bg-white/5 border-white/10"
+                  )}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Bot size={14} className="text-blue-400" />
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">AI Suggestion</span>
+                    </div>
+                    <p className="text-xs text-gray-300">I can help you modify the current file. Try asking me to add error handling, optimize the logic, or add more documentation.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Quick Commands</span>
+                    <div className="grid grid-cols-1 gap-2">
+                      {[
+                        "Add Try/Catch Block",
+                        "Optimize Performance",
+                        "Generate README",
+                        "Add Type Definitions"
+                      ].map((cmd) => (
+                        <button key={cmd} className="text-left px-3 py-2 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 text-[11px] text-gray-400 transition-all">
+                          {cmd}
                         </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
 
-                {/* Status Bar */}
-                <div className="h-6 flex items-center justify-between px-4 bg-black/60 border-t border-white/5 text-[10px] text-gray-500 font-mono">
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1"><CheckCircle2 size={10} className="text-green-500" /> Ready</span>
-                    <span>UTF-8</span>
-                    <span>JavaScript (Node.js)</span>
+                <div className="p-4 border-t border-white/5 bg-black/20">
+                  <div className="relative">
+                    <textarea 
+                      placeholder="Ask AI to edit this artifact..."
+                      className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-3 pr-10 text-xs text-white focus:outline-none focus:border-blue-500/50 resize-none h-24"
+                    />
+                    <button className="absolute right-2 bottom-3 text-blue-400 hover:text-blue-300">
+                      <Send size={16} />
+                    </button>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span>Line 12, Column 45</span>
-                    <span>2 Spaces</span>
-                  </div>
+                  <p className="text-[9px] text-gray-600 mt-2 text-center uppercase font-bold tracking-tighter">Powered by Claude 3.5 Sonnet</p>
                 </div>
               </div>
             </motion.div>

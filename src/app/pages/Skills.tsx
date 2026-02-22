@@ -46,6 +46,7 @@ const mockSkills = [
     desc: { en: 'Run Python scripts in a sandboxed environment for data analysis.', zh: '在沙盒环境中运行 Python 脚本进行数据分析。' }, 
     tags: { en: ['Dev', 'Logic'], zh: ['开发', '逻辑'] }, 
     source: 'Project', 
+    projectName: 'Cloud Migration',
     status: 'enabled', 
     rarity: 'epic', 
     level: 8, 
@@ -60,6 +61,7 @@ const mockSkills = [
     desc: { en: 'Parse and extract text/images from PDF files of any size.', zh: '解析并提取任何大小的 PDF 文件中的文本/图像。' }, 
     tags: { en: ['Data', 'Docs'], zh: ['数据', '文档'] }, 
     source: 'Plugin', 
+    pluginNamespace: 'adobe-acrobat-pro',
     status: 'disabled', 
     rarity: 'common', 
     level: 2, 
@@ -74,6 +76,7 @@ const mockSkills = [
     desc: { en: 'Automatically generate REST or GraphQL API boilerplate code.', zh: '自动生成 REST 或 GraphQL API 样板代码。' }, 
     tags: { en: ['Dev', 'Gen'], zh: ['开发', '生成'] }, 
     source: 'Project', 
+    projectName: 'Internal Tools',
     status: 'enabled', 
     rarity: 'legendary', 
     level: 12, 
@@ -102,6 +105,7 @@ const mockSkills = [
     desc: { en: 'Identify patterns and bugs in massive log files using AI.', zh: '使用 AI 在海量日志文件中识别模式和错误。' }, 
     tags: { en: ['DevOps', 'QA'], zh: ['运维', '质检'] }, 
     source: 'Plugin', 
+    pluginNamespace: 'sys-log-monitor',
     status: 'enabled', 
     rarity: 'rare', 
     level: 4, 
@@ -202,8 +206,19 @@ const Skills = () => {
                       ))}
                     </div>
                     
-                    <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed italic">"{skill.desc[lang]}"</p>
+                    <p className="text-xs text-gray-400 line-clamp-2 mb-2 leading-relaxed italic">"{skill.desc[lang]}"</p>
                     
+                    {(skill as any).projectName && (
+                      <div className="text-[10px] text-green-500/80 font-bold uppercase mb-4 flex items-center gap-1">
+                        <BookOpen size={10} /> {(skill as any).projectName}
+                      </div>
+                    )}
+                    {(skill as any).pluginNamespace && (
+                      <div className="text-[10px] text-orange-500/80 font-bold uppercase mb-4 flex items-center gap-1">
+                        <Zap size={10} /> {(skill as any).pluginNamespace}
+                      </div>
+                    )}
+
                     <div className="w-full mt-auto space-y-2">
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
                         <span className="text-yellow-500">{t('lvl' as any)} {skill.level}</span>
@@ -316,6 +331,16 @@ const Skills = () => {
                 </div>
 
                 <h3 className="text-lg font-bold mb-1">{skill.name[lang]}</h3>
+                { (skill as any).projectName && (
+                  <p className="text-[10px] text-green-500 font-bold uppercase mb-2 flex items-center gap-1 opacity-70">
+                    <BookOpen size={10} /> {(skill as any).projectName}
+                  </p>
+                )}
+                { (skill as any).pluginNamespace && (
+                  <p className="text-[10px] text-orange-500 font-bold uppercase mb-2 flex items-center gap-1 opacity-70">
+                    <Zap size={10} /> {(skill as any).pluginNamespace}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 line-clamp-2 mb-4">{skill.desc[lang]}</p>
                 
                 <div className="flex flex-wrap gap-2 mb-6 mt-auto">

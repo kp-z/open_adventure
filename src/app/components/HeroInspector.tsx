@@ -26,14 +26,14 @@ import { cn } from '../lib/utils';
 
 // Mock data for skills
 const availableSkills = [
-  { id: 1, name: { en: 'Web Search', zh: '网页搜索' }, advIcon: 'swimming', rarity: 'rare', level: 5, type: 'skill' },
-  { id: 2, name: { en: 'Python Exec', zh: 'Python 执行' }, advIcon: 'chess', rarity: 'epic', level: 8, type: 'skill' },
-  { id: 3, name: { en: 'PDF Reader', zh: 'PDF 阅读器' }, advIcon: 'sportsBottle', rarity: 'common', level: 2, type: 'skill' },
-  { id: 4, name: { en: 'API Generator', zh: 'API 生成器' }, advIcon: 'esports', rarity: 'legendary', level: 12, type: 'skill' },
-  { id: 5, name: { en: 'UI Architect', zh: 'UI 架构师' }, advIcon: 'gymming', rarity: 'epic', level: 7, type: 'skill' },
-  { id: 6, name: { en: 'Log Analyzer', zh: '日志分析器' }, advIcon: 'stopwatch', rarity: 'rare', level: 4, type: 'skill' },
-  { id: 7, name: { en: 'Cloud Forge', zh: '云端锻造' }, advIcon: 'sword', rarity: 'legendary', level: 15, type: 'skill' },
-  { id: 8, name: { en: 'Neural Link', zh: '神经链接' }, advIcon: 'trophy', rarity: 'epic', level: 9, type: 'skill' },
+  { id: 1, name: { en: 'Web Search', zh: '网页搜索' }, advIcon: 'swimming', rarity: 'rare', level: 5, type: 'skill', source: 'Global' },
+  { id: 2, name: { en: 'Python Exec', zh: 'Python 执行' }, advIcon: 'chess', rarity: 'epic', level: 8, type: 'skill', source: 'Project', projectName: 'Data Forge' },
+  { id: 3, name: { en: 'PDF Reader', zh: 'PDF 阅读器' }, advIcon: 'sportsBottle', rarity: 'common', level: 2, type: 'skill', source: 'Plugin', pluginNamespace: 'adobe-helper' },
+  { id: 4, name: { en: 'API Generator', zh: 'API 生成器' }, advIcon: 'esports', rarity: 'legendary', level: 12, type: 'skill', source: 'Project', projectName: 'Internal API' },
+  { id: 5, name: { en: 'UI Architect', zh: 'UI 架构师' }, advIcon: 'gymming', rarity: 'epic', level: 7, type: 'skill', source: 'Global' },
+  { id: 6, name: { en: 'Log Analyzer', zh: '日志分析器' }, advIcon: 'stopwatch', rarity: 'rare', level: 4, type: 'skill', source: 'Plugin', pluginNamespace: 'sys-log-monitor' },
+  { id: 7, name: { en: 'Cloud Forge', zh: '云端锻造' }, advIcon: 'sword', rarity: 'legendary', level: 15, type: 'skill', source: 'Global' },
+  { id: 8, name: { en: 'Neural Link', zh: '神经链接' }, advIcon: 'trophy', rarity: 'epic', level: 9, type: 'skill', source: 'Global' },
 ];
 
 const availableWeapons = [

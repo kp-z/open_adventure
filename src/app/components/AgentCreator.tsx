@@ -39,11 +39,11 @@ const availableModels = [
 ];
 
 const mockSkills = [
-  { id: 1, name: 'Web Search', icon: Globe, advIcon: 'swimming', desc: 'Browse the web for real-time info' },
-  { id: 2, name: 'Python Exec', icon: Code2, advIcon: 'chess', desc: 'Run Python scripts' },
-  { id: 3, name: 'PDF Reader', icon: FileText, advIcon: 'sportsBottle', desc: 'Extract data from PDFs' },
-  { id: 4, name: 'UI Architect', icon: Wrench, advIcon: 'gymming', desc: 'Design UI components' },
-  { id: 5, name: 'API Generator', icon: Zap, advIcon: 'esports', desc: 'Create API boilerplates' }
+  { id: 1, name: 'Web Search', icon: Globe, advIcon: 'swimming', desc: 'Browse the web for real-time info', source: 'Global' },
+  { id: 2, name: 'Python Exec', icon: Code2, advIcon: 'chess', desc: 'Run Python scripts', source: 'Project', projectName: 'Analysis Core' },
+  { id: 3, name: 'PDF Reader', icon: FileText, advIcon: 'sportsBottle', desc: 'Extract data from PDFs', source: 'Plugin', pluginNamespace: 'doc-parser' },
+  { id: 4, name: 'UI Architect', icon: Wrench, advIcon: 'gymming', desc: 'Design UI components', source: 'Global' },
+  { id: 5, name: 'API Generator', icon: Zap, advIcon: 'esports', desc: 'Create API boilerplates', source: 'Project', projectName: 'Backend Lab' }
 ];
 
 interface AgentCreatorProps {
@@ -596,6 +596,16 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h3 className="font-bold text-white mb-0.5 truncate">{skill.name}</h3>
+                                { (skill as any).projectName && (
+                                  <p className="text-[9px] text-green-500 font-bold uppercase truncate opacity-70 mb-0.5">
+                                    Project: {(skill as any).projectName}
+                                  </p>
+                                )}
+                                { (skill as any).pluginNamespace && (
+                                  <p className="text-[9px] text-orange-500 font-bold uppercase truncate opacity-70 mb-0.5">
+                                    Plugin: {(skill as any).pluginNamespace}
+                                  </p>
+                                )}
                                 <p className="text-[10px] text-gray-500 line-clamp-1">{skill.desc}</p>
                               </div>
                               <div className={cn(

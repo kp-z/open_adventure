@@ -7,8 +7,10 @@ import '../styles/fonts.css';
 
 export default function App() {
   return (
-    <ModeProvider>
-      <RouterProvider router={router} />
-    </ModeProvider>
+    <React.StrictMode>
+      <ModeProvider>
+        <RouterProvider router={router} />
+      </ModeProvider>
+    </React.StrictMode>
   );
 }
