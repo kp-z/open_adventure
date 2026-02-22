@@ -1,10 +1,10 @@
-import React from 'react';
-import { 
-  BarChart3, 
-  Terminal, 
-  Activity, 
-  Code2, 
-  BrainCircuit, 
+import React, { useState, useEffect } from 'react';
+import {
+  BarChart3,
+  Terminal,
+  Activity,
+  Code2,
+  BrainCircuit,
   Cpu,
   Sword,
   Shield,
@@ -17,17 +17,19 @@ import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { getAvatarById } from '../lib/avatars';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   AreaChart,
-  Area 
+  Area
 } from 'recharts';
+import { dashboardApi, executionsApi } from '@/lib/api';
+import type { DashboardStats, Execution } from '@/lib/api';
 
 const mockChartData = [
   { name: 'Mon', value: 40 },
@@ -42,6 +44,56 @@ const mockChartData = [
 const Dashboard = () => {
   const { mode } = useMode();
   const { t } = useTranslation();
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // 获取仪表板统计数据
+        const statsData = await dashboardApi.getStats();
+        setStats(statsData);
+
+        // 获取最近的执行历史
+        const executionsData = await executionsApi.list({ limit: 4 });
+        setExecutions(executionsData.items || []);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-500 mb-4">Error: {error}</p>
+          <ActionButton onClick={() => window.location.reload()}>Retry</ActionButton>
+        </div>
+      </div>
+    );
+  }
 
   if (mode === 'adventure') {
     return (
@@ -57,7 +109,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <GameCard rarity="legendary" className="flex items-center gap-6 py-6">
             <div className="w-16 h-16 rounded-full bg-yellow-500/20 border-2 border-yellow-500 flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.4)]">
-              <span className="text-2xl font-black text-yellow-500">42</span>
+              <span className="text-2xl font-black text-yellow-500">{stats?.total_workflows || 0}</span>
             </div>
             <div>
               <p className="text-xs font-bold text-yellow-500/80 uppercase tracking-widest">Architect Level</p>
@@ -73,8 +125,8 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-xs font-bold text-purple-500/80 uppercase tracking-widest">Skill Orbs</p>
-              <p className="text-2xl font-black text-white">12,450 XP</p>
-              <p className="text-xs text-gray-500">Next level: 15,000 XP</p>
+              <p className="text-2xl font-black text-white">{stats?.total_skills || 0} XP</p>
+              <p className="text-xs text-gray-500">Total Skills Collected</p>
             </div>
           </GameCard>
           <GameCard rarity="rare" className="flex items-center gap-6 py-6">
@@ -83,8 +135,8 @@ const Dashboard = () => {
             </div>
             <div>
               <p className="text-xs font-bold text-blue-500/80 uppercase tracking-widest">Battles Won</p>
-              <p className="text-2xl font-black text-white">1,248</p>
-              <p className="text-xs text-gray-500">98% Success Rate</p>
+              <p className="text-2xl font-black text-white">{stats?.total_tasks || 0}</p>
+              <p className="text-xs text-gray-500">Total Tasks Completed</p>
             </div>
           </GameCard>
         </div>
@@ -168,7 +220,7 @@ const Dashboard = () => {
           </div>
           <div>
             <p className="text-sm text-gray-400">Total Skills</p>
-            <p className="text-3xl font-bold">48</p>
+            <p className="text-3xl font-bold">{stats?.total_skills || 0}</p>
           </div>
           <div className="h-12 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
@@ -188,7 +240,7 @@ const Dashboard = () => {
           </div>
           <div>
             <p className="text-sm text-gray-400">Agents Running</p>
-            <p className="text-3xl font-bold">6</p>
+            <p className="text-3xl font-bold">{stats?.total_agents || 0}</p>
           </div>
           <div className="h-12 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
@@ -208,31 +260,45 @@ const Dashboard = () => {
             <button className="text-sm text-blue-400 hover:underline">View All</button>
           </div>
           <div className="space-y-4">
-            {[
-              { id: 'T-982', task: 'Deploy API Gateway', status: 'success', time: '2m ago', avatar: 'blackpanther' },
-              { id: 'T-981', task: 'Review PR #245', status: 'running', time: '5m ago', avatar: 'spiderman' },
-              { id: 'T-980', task: 'Generate Documentation', status: 'success', time: '14m ago', avatar: 'blackwidow' },
-              { id: 'T-979', task: 'Fix Security Vulnerabilities', status: 'failed', time: '1h ago', avatar: 'thanos' },
-            ].map((task) => (
-              <div key={task.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10">
-                      <img src={getAvatarById(task.avatar).img} alt="" className="w-full h-full object-cover opacity-80" />
+            {executions.length > 0 ? (
+              executions.map((execution, index) => {
+                const task = execution.task;
+                const avatars = ['vanguard_1', 'vanguard_2', 'vanguard_3', 'vanguard_4'];
+                const avatar = avatars[index % avatars.length];
+                const avatarData = getAvatarById(avatar);
+                const AvatarIcon = avatarData.icon;
+                const status = task?.status === 'completed' ? 'success' :
+                              task?.status === 'running' ? 'running' :
+                              task?.status === 'failed' ? 'failed' : 'success';
+
+                return (
+                  <div key={execution.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                          <AvatarIcon className="w-6 h-6 text-white" />
+                        </div>
+                        <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#1a1b26] ${
+                          status === 'success' ? 'bg-green-500' :
+                          status === 'running' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
+                        }`} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Execution #{execution.id}</p>
+                        <p className="text-[10px] text-gray-500 uppercase font-bold">
+                          Task #{task?.id || 'N/A'} • {new Date(execution.created_at).toLocaleTimeString()}
+                        </p>
+                      </div>
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#1a1b26] ${
-                      task.status === 'success' ? 'bg-green-500' : 
-                      task.status === 'running' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
-                    }`} />
+                    <ActionButton variant="secondary" className="py-1 px-3 text-xs">Details</ActionButton>
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">{task.task}</p>
-                    <p className="text-[10px] text-gray-500 uppercase font-bold">{task.id} • {task.time}</p>
-                  </div>
-                </div>
-                <ActionButton variant="secondary" className="py-1 px-3 text-xs">Details</ActionButton>
+                );
+              })
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No execution history yet</p>
               </div>
-            ))}
+            )}
           </div>
         </GlassCard>
 

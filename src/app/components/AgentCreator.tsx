@@ -414,15 +414,14 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
 
                         {mode === 'adventure' && (
                           <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-6">
-                            <div className="w-24 h-24 rounded-full border-4 border-yellow-500/30 overflow-hidden shrink-0 shadow-2xl relative group">
-                              <img 
-                                src={getAvatarById(formData.avatar).img} 
-                                alt="Hero Preview" 
-                                className="w-full h-full object-cover"
-                              />
-                              <button 
+                            <div className="w-24 h-24 rounded-full border-4 border-yellow-500/30 shrink-0 shadow-2xl relative group bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
+                              {(() => {
+                                const AvatarIcon = getAvatarById(formData.avatar).icon;
+                                return <AvatarIcon className="w-12 h-12 text-yellow-500" />;
+                              })()}
+                              <button
                                 onClick={() => setFormData(p => ({ ...p, avatar: getRandomAvatar().id }))}
-                                className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
                               >
                                 <Zap size={20} className="text-yellow-500" />
                               </button>
@@ -584,12 +583,15 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                             >
                               <div className={cn(
                                 "w-10 h-10 rounded-lg flex items-center justify-center transition-all shrink-0 overflow-hidden",
-                                formData.selectedSkills.includes(skill.id) 
+                                formData.selectedSkills.includes(skill.id)
                                   ? (mode === 'adventure' ? "bg-yellow-500 text-black shadow-lg" : "bg-blue-600 text-white")
                                   : "bg-white/10 text-gray-500"
                               )}>
                                 {mode === 'adventure' ? (
-                                  <img src={getSkillIcon(skill.advIcon)} className="w-full h-full object-contain p-1" alt="" />
+                                  (() => {
+                                    const IconComponent = getSkillIcon(skill.advIcon);
+                                    return <IconComponent className="w-6 h-6" />;
+                                  })()
                                 ) : (
                                   <skill.icon size={20} />
                                 )}

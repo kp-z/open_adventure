@@ -24,7 +24,6 @@ import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
-import imgEsports from "figma:asset/46c7531e4886b7b49890d99d64d86e9ce62c198a.png";
 
 const Navigation = () => {
   const { mode } = useMode();
@@ -147,7 +146,7 @@ export const Layout = () => {
             {mode === "adventure" ? (
               <>
                 <div className="absolute inset-0 flex items-center justify-center opacity-40">
-                   <img src={imgEsports} alt="" className="w-10 h-10 object-contain scale-125 rotate-12" />
+                   <Sparkles className="w-10 h-10 scale-125 rotate-12" />
                 </div>
                 <div className="relative z-10 flex items-center justify-center">
                   <Sword

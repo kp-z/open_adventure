@@ -164,17 +164,16 @@ export const HeroInspector = ({ agent, onBack, onSave }: HeroInspectorProps) => 
               {/* Avatar Popping Out Effect */}
               <div className="relative w-full aspect-square max-w-[400px]">
                  <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-purple-500/5 rounded-full blur-3xl" />
-                 <motion.div 
+                 <motion.div
                    initial={{ scale: 0.8, opacity: 0 }}
                    animate={{ scale: 1, opacity: 1 }}
                    transition={{ duration: 0.8, ease: "easeOut" }}
                    className="relative w-full h-full flex items-end justify-center"
                  >
-                    <img 
-                      src={getAvatarById(agent?.avatar || 'vanguard_1').img} 
-                      alt="Hero"
-                      className="w-[120%] h-[120%] object-contain object-bottom drop-shadow-[0_40px_60px_rgba(0,0,0,0.8)]"
-                    />
+                    {(() => {
+                      const AvatarIcon = getAvatarById(agent?.avatar || 'vanguard_1').icon;
+                      return <AvatarIcon className="w-32 h-32 text-yellow-500 drop-shadow-[0_40px_60px_rgba(0,0,0,0.8)]" />;
+                    })()}
                  </motion.div>
                  
                  {/* Radial Decorative Rings */}
@@ -251,12 +250,11 @@ export const HeroInspector = ({ agent, onBack, onSave }: HeroInspectorProps) => 
                                 )}>
                                   {item ? (
                                     <>
-                                      <div className="w-16 h-16 mb-2">
-                                          <img 
-                                            src={getSkillIcon(item.advIcon || 'sword')} 
-                                            className="w-full h-full object-contain drop-shadow-lg"
-                                            alt={item.name[lang]}
-                                          />
+                                      <div className="w-16 h-16 mb-2 flex items-center justify-center">
+                                          {(() => {
+                                            const IconComponent = getSkillIcon(item.advIcon || 'sword');
+                                            return <IconComponent className="w-12 h-12 drop-shadow-lg" />;
+                                          })()}
                                       </div>
                                       <div className="absolute bottom-3 text-[9px] font-black uppercase tracking-widest text-white/70">
                                           {item.name[lang]}
@@ -302,12 +300,11 @@ export const HeroInspector = ({ agent, onBack, onSave }: HeroInspectorProps) => 
                                 )}>
                                   {item ? (
                                     <>
-                                      <div className="w-16 h-16 mb-2">
-                                          <img 
-                                            src={getSkillIcon(item.advIcon || 'trophy')} 
-                                            className="w-full h-full object-contain drop-shadow-lg"
-                                            alt={item.name[lang]}
-                                          />
+                                      <div className="w-16 h-16 mb-2 flex items-center justify-center">
+                                          {(() => {
+                                            const IconComponent = getSkillIcon(item.advIcon || 'trophy');
+                                            return <IconComponent className="w-12 h-12 drop-shadow-lg" />;
+                                          })()}
                                       </div>
                                       <div className="absolute bottom-3 text-[9px] font-black uppercase tracking-widest text-white/70">
                                           {item.name[lang]}
@@ -400,12 +397,11 @@ export const HeroInspector = ({ agent, onBack, onSave }: HeroInspectorProps) => 
                                        <Check size={12} className={item.type === 'skill' ? 'text-black' : 'text-white'} />
                                     </div>
                                   )}
-                                  <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform">
-                                     <img 
-                                       src={getSkillIcon(item.advIcon || (item.type === 'weapon' ? 'sword' : 'trophy'))} 
-                                       className="w-full h-full object-contain"
-                                       alt={item.name[lang]}
-                                     />
+                                  <div className="w-12 h-12 mb-1 group-hover:scale-110 transition-transform flex items-center justify-center">
+                                     {(() => {
+                                       const IconComponent = getSkillIcon(item.advIcon || (item.type === 'weapon' ? 'sword' : 'trophy'));
+                                       return <IconComponent className="w-10 h-10" />;
+                                     })()}
                                   </div>
                                   <span className={cn(
                                     "text-[8px] font-black uppercase tracking-tighter px-2 text-center truncate w-full",
