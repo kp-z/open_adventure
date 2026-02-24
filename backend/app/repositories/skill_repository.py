@@ -17,7 +17,9 @@ class SkillRepository:
 
     async def create(self, skill_data: SkillCreate) -> Skill:
         """Create a new skill"""
-        skill = Skill(**skill_data.model_dump())
+        # 只提取 Skill 模型需要的字段，排除 scripts 和 references
+        skill_dict = skill_data.model_dump(exclude={'scripts', 'references'})
+        skill = Skill(**skill_dict)
         self.session.add(skill)
         await self.session.commit()
         await self.session.refresh(skill)
@@ -34,6 +36,22 @@ class SkillRepository:
         """Get skill by name"""
         result = await self.session.execute(
             select(Skill).where(Skill.name == name)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_path(self, path: str) -> Optional[Skill]:
+        """
+        Get skill by path (from meta.path)
+        
+        使用路径作为唯一标识，支持同名 skill 在不同位置的情况
+        """
+        from sqlalchemy import text
+        
+        # 使用 SQLite 的 json_extract 函数
+        result = await self.session.execute(
+            select(Skill).where(
+                func.json_extract(Skill.meta, "$.path") == path
+            )
         )
         return result.scalar_one_or_none()
 

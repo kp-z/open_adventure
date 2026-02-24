@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.security import (
@@ -36,7 +36,7 @@ class TokenData(BaseModel):
 
 class UserCreate(BaseModel):
     username: str
-    email: EmailStr
+    email: str
     password: str
     full_name: str | None = None
 
@@ -54,7 +54,7 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    email: EmailStr | None = None
+    email: str | None = None
     full_name: str | None = None
     password: str | None = None
 
