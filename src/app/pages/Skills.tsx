@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   Filter, 
@@ -14,7 +14,16 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  Edit3,
+  Trash2,
+  Power,
+  PowerOff,
+  Rocket,
+  Copy
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -22,115 +31,213 @@ import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { motion, AnimatePresence } from 'motion/react';
 import { SkillEditor } from '../components/SkillEditor';
 import { getSkillIcon } from '../lib/skill-icons';
-
-const mockSkills = [
-  { 
-    id: 1, 
-    name: { en: 'Web Search', zh: '网页搜索' }, 
-    icon: Globe, 
-    advIcon: 'swimming', 
-    desc: { en: 'Browse the web to fetch real-time information and documentation.', zh: '浏览网页以获取实时信息和文档。' }, 
-    tags: { en: ['Browsing', 'Data'], zh: ['浏览', '数据'] }, 
-    source: 'Global', 
-    status: 'enabled', 
-    rarity: 'rare', 
-    level: 5, 
-    xp: 85, 
-    usage: 1240 
-  },
-  { 
-    id: 2, 
-    name: { en: 'Python Exec', zh: 'Python 执行' }, 
-    icon: Code2, 
-    advIcon: 'chess', 
-    desc: { en: 'Run Python scripts in a sandboxed environment for data analysis.', zh: '在沙盒环境中运行 Python 脚本进行数据分析。' }, 
-    tags: { en: ['Dev', 'Logic'], zh: ['开发', '逻辑'] }, 
-    source: 'Project', 
-    projectName: 'Cloud Migration',
-    status: 'enabled', 
-    rarity: 'epic', 
-    level: 8, 
-    xp: 42, 
-    usage: 3450 
-  },
-  { 
-    id: 3, 
-    name: { en: 'PDF Reader', zh: 'PDF 阅读器' }, 
-    icon: FileText, 
-    advIcon: 'sportsBottle', 
-    desc: { en: 'Parse and extract text/images from PDF files of any size.', zh: '解析并提取任何大小的 PDF 文件中的文本/图像。' }, 
-    tags: { en: ['Data', 'Docs'], zh: ['数据', '文档'] }, 
-    source: 'Plugin', 
-    pluginNamespace: 'adobe-acrobat-pro',
-    status: 'disabled', 
-    rarity: 'common', 
-    level: 2, 
-    xp: 12, 
-    usage: 450 
-  },
-  { 
-    id: 4, 
-    name: { en: 'API Generator', zh: 'API 生成器' }, 
-    icon: Zap, 
-    advIcon: 'esports', 
-    desc: { en: 'Automatically generate REST or GraphQL API boilerplate code.', zh: '自动生成 REST 或 GraphQL API 样板代码。' }, 
-    tags: { en: ['Dev', 'Gen'], zh: ['开发', '生成'] }, 
-    source: 'Project', 
-    projectName: 'Internal Tools',
-    status: 'enabled', 
-    rarity: 'legendary', 
-    level: 12, 
-    xp: 95, 
-    usage: 5600 
-  },
-  { 
-    id: 5, 
-    name: { en: 'UI Architect', zh: 'UI 架构师' }, 
-    icon: Wrench, 
-    advIcon: 'gymming', 
-    desc: { en: 'Design complex React components from verbal descriptions.', zh: '根据口头描述设计复杂的 React 组件。' }, 
-    tags: { en: ['UI', 'React'], zh: ['UI', 'React'] }, 
-    source: 'Global', 
-    status: 'enabled', 
-    rarity: 'epic', 
-    level: 7, 
-    xp: 68, 
-    usage: 1890 
-  },
-  { 
-    id: 6, 
-    name: { en: 'Log Analyzer', zh: '日志分析器' }, 
-    icon: Clock, 
-    advIcon: 'stopwatch', 
-    desc: { en: 'Identify patterns and bugs in massive log files using AI.', zh: '使用 AI 在海量日志文件中识别模式和错误。' }, 
-    tags: { en: ['DevOps', 'QA'], zh: ['运维', '质检'] }, 
-    source: 'Plugin', 
-    pluginNamespace: 'sys-log-monitor',
-    status: 'enabled', 
-    rarity: 'rare', 
-    level: 4, 
-    xp: 33, 
-    usage: 980 
-  },
-];
+import { skillsApi, claudeApi, transformSkillsToUI, type UISkill } from '@/lib/api';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 
 const Skills = () => {
   const { mode, lang } = useMode();
   const { t } = useTranslation();
+  
+  // ========== API 数据状态 ==========
+  const [skills, setSkills] = useState<UISkill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  // ========== UI 交互状态 ==========
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('All');
   const [isCreating, setIsCreating] = useState(false);
   const [initialEditorMode, setInitialEditorMode] = useState<'ai' | 'manual'>('ai');
+  const [editingSkillId, setEditingSkillId] = useState<number | undefined>(undefined);
+  
+  // ========== 删除确认对话框状态 ==========
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [skillToDelete, setSkillToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);  // 当前打开的菜单ID
 
-  const filteredSkills = mockSkills.filter(s => {
+  // ========== 获取技能列表 ==========
+  const fetchSkills = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await skillsApi.list({ limit: 100 });
+      const transformed = transformSkillsToUI(response.items);
+      setSkills(transformed);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '获取技能列表失败';
+      setError(message);
+      console.error('Failed to fetch skills:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ========== 初始加载 ==========
+  useEffect(() => {
+    fetchSkills();
+  }, [fetchSkills]);
+
+  // ========== 同步技能 ==========
+  const handleSync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      await claudeApi.syncSkills();
+      await fetchSkills();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '同步失败';
+      setError(message);
+      console.error('Failed to sync skills:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // ========== 删除技能 ==========
+  // 打开删除确认对话框
+  const handleDeleteClick = (e: React.MouseEvent, skill: UISkill) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    console.log('[Skills] Opening delete dialog for skill:', skill.id, skill.name);
+    
+    // 关闭菜单
+    setOpenMenuId(null);
+    
+    // 设置要删除的技能并打开对话框
+    setSkillToDelete({ id: skill.id, name: skill.name[lang] || skill.name.en });
+    setDeleteDialogOpen(true);
+  };
+  
+  // 执行删除操作
+  const handleConfirmDelete = async () => {
+    if (!skillToDelete) return;
+    
+    console.log('[Skills] Proceeding to delete skill:', skillToDelete.id);
+    setIsDeleting(true);
+    
+    try {
+      await skillsApi.delete(skillToDelete.id);
+      console.log('[Skills] Skill deleted successfully');
+      setSkills(prev => prev.filter(s => s.id !== skillToDelete.id));
+      setDeleteDialogOpen(false);
+      setSkillToDelete(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '删除失败';
+      setError(message);
+      console.error('[Skills] Failed to delete skill:', err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // ========== 切换启用状态 ==========
+  const handleToggleEnabled = async (skillId: number, currentStatus: string) => {
+    try {
+      const newEnabled = currentStatus !== 'enabled';
+      await skillsApi.toggleEnabled(skillId, newEnabled);
+      setSkills(prev =>
+        prev.map(s =>
+          s.id === skillId ? { ...s, status: newEnabled ? 'enabled' : 'disabled' } : s
+        )
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '更新状态失败';
+      setError(message);
+      console.error('Failed to toggle skill status:', err);
+    }
+  };
+
+  // ========== 创建/编辑回调 ==========
+  const handleSkillSaved = async () => {
+    setIsCreating(false);
+    setEditingSkillId(undefined);
+    await fetchSkills();
+  };
+
+  // ========== 点击卡片进入编辑 ==========
+  const handleEditSkill = (skillId: number) => {
+    setEditingSkillId(skillId);
+    setIsCreating(true);
+    setInitialEditorMode('manual');
+    setOpenMenuId(null);
+  };
+
+  // ========== 菜单操作 ==========
+  const handleMenuToggle = (e: React.MouseEvent, skillId: number) => {
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === skillId ? null : skillId);
+  };
+
+  // 点击页面其他地方关闭菜单
+  useEffect(() => {
+    if (openMenuId === null) return;
+    
+    const handleClickOutside = (e: MouseEvent) => {
+      // 检查点击目标是否在菜单内
+      const target = e.target as HTMLElement;
+      const menuElement = document.querySelector('[data-skill-menu]');
+      if (menuElement && menuElement.contains(target)) {
+        // 点击在菜单内，不关闭
+        return;
+      }
+      setOpenMenuId(null);
+    };
+    
+    // 使用 setTimeout 延迟添加监听器，避免立即触发
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+    }, 0);
+    
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [openMenuId]);
+
+  // ========== 过滤逻辑 ==========
+  const filteredSkills = skills.filter(s => {
     const name = s.name[lang] || s.name.en;
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = filter === 'All' || s.source === filter;
     return matchesSearch && matchesFilter;
   });
 
+  // ========== Loading 状态 ==========
+  if (loading && skills.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-gray-400">{t('loading' as any) || '加载中...'}</p>
+      </div>
+    );
+  }
+
+  // ========== 错误状态 ==========
+  if (error && skills.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <p className="text-red-400">{error}</p>
+        <ActionButton onClick={fetchSkills}>{t('retry' as any) || '重试'}</ActionButton>
+      </div>
+    );
+  }
+
+  // ========== 编辑器视图 ==========
   if (isCreating) {
-    return <SkillEditor onBack={() => setIsCreating(false)} initialMode={initialEditorMode} />;
+    return <SkillEditor onBack={handleSkillSaved} initialMode={initialEditorMode} editingSkillId={editingSkillId} />;
   }
 
   if (mode === 'adventure') {
@@ -183,7 +290,22 @@ const Skills = () => {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
               >
-                <GameCard rarity={skill.rarity as any} className="group h-full flex flex-col p-0 overflow-visible">
+                <GameCard 
+                  rarity={skill.rarity as any} 
+                  className="group h-full flex flex-col p-0 overflow-visible cursor-pointer relative"
+                  onClick={() => handleEditSkill(skill.id)}
+                >
+                  {/* 重复标记 */}
+                  {skill.isDuplicate && (
+                    <div 
+                      className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-orange-500/90 text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-lg"
+                      title={`重复 ${skill.duplicateCount} 处: ${skill.duplicateLocations.join(', ')}`}
+                    >
+                      <Copy size={10} />
+                      <span>×{skill.duplicateCount}</span>
+                    </div>
+                  )}
+
                   {/* Card Front */}
                   <div className="p-6 flex-1 flex flex-col items-center text-center">
                     <div className="w-24 h-24 relative mb-6 group-hover:scale-110 transition-transform duration-500">
@@ -206,7 +328,8 @@ const Skills = () => {
                       ))}
                     </div>
                     
-                    <p className="text-xs text-gray-400 line-clamp-2 mb-2 leading-relaxed italic">"{skill.desc[lang]}"</p>
+                    {/* 显示完整 description */}
+                    <p className="text-xs text-gray-400 line-clamp-3 mb-2 leading-relaxed italic">"{skill.desc[lang] || (skill._raw as any)?.description || '无描述'}"</p>
                     
                     {(skill as any).projectName && (
                       <div className="text-[10px] text-green-500/80 font-bold uppercase mb-4 flex items-center gap-1">
@@ -245,15 +368,126 @@ const Skills = () => {
                         <span key={t} className="text-[9px] font-bold text-gray-500 bg-white/5 px-2 py-0.5 rounded border border-white/5 uppercase">{t}</span>
                       ))}
                     </div>
-                    <button className="text-yellow-500 hover:text-yellow-400 transition-colors">
-                      <ExternalLink size={16} />
-                    </button>
+                    {/* 三点菜单 */}
+                    <div className="relative">
+                      <button 
+                        className="text-yellow-500 hover:text-yellow-400 transition-colors p-1 rounded hover:bg-yellow-500/10"
+                        onClick={(e) => handleMenuToggle(e, skill.id)}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      
+                      {/* 下拉菜单 */}
+                      <AnimatePresence>
+                        {openMenuId === skill.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 bottom-full mb-1 w-40 bg-[#1a1a2e]/95 backdrop-blur-xl border border-yellow-500/20 rounded-xl shadow-xl z-50 overflow-hidden"
+                            data-skill-menu="true"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* 编辑 */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-500/80 hover:bg-yellow-500/20 hover:text-yellow-400 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditSkill(skill.id);
+                              }}
+                            >
+                              <Edit3 size={14} />
+                              编辑
+                            </button>
+                            
+                            {/* 启用/禁用 */}
+                            <button
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                skill.status === 'enabled' 
+                                  ? 'text-yellow-500/80 hover:bg-orange-500/20 hover:text-orange-400' 
+                                  : 'text-yellow-500/80 hover:bg-green-500/20 hover:text-green-400'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleEnabled(skill.id, skill.status);
+                                setOpenMenuId(null);
+                              }}
+                            >
+                              {skill.status === 'enabled' ? <PowerOff size={14} /> : <Power size={14} />}
+                              {skill.status === 'enabled' ? '禁用' : '启用'}
+                            </button>
+                            
+                            {/* 部署/同步 */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-yellow-500/80 hover:bg-purple-500/20 hover:text-purple-400 transition-colors"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                await handleSync();
+                              }}
+                            >
+                              <Rocket size={14} />
+                              同步部署
+                            </button>
+                            
+                            {/* 分割线 */}
+                            <div className="border-t border-yellow-500/20 my-1" />
+                            
+                            {/* 删除 */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/20 transition-colors"
+                              onClick={(e) => handleDeleteClick(e, skill)}
+                            >
+                              <Trash2 size={14} />
+                              删除
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </GameCard>
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
+        
+        {/* 删除确认对话框 */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent className="bg-[#1a1a2e] border-yellow-500/20">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-yellow-400">确认删除</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-400">
+                确定要删除技能 <span className="text-yellow-300 font-semibold">"{skillToDelete?.name}"</span> 吗？
+                <br />
+                此操作不可恢复。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel 
+                className="bg-gray-800 border-yellow-500/20 text-white hover:bg-gray-700"
+                disabled={isDeleting}
+              >
+                取消
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-600 text-white hover:bg-red-700"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    删除中...
+                  </>
+                ) : (
+                  '确认删除'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
@@ -266,9 +500,28 @@ const Skills = () => {
           <p className="text-gray-400">{t('skillsDesc' as any)}</p>
         </div>
         <div className="flex gap-3">
-          <ActionButton variant="secondary">{t('syncSkills' as any)}</ActionButton>
+          <ActionButton 
+            variant="secondary" 
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                {t('syncing' as any) || '同步中...'}
+              </span>
+            ) : (
+              t('syncSkills' as any)
+            )}
+          </ActionButton>
           <ActionButton onClick={() => { setIsCreating(true); setInitialEditorMode('ai'); }}>{t('genAi' as any)}</ActionButton>
         </div>
+        {error && (
+          <div className="text-red-400 text-sm flex items-center gap-2 mt-2">
+            <AlertCircle className="w-4 h-4" />
+            {error}
+          </div>
+        )}
       </header>
 
       {/* Search & Filter */}
@@ -309,7 +562,10 @@ const Skills = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
             >
-              <GlassCard className="h-full flex flex-col group">
+              <GlassCard 
+                className="h-full flex flex-col group cursor-pointer hover:border-blue-500/50 transition-colors"
+                onClick={() => handleEditSkill(skill.id)}
+              >
                 <div className="flex justify-between items-start mb-4">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                     skill.status === 'enabled' ? 'bg-blue-600/20 text-blue-400' : 'bg-gray-700/20 text-gray-500'
@@ -317,6 +573,16 @@ const Skills = () => {
                     <skill.icon size={20} />
                   </div>
                   <div className="flex gap-2">
+                    {/* 重复标记 */}
+                    {skill.isDuplicate && (
+                      <div 
+                        className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30"
+                        title={`重复 ${skill.duplicateCount} 处: ${skill.duplicateLocations.join(', ')}`}
+                      >
+                        <Copy size={10} />
+                        <span>×{skill.duplicateCount}</span>
+                      </div>
+                    )}
                     <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                       skill.source === 'Global' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
                       skill.source === 'Plugin' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
@@ -324,9 +590,84 @@ const Skills = () => {
                     }`}>
                       {t(skill.source.toLowerCase() as any)}
                     </div>
-                    <button className="text-gray-500 hover:text-white transition-colors">
-                      <MoreVertical size={16} />
-                    </button>
+                    {/* 三点菜单 */}
+                    <div className="relative">
+                      <button 
+                        className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
+                        onClick={(e) => handleMenuToggle(e, skill.id)}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      
+                      {/* 下拉菜单 */}
+                      <AnimatePresence>
+                        {openMenuId === skill.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 top-full mt-1 w-40 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden"
+                            data-skill-menu="true"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {/* 编辑 */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditSkill(skill.id);
+                              }}
+                            >
+                              <Edit3 size={14} />
+                              编辑
+                            </button>
+                            
+                            {/* 启用/禁用 */}
+                            <button
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                skill.status === 'enabled' 
+                                  ? 'text-gray-300 hover:bg-orange-500/20 hover:text-orange-400' 
+                                  : 'text-gray-300 hover:bg-green-500/20 hover:text-green-400'
+                              }`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleEnabled(skill.id, skill.status);
+                                setOpenMenuId(null);
+                              }}
+                            >
+                              {skill.status === 'enabled' ? <PowerOff size={14} /> : <Power size={14} />}
+                              {skill.status === 'enabled' ? '禁用' : '启用'}
+                            </button>
+                            
+                            {/* 部署/同步 */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-purple-500/20 hover:text-purple-400 transition-colors"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                await handleSync();
+                              }}
+                            >
+                              <Rocket size={14} />
+                              同步部署
+                            </button>
+                            
+                            {/* 分割线 */}
+                            <div className="border-t border-white/10 my-1" />
+                            
+                            {/* 删除 */}
+                            <button
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/20 transition-colors"
+                              onClick={(e) => handleDeleteClick(e, skill)}
+                            >
+                              <Trash2 size={14} />
+                              删除
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
 
@@ -341,7 +682,8 @@ const Skills = () => {
                     <Zap size={10} /> {(skill as any).pluginNamespace}
                   </p>
                 )}
-                <p className="text-xs text-gray-400 line-clamp-2 mb-4">{skill.desc[lang]}</p>
+                {/* 显示完整 description */}
+                <p className="text-xs text-gray-400 line-clamp-3 mb-4">{skill.desc[lang] || (skill._raw as any)?.description || '无描述'}</p>
                 
                 <div className="flex flex-wrap gap-2 mb-6 mt-auto">
                   {skill.tags[lang].map(t => (
@@ -372,6 +714,42 @@ const Skills = () => {
           <p className="font-bold text-gray-400 group-hover:text-blue-400">{t('addSkill' as any)}</p>
         </button>
       </div>
+      
+      {/* 删除确认对话框 */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="bg-gray-900 border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">确认删除</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              确定要删除技能 <span className="text-white font-semibold">"{skillToDelete?.name}"</span> 吗？
+              <br />
+              此操作不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="bg-gray-800 border-white/10 text-white hover:bg-gray-700"
+              disabled={isDeleting}
+            >
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  删除中...
+                </>
+              ) : (
+                '确认删除'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -25,7 +25,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
 
-const Navigation = () => {
+const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
   const { mode } = useMode();
   const { t } = useTranslation();
 
@@ -63,13 +63,14 @@ const Navigation = () => {
   ];
 
   return (
-    <nav className="flex flex-col gap-2 p-4">
+    <nav className={`flex flex-col gap-2 ${collapsed ? 'p-2' : 'p-4'}`}>
       {navItems.map((item) => (
         <NavLink
           key={item.path}
           to={item.path}
+          title={collapsed ? item.name : undefined}
           className={({ isActive }) => `
-            flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+            flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
             ${
               isActive
                 ? mode === "adventure"
@@ -80,16 +81,19 @@ const Navigation = () => {
           `}
         >
           <item.icon size={20} />
-          <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-            {item.name}
-          </span>
+          {!collapsed && (
+            <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+              {item.name}
+            </span>
+          )}
         </NavLink>
       ))}
-      <div className="mt-auto pt-4 border-t border-white/10">
+      <div className={`mt-auto pt-4 border-t border-white/10 ${collapsed ? 'mx-1' : ''}`}>
         <NavLink
           to="/settings"
+          title={collapsed ? t("settings") : undefined}
           className={({ isActive }) => `
-            flex items-center gap-3 px-4 py-3 rounded-xl transition-all
+            flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
             ${
               isActive
                 ? mode === "adventure"
@@ -100,7 +104,7 @@ const Navigation = () => {
           `}
         >
           <Settings size={20} />
-          <span className="font-medium">{t("settings")}</span>
+          {!collapsed && <span className="font-medium">{t("settings")}</span>}
         </NavLink>
       </div>
     </nav>
@@ -110,8 +114,27 @@ const Navigation = () => {
 export const Layout = () => {
   const { mode, toggleMode, lang } = useMode();
   const { t } = useTranslation();
-  const [isSidebarOpen, setIsSidebarOpen] =
-    React.useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // 点击外部关闭搜索框
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isSearchOpen && searchInputRef.current && !searchInputRef.current.parentElement?.contains(e.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSearchOpen]);
+
+  // 搜索框展开时自动聚焦
+  React.useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchOpen]);
 
   return (
     <div
@@ -221,7 +244,7 @@ export const Layout = () => {
           )}
         </button>
 
-        <Navigation />
+        <Navigation collapsed={!isSidebarOpen} />
       </aside>
 
       {/* Main Content Area */}
@@ -234,6 +257,36 @@ export const Layout = () => {
         `}
         >
           <div className="flex items-center gap-4 flex-1">
+            {/* 侧边栏收起/展开按钮 */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`
+                hidden md:flex p-2.5 rounded-xl transition-all duration-200
+                ${isSidebarOpen 
+                  ? 'hover:bg-white/5 text-gray-400 hover:text-white' 
+                  : mode === "adventure"
+                    ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
+                    : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                }
+              `}
+              title={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+            >
+              {isSidebarOpen ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18" />
+                  <path d="m14 9-3 3 3 3" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18" />
+                  <path d="m16 15-3-3 3-3" />
+                </svg>
+              )}
+            </button>
+
+            {/* 移动端菜单按钮 */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="md:hidden p-2 hover:bg-white/5 rounded-lg"
@@ -259,16 +312,51 @@ export const Layout = () => {
               </span>
             </button>
 
-            <div className="relative max-w-md w-full hidden sm:block">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder={t("search")}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 focus:outline-none focus:border-blue-500/50 transition-all"
-              />
+            {/* 搜索框 - 可收起展开 */}
+            <div className="relative hidden sm:flex items-center">
+              <motion.div
+                initial={false}
+                animate={{
+                  width: isSearchOpen ? 320 : 42,
+                }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                className={`
+                  relative flex items-center overflow-hidden rounded-xl
+                  ${isSearchOpen 
+                    ? 'bg-white/5 border border-white/10' 
+                    : 'hover:bg-white/5'
+                  }
+                `}
+              >
+                <button
+                  onClick={() => setIsSearchOpen(!isSearchOpen)}
+                  className={`
+                    flex-shrink-0 p-3 transition-colors
+                    ${isSearchOpen ? 'text-gray-400' : 'text-gray-400 hover:text-white'}
+                  `}
+                >
+                  <Search size={18} />
+                </button>
+                
+                <AnimatePresence>
+                  {isSearchOpen && (
+                    <motion.input
+                      ref={searchInputRef}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      type="text"
+                      placeholder={t("search")}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setIsSearchOpen(false);
+                        }
+                      }}
+                      className="flex-1 bg-transparent py-2 pr-4 focus:outline-none text-sm"
+                    />
+                  )}
+                </AnimatePresence>
+              </motion.div>
             </div>
           </div>
 

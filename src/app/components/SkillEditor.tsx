@@ -19,12 +19,15 @@ import {
   Settings,
   X,
   MessageSquare,
-  Bot
+  Bot,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
 import { GlassCard, GameCard, ActionButton } from './ui-shared';
 import { cn } from '../lib/utils';
+import { skillsApi, type ClaudeGenerateResponse, type SkillFileItem, type SaveSkillRequest, type SkillContentResponse } from '@/lib/api';
 
 type SkillFile = {
   name: string;
@@ -42,11 +45,12 @@ type SkillStructure = {
 interface SkillEditorProps {
   onBack: () => void;
   initialMode?: 'ai' | 'manual';
+  editingSkillId?: number;  // 编辑现有技能时传入
 }
 
-export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) => {
+export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: SkillEditorProps) => {
   const { mode } = useMode();
-  const [editorMode, setEditorMode] = useState<'ai' | 'manual'>(initialMode);
+  const [editorMode, setEditorMode] = useState<'ai' | 'manual'>(editingSkillId ? 'manual' : initialMode);
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
@@ -55,54 +59,247 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
   
   const [skillData, setSkillData] = useState<SkillStructure>({
     'SKILL.md': '# New Skill\n\nDescribe your skill here...',
-    'scripts': [
-      { name: 'main.js', content: '// Write your skill logic here\nexport default async function run(input) {\n  console.log("Running skill with input:", input);\n  return { success: true };\n}', type: 'js' }
-    ],
-    'references': [
-      { name: 'config.json', content: '{\n  "version": "1.0.0",\n  "permissions": ["web_search"]\n}', type: 'json' }
-    ],
+    'scripts': [],
+    'references': [],
     'assets': []
   });
 
+  // 生成/保存状态
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [generatedSkillName, setGeneratedSkillName] = useState<string>('');
+  const [skillPath, setSkillPath] = useState<string | null>(null);  // 技能的实际路径
+  const [generationComplete, setGenerationComplete] = useState(false);
+  const [isLoadingSkill, setIsLoadingSkill] = useState(false);
+
+  // 加载现有技能数据
+  useEffect(() => {
+    if (editingSkillId) {
+      setIsLoadingSkill(true);
+      skillsApi.getContent(editingSkillId)
+        .then((content: SkillContentResponse) => {
+          console.log('[SkillEditor] Loaded skill content:', content);
+          setGeneratedSkillName(content.name);
+          setSkillPath(content.path);  // 设置实际路径
+          setSkillData({
+            'SKILL.md': content.skill_md || '# New Skill\n\nDescribe your skill here...',
+            'scripts': content.scripts.map((s: SkillFileItem) => ({
+              name: s.name,
+              content: s.content,
+              type: s.name.endsWith('.py') ? 'js' : s.name.endsWith('.json') ? 'json' : 'js' as const
+            })),
+            'references': content.references.map((r: SkillFileItem) => ({
+              name: r.name,
+              content: r.content,
+              type: r.name.endsWith('.json') ? 'json' : 'md' as const
+            })),
+            'assets': content.assets.map((a: SkillFileItem) => ({
+              name: a.name,
+              content: a.content,
+              type: 'asset' as const
+            }))
+          });
+        })
+        .catch((err: Error) => {
+          console.error('[SkillEditor] Failed to load skill content:', err);
+          setGenerateError(err.message || '加载技能内容失败');
+        })
+        .finally(() => {
+          setIsLoadingSkill(false);
+        });
+    }
+  }, [editingSkillId]);
+
+  // 当生成完成时切换到编辑模式
+  useEffect(() => {
+    if (generationComplete && !isGenerating) {
+      console.log('[SkillEditor] Generation complete, switching to manual mode');
+      console.log('[SkillEditor] Current skillData after generation:', skillData);
+      setEditorMode('manual');
+      setGenerationComplete(false);
+    }
+  }, [generationComplete, isGenerating, skillData]);
+
   const steps = [
     "Analyzing intent...",
-    "Drafting documentation...",
-    "Generating core logic...",
-    "Resolving dependencies...",
-    "Finalizing artifact structure..."
+    "Calling Claude AI...",
+    "Generating skill structure...",
+    "Processing scripts...",
+    "Finalizing artifact..."
   ];
 
-  const handleGenerate = () => {
+  // 将 API 返回的文件转换为 SkillFile 格式
+  const convertToSkillFile = (item: SkillFileItem): SkillFile => {
+    let fileType: 'md' | 'js' | 'json' | 'asset' = 'asset';
+    if (item.name.endsWith('.md')) fileType = 'md';
+    else if (item.name.endsWith('.js') || item.name.endsWith('.ts') || item.name.endsWith('.py')) fileType = 'js';
+    else if (item.name.endsWith('.json') || item.name.endsWith('.yaml') || item.name.endsWith('.yml')) fileType = 'json';
+    
+    return {
+      name: item.name,
+      content: item.content,
+      type: fileType
+    };
+  };
+
+  const handleGenerate = async () => {
     if (!prompt.trim()) return;
+    
     setIsGenerating(true);
     setGenerationStep(0);
+    setGenerateError(null);
     
-    // Simulate generation process
+    // 启动进度动画
     const interval = setInterval(() => {
       setGenerationStep(prev => {
-        if (prev >= steps.length - 1) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setIsGenerating(false);
-            setEditorMode('manual');
-            // Mock generated content
-            setSkillData({
-              'SKILL.md': `# ${prompt.split(' ').slice(0, 3).join(' ')} Assistant\n\nGenerated based on: "${prompt}"\n\n## Capabilities\n- Automated processing\n- Intelligent analysis\n- seamless integration`,
-              'scripts': [
-                { name: 'main.js', content: `// Generated logic for ${prompt}\nexport default async function execute(context) {\n  // Implementation here\n  return { status: "success" };\n}`, type: 'js' },
-                { name: 'utils.js', content: 'export const helper = () => true;', type: 'js' }
-              ],
-              'references': [
-                { name: 'api_specs.json', content: '{\n  "endpoint": "https://api.example.com",\n  "method": "POST"\n}', type: 'json' }
-              ],
-              'assets': []
-            });
-          }, 800);
-          return prev;
-        }
+        if (prev >= steps.length - 1) return prev;
         return prev + 1;
       });
-    }, 1000);
+    }, 2000);
+    
+    try {
+      console.log('[SkillEditor] Calling generateWithClaude API with prompt:', prompt);
+      
+      // 调用真实 API
+      const response = await skillsApi.generateWithClaude({
+        description: prompt,
+        save_to_global: false  // 先预览，用户确认后再保存
+      });
+      
+      console.log('[SkillEditor] API Response:', response);
+      
+      clearInterval(interval);
+      
+      if (response.success) {
+        // 保存生成的技能名称
+        setGeneratedSkillName(response.name);
+        console.log('[SkillEditor] Generated skill name:', response.name);
+        console.log('[SkillEditor] SKILL.md content length:', response.skill_md?.length || 0);
+        console.log('[SkillEditor] SKILL.md content preview:', response.skill_md?.substring(0, 200));
+        
+        // 将 API 响应转换为编辑器数据结构
+        const newSkillData: SkillStructure = {
+          'SKILL.md': response.skill_md || '',
+          'scripts': (response.scripts || []).map(convertToSkillFile),
+          'references': (response.references || []).map(convertToSkillFile),
+          'assets': (response.assets || []).map(convertToSkillFile)
+        };
+        
+        console.log('[SkillEditor] Setting skillData:', newSkillData);
+        
+        // 批量更新状态
+        setSkillData(newSkillData);
+        setGenerationStep(steps.length - 1);
+        
+        // 延迟一下让动画完成，然后标记生成完成
+        setTimeout(() => {
+          setIsGenerating(false);
+          setGenerationComplete(true);
+          console.log('[SkillEditor] Generation finished, triggering mode switch');
+        }, 800);
+      } else {
+        console.error('[SkillEditor] Generation failed:', response.message);
+        throw new Error(response.message || '生成失败');
+      }
+    } catch (err) {
+      clearInterval(interval);
+      setIsGenerating(false);
+      const errorMessage = err instanceof Error ? err.message : '生成 Skill 失败，请稍后重试';
+      setGenerateError(errorMessage);
+      console.error('[SkillEditor] Failed to generate skill:', err);
+    }
+  };
+
+  // 保存 Skill 到全局目录
+  const handleSave = async () => {
+    console.log('[SkillEditor] handleSave called');
+    console.log('[SkillEditor] Current skillData:', skillData);
+    
+    setIsSaving(true);
+    setGenerateError(null);
+    
+    try {
+      // 从 SKILL.md 中提取技能名称
+      const skillMdContent = skillData['SKILL.md'];
+      console.log('[SkillEditor] SKILL.md content length:', skillMdContent?.length || 0);
+      console.log('[SkillEditor] SKILL.md content preview:', skillMdContent?.substring(0, 200));
+      
+      let skillName = generatedSkillName;
+      console.log('[SkillEditor] Initial skill name from state:', skillName);
+      
+      // 尝试从 frontmatter 中提取 name
+      const nameMatch = skillMdContent.match(/^---[\s\S]*?name:\s*(.+?)[\s\n]/m);
+      if (nameMatch) {
+        skillName = nameMatch[1].trim();
+        console.log('[SkillEditor] Extracted skill name from frontmatter:', skillName);
+      }
+      
+      // 如果没有名称，从标题提取
+      if (!skillName) {
+        const titleMatch = skillMdContent.match(/^#\s+(.+?)$/m);
+        if (titleMatch) {
+          skillName = titleMatch[1].toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          console.log('[SkillEditor] Extracted skill name from title:', skillName);
+        }
+      }
+      
+      if (!skillName) {
+        skillName = 'new-skill';
+        console.log('[SkillEditor] Using default skill name:', skillName);
+      }
+
+      // 验证 SKILL.md 内容不能为空或仅为模板
+      const defaultContent = '# New Skill\n\nDescribe your skill here...';
+      if (!skillMdContent || skillMdContent.trim() === defaultContent.trim()) {
+        console.error('[SkillEditor] SKILL.md content is empty or default template');
+        throw new Error('请先生成或编辑 Skill 内容后再保存');
+      }
+      
+      // 构建保存请求
+      const saveRequest: SaveSkillRequest = {
+        name: skillName,
+        skill_md: skillMdContent,
+        scripts: skillData.scripts.map(s => ({
+          name: s.name,
+          content: s.content,
+          type: s.type
+        })),
+        references: skillData.references.map(r => ({
+          name: r.name,
+          content: r.content,
+          type: r.type
+        })),
+        assets: skillData.assets.map(a => ({
+          name: a.name,
+          content: a.content,
+          type: a.type
+        }))
+      };
+      
+      console.log('[SkillEditor] Calling saveToGlobal API with:', saveRequest);
+      
+      // 调用保存 API
+      const response = await skillsApi.saveToGlobal(saveRequest);
+      
+      console.log('[SkillEditor] saveToGlobal response:', response);
+      
+      if (response.success) {
+        console.log('[SkillEditor] Skill saved successfully to:', response.saved_path);
+        setSaveSuccess(true);
+        setTimeout(() => {
+          onBack();  // 返回技能列表
+        }, 1500);
+      } else {
+        throw new Error(response.message || '保存失败');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : '保存 Skill 失败';
+      setGenerateError(errorMessage);
+      console.error('[SkillEditor] Failed to save skill:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const FileIcon = ({ type, className }: { type: string, className?: string }) => {
@@ -114,6 +311,16 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
       default: return <FileText size={16} className={className} />;
     }
   };
+
+  // 加载现有技能时显示加载状态
+  if (isLoadingSkill) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <p className="text-gray-400">加载技能内容...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -134,9 +341,9 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
               "font-bold",
               mode === 'adventure' ? "text-yellow-500 uppercase tracking-widest text-sm" : "text-lg"
             )}>
-              {editorMode === 'ai' ? 'Forge Skill with AI' : 'Skill Editor'}
+              {editingSkillId ? `Edit: ${generatedSkillName || 'Skill'}` : (editorMode === 'ai' ? 'Forge Skill with AI' : 'Skill Editor')}
             </h2>
-            <p className="text-[10px] text-gray-500 font-mono">/root/skills/new_skill_artifact</p>
+            <p className="text-[10px] text-gray-500 font-mono">{editingSkillId ? (skillPath || `~/.claude/skills/${generatedSkillName}`) : '~/.claude/skills/new_skill'}</p>
           </div>
         </div>
 
@@ -170,9 +377,27 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
           
           <div className="h-8 w-[1px] bg-white/10 mx-2" />
           
-          <ActionButton className="h-9 px-4 py-0 text-xs">
-            <Save size={14} className="mr-2" />
-            Deploy Skill
+          <ActionButton 
+            className="h-9 px-4 py-0 text-xs"
+            onClick={handleSave}
+            disabled={isSaving || saveSuccess}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 size={14} className="mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <CheckCircle2 size={14} className="mr-2" />
+                Saved!
+              </>
+            ) : (
+              <>
+                <Save size={14} className="mr-2" />
+                Deploy Skill
+              </>
+            )}
           </ActionButton>
         </div>
       </div>
@@ -205,6 +430,20 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
                     <p className="text-gray-400">The AI will generate the documentation, code, and resources needed for your skill.</p>
                   </div>
 
+                  {/* 错误提示 */}
+                  {generateError && (
+                    <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+                      <AlertCircle size={20} />
+                      <span className="text-sm flex-1">{generateError}</span>
+                      <button 
+                        onClick={() => setGenerateError(null)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+
                   <div className={cn(
                     "relative p-1 rounded-2xl border transition-all duration-500",
                     mode === 'adventure' ? "bg-black/60 border-yellow-500/30" : "bg-white/5 border-white/10"
@@ -212,6 +451,11 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
                     <textarea 
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.ctrlKey && e.key === 'Enter' && prompt.trim()) {
+                          handleGenerate();
+                        }
+                      }}
                       placeholder="e.g., A skill that summarizes daily news from tech blogs and formats them into a weekly digest PDF..."
                       className="w-full h-40 bg-transparent p-6 text-white placeholder:text-gray-600 focus:outline-none resize-none"
                     />
@@ -235,9 +479,9 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {[
-                      { title: "Smart Summarizer", desc: "Process long documents into concise bullets." },
-                      { title: "Code Auditor", desc: "Review pull requests for security flaws." },
-                      { title: "Market Analyst", desc: "Fetch and visualize stock trends." }
+                      { title: "Smart Summarizer", desc: "A skill that processes long documents and extracts key points into concise bullet summaries." },
+                      { title: "Code Auditor", desc: "A skill that reviews code for security vulnerabilities, code smells, and best practice violations." },
+                      { title: "API Doc Generator", desc: "A skill that generates API documentation from code comments and function signatures." }
                     ].map((example, i) => (
                       <button 
                         key={i}
@@ -245,7 +489,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai' }: SkillEditorProps) =>
                         className="p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 transition-all text-left group"
                       >
                         <p className="text-xs font-bold text-gray-400 group-hover:text-blue-400 mb-1">{example.title}</p>
-                        <p className="text-[10px] text-gray-500 line-clamp-1">{example.desc}</p>
+                        <p className="text-[10px] text-gray-500 line-clamp-2">{example.desc}</p>
                       </button>
                     ))}
                   </div>

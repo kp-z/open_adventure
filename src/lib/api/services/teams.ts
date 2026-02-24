@@ -5,6 +5,18 @@
 import { apiClient } from '../client';
 import type { Team, TeamCreate, TeamUpdate, TeamListResponse } from '../types';
 
+export interface TeamGenerateRequest {
+  description: string;
+  member_count?: number;
+  save_immediately?: boolean;
+}
+
+export interface TeamGenerateResponse {
+  success: boolean;
+  team: TeamCreate;
+  message: string;
+}
+
 export const teamsApi = {
   /**
    * 获取团队列表
@@ -35,4 +47,10 @@ export const teamsApi = {
    */
   delete: (id: number) =>
     apiClient.delete<void>(`/agent-teams/${id}`),
+
+  /**
+   * 使用 Claude AI 生成团队配置
+   */
+  generate: (request: TeamGenerateRequest) =>
+    apiClient.post<TeamGenerateResponse>('/agent-teams/generate-with-claude', request),
 };

@@ -8,19 +8,25 @@ import {
   Plus,
   MoreVertical,
   BrainCircuit,
-  MessageSquare
+  MessageSquare,
+  Edit
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
+import { TeamEditor } from '../components/TeamEditor';
 import { motion } from 'motion/react';
 import { teamsApi } from '@/lib/api';
 import type { Team } from '@/lib/api';
+
+type ViewMode = 'list' | 'create' | 'edit';
 
 const Teams = () => {
   const { mode } = useMode();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
 
   useEffect(() => {
     fetchTeams();
@@ -39,6 +45,33 @@ const Teams = () => {
       setLoading(false);
     }
   };
+
+  const handleCreateTeam = () => {
+    setSelectedTeam(null);
+    setViewMode('create');
+  };
+
+  const handleEditTeam = (team: Team) => {
+    setSelectedTeam(team);
+    setViewMode('edit');
+  };
+
+  const handleBackToList = () => {
+    setViewMode('list');
+    setSelectedTeam(null);
+    fetchTeams();
+  };
+
+  // 如果在编辑模式，显示编辑器
+  if (viewMode === 'create' || viewMode === 'edit') {
+    return (
+      <TeamEditor
+        team={selectedTeam}
+        onBack={handleBackToList}
+        onSave={handleBackToList}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -72,7 +105,7 @@ const Teams = () => {
             </h1>
             <p className="text-gray-400 font-medium">Form elite squads of heroes to tackle impossible raids.</p>
           </div>
-          <ActionButton onClick={() => {}}>Forge Alliance</ActionButton>
+          <ActionButton onClick={handleCreateTeam}>Forge Alliance</ActionButton>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -113,7 +146,13 @@ const Teams = () => {
                     </div>
 
                     <div className="mt-auto pt-4 border-t border-white/5">
-                      <ActionButton variant="secondary" className="w-full text-xs font-black uppercase">Review Formation</ActionButton>
+                      <ActionButton
+                        variant="secondary"
+                        className="w-full text-xs font-black uppercase"
+                        onClick={() => handleEditTeam(team)}
+                      >
+                        Review Formation
+                      </ActionButton>
                     </div>
                   </div>
                 </GameCard>
@@ -133,7 +172,7 @@ const Teams = () => {
           <p className="text-gray-400">Manage collaborative groups of AI agents for complex tasks.</p>
         </div>
         <div className="flex gap-3">
-          <ActionButton onClick={() => {}}>Create Team</ActionButton>
+          <ActionButton onClick={handleCreateTeam}>Create Team</ActionButton>
         </div>
       </header>
 
@@ -170,7 +209,13 @@ const Teams = () => {
 
               <div className="mt-auto flex gap-3 pt-4 border-t border-white/5">
                 <button className="flex-1 py-2 text-sm font-bold text-gray-400 hover:text-white transition-colors">Settings</button>
-                <button className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm font-bold transition-all border border-white/10">Manage</button>
+                <button
+                  onClick={() => handleEditTeam(team)}
+                  className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm font-bold transition-all border border-white/10 flex items-center justify-center gap-2"
+                >
+                  <Edit size={14} />
+                  Manage
+                </button>
               </div>
             </GlassCard>
           );

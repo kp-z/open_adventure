@@ -41,20 +41,24 @@ const Tasks = () => {
     }
   };
 
-  const filteredTasks = tasks.filter(task =>
-    task.workflow?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    task.workflow?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    task.error_message?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTasks = searchQuery.trim() === '' 
+    ? tasks 
+    : tasks.filter(task =>
+        task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        task.project_path?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed':
+      case 'succeeded':
         return <CheckCircle2 size={16} className="text-green-500" />;
       case 'failed':
         return <XCircle size={16} className="text-red-500" />;
       case 'running':
         return <Clock size={16} className="text-blue-500 animate-pulse" />;
+      case 'waiting_user':
+        return <Clock size={16} className="text-yellow-500" />;
       default:
         return <Clock size={16} className="text-gray-500" />;
     }
@@ -62,24 +66,36 @@ const Tasks = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed':
+      case 'succeeded':
         return 'text-green-500';
       case 'failed':
         return 'text-red-500';
       case 'running':
         return 'text-blue-500';
+      case 'waiting_user':
+        return 'text-yellow-500';
       default:
         return 'text-gray-500';
     }
   };
 
   const getRating = (task: Task) => {
-    if (task.status === 'completed') {
-      return task.error_message ? 'A' : 'S';
+    if (task.status === 'succeeded') {
+      return 'S';
     } else if (task.status === 'failed') {
       return 'F';
+    } else if (task.status === 'running') {
+      return 'A';
     }
     return 'B';
+  };
+  
+  const getPriorityTag = (task: Task) => {
+    const priority = task.meta?.priority;
+    if (priority === 'critical') return { text: 'CRITICAL', color: 'bg-red-500' };
+    if (priority === 'high') return { text: 'HIGH', color: 'bg-orange-500' };
+    if (priority === 'medium') return { text: 'MEDIUM', color: 'bg-blue-500' };
+    return { text: 'LOW', color: 'bg-gray-500' };
   };
 
   const formatDuration = (startTime: string, endTime?: string) => {
@@ -149,7 +165,7 @@ const Tasks = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.1 }}
               >
-                <GameCard rarity={task.status === 'completed' ? 'rare' : 'common'} className="p-0 flex flex-col sm:flex-row items-stretch gap-0 overflow-hidden group">
+                <GameCard rarity={task.status === 'succeeded' ? 'rare' : task.status === 'running' ? 'epic' : 'common'} className="p-0 flex flex-col sm:flex-row items-stretch gap-0 overflow-hidden group">
                   {/* Hero Avatar Section */}
                   <div className="w-full sm:w-28 bg-black/40 relative overflow-hidden flex items-center justify-center shrink-0 min-h-[100px] sm:min-h-0">
                     <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent z-10" />
@@ -169,8 +185,14 @@ const Tasks = () => {
 
                   <div className="flex-1 p-4 flex flex-col sm:flex-row items-center gap-6">
                     <div className="flex-1 text-center sm:text-left">
-                      <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">T-{task.id} • {task.workflow?.name || 'Direct Task'}</p>
-                      <h3 className="text-xl font-black uppercase italic tracking-wider text-white mt-1">{task.workflow?.description || `Task #${task.id}`}</h3>
+                      <div className="flex items-center gap-2 justify-center sm:justify-start">
+                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">T-{task.id}</p>
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${getPriorityTag(task).color}`}>
+                          {getPriorityTag(task).text}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-black uppercase italic tracking-wider text-white mt-1">{task.title}</h3>
+                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">{task.description}</p>
                       <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-2">
                         <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
                           <Clock size={12} /> {formatDuration(task.created_at, task.updated_at)}
@@ -250,14 +272,19 @@ const Tasks = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div>
-                      <p className="text-sm font-bold">{task.workflow?.description || `Task #${task.id}`}</p>
-                      <p className="text-[10px] text-gray-500 font-mono uppercase tracking-tighter">T-{task.id}</p>
+                      <p className="text-sm font-bold">{task.title}</p>
+                      <p className="text-[10px] text-gray-500 line-clamp-1">{task.description}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-xs text-gray-400 bg-white/5 px-2 py-1 rounded border border-white/5">
-                      {task.workflow?.name || 'Direct'}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${getPriorityTag(task).color}`}>
+                        {getPriorityTag(task).text}
+                      </span>
+                      {task.workflow_id && (
+                        <span className="text-[10px] text-gray-500">Workflow #{task.workflow_id}</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-xs text-gray-400">{formatDuration(task.created_at, task.updated_at)}</td>
                   <td className="px-6 py-4 text-xs text-gray-400">{formatTime(task.created_at)}</td>
