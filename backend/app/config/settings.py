@@ -31,16 +31,24 @@ class Settings(BaseSettings):
     claude_skills_dir: Path = Path.home() / ".claude" / "skills"
     claude_plugins_dir: Path = Path.home() / ".claude" / "plugins"
 
+    # 项目路径配置（用于扫描项目级 agents）
+    # 可以通过环境变量 PROJECT_PATH 设置
+    project_path: Optional[str] = None
+
     # Logging
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-    # CORS
+    # CORS - 允许多个端口以支持不同的开发环境
     cors_origins: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5173",  # Vite 默认端口
         "http://127.0.0.1:5173",
+        "http://localhost:5174",  # Vite 备用端口
+        "http://127.0.0.1:5174",
+        "http://localhost:5175",  # Vite 备用端口
+        "http://127.0.0.1:5175",
     ]
 
     model_config = SettingsConfigDict(

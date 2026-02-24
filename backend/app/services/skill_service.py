@@ -181,24 +181,58 @@ class SkillService:
         return SkillResponse.model_validate(skill)
 
     async def delete_skill(self, skill_id: int) -> None:
-        """Delete a skill"""
-        # Get skill before deletion
+        """Delete a skill and its files from filesystem"""
+        # 步骤 1: 获取要删除的 skill
         skill = await self.repository.get_by_id(skill_id)
         if not skill:
             raise NotFoundException(f"Skill with id {skill_id} not found")
 
-        # Delete from database
+        # 步骤 2: 从数据库删除
         success = await self.repository.delete(skill_id)
         if not success:
             raise NotFoundException(f"Skill with id {skill_id} not found")
 
-        # Delete from filesystem
+        # 步骤 3: 从文件系统删除
         try:
-            skill_dir = self._get_skill_directory(skill.name, skill.source)
-            self._delete_skill_files(skill_dir)
+            skill_dir = self._get_skill_directory_for_delete(skill)
+            if skill_dir and skill_dir.exists():
+                print(f"[SkillService] Deleting skill files at: {skill_dir}")
+                self._delete_skill_files(skill_dir)
+                print(f"[SkillService] Successfully deleted skill files")
+            else:
+                print(f"[SkillService] Skill directory not found: {skill_dir}")
         except Exception as e:
-            # Log error but don't fail the deletion
+            # 记录错误但不影响删除操作
             print(f"Warning: Failed to delete skill files: {str(e)}")
+    
+    def _get_skill_directory_for_delete(self, skill) -> Optional[Path]:
+        """
+        获取 skill 目录路径用于删除
+        支持所有类型的 skills：global、project、plugin
+        """
+        # 优先从 meta.path 获取（plugin skills 存储在这里）
+        if skill.meta and isinstance(skill.meta, dict) and 'path' in skill.meta:
+            return Path(skill.meta['path'])
+        
+        # 根据 source 类型确定目录
+        if skill.source == SkillSource.GLOBAL:
+            return Path(self.claude_adapter.config_dir) / "skills" / skill.name
+        elif skill.source == SkillSource.PROJECT:
+            return Path.cwd() / ".claude" / "skills" / skill.name
+        elif skill.source == SkillSource.PLUGIN:
+            # Plugin skills 如果没有 meta.path，尝试常见路径
+            plugin_base = Path(self.claude_adapter.config_dir) / "plugins"
+            possible_paths = [
+                plugin_base / "claude-manager" / "skills" / skill.name,
+                Path.home() / ".claude" / "skills" / skill.name,
+            ]
+            for path in possible_paths:
+                if path.exists():
+                    return path
+            print(f"[SkillService] Could not find plugin skill directory for: {skill.name}")
+            return None
+        
+        return None
 
     async def search_skills(
         self,

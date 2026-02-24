@@ -10,6 +10,9 @@ from app.config.settings import settings
 from app.core.database import init_db, close_db
 from app.core.logging import setup_logging, get_logger
 
+# 导入所有模型以确保它们被注册到 Base.metadata（必须在 init_db 之前）
+from app.models import Skill, Agent, AgentTeam, Workflow, Task, User
+
 # Setup logging
 setup_logging()
 logger = get_logger(__name__)

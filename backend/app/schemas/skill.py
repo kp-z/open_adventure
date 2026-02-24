@@ -13,7 +13,7 @@ class SkillBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     full_name: str = Field(..., min_length=1, max_length=200)
     type: str = Field(..., min_length=1, max_length=50)
-    description: str = Field(..., min_length=1, max_length=500)
+    description: str = Field(..., min_length=1, max_length=2000)
     tags: list[str] = Field(default_factory=list)
     source: SkillSource = Field(default=SkillSource.GLOBAL)
     enabled: bool = Field(default=True)
@@ -31,7 +31,7 @@ class SkillUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     full_name: Optional[str] = Field(None, min_length=1, max_length=200)
     type: Optional[str] = Field(None, min_length=1, max_length=50)
-    description: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = Field(None, min_length=1, max_length=2000)
     tags: Optional[list[str]] = None
     source: Optional[SkillSource] = None
     enabled: Optional[bool] = None

@@ -23,8 +23,9 @@ class Skill(Base):
     __tablename__ = "skills"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
-    full_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # 移除 unique 约束，允许同名 skill 在不同位置
+    name: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    full_name: Mapped[str] = mapped_column(String(500), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
