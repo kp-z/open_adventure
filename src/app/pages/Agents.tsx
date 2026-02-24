@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router';
 import {
   RefreshCw,
   Plus,
@@ -92,6 +93,7 @@ const modelColors: Record<string, string> = {
 const Agents = () => {
   const { mode } = useMode();
   const { t } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // 状态
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -229,6 +231,16 @@ const Agents = () => {
   useEffect(() => {
     handleSync();
   }, []);
+
+  // 检测 URL 参数，自动打开创建表单
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create') {
+      setIsCreating(true);
+      // 清除 URL 参数
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   // 过滤 agents
   const filteredAgents = agents.filter(agent => {

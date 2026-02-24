@@ -7,6 +7,7 @@ import Workflows from './pages/Workflows';
 import Tasks from './pages/Tasks';
 import Settings from './pages/Settings';
 import Teams from './pages/Teams';
+import Terminal from './pages/Terminal';
 
 export const router = createBrowserRouter([
   {
@@ -40,6 +41,10 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         Component: Settings,
+      },
+      {
+        path: 'terminal',
+        Component: Terminal,
       },
     ],
   },

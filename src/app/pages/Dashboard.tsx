@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import {
   BarChart3,
   Terminal,
@@ -28,8 +29,8 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { dashboardApi, executionsApi } from '@/lib/api';
-import type { DashboardStats, Execution } from '@/lib/api';
+import { dashboardApi, executionsApi, claudeApi } from '@/lib/api';
+import type { DashboardStats, Execution, ClaudeHealthResponse } from '@/lib/api';
 
 const mockChartData = [
   { name: 'Mon', value: 40 },
@@ -44,10 +45,59 @@ const mockChartData = [
 const Dashboard = () => {
   const { mode } = useMode();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
+  const [claudeHealth, setClaudeHealth] = useState<ClaudeHealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchDashboardData = async () => {
+    // 获取仪表板统计数据
+    const statsData = await dashboardApi.getStats();
+    setStats(statsData);
+
+    // 获取最近的执行历史
+    const executionsData = await executionsApi.list({ limit: 4 });
+    setExecutions(executionsData.items || []);
+  };
+
+  const fetchClaudeHealth = async () => {
+    // 获取 Claude 健康状态
+    const healthData = await claudeApi.health();
+    setClaudeHealth(healthData);
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchDashboardData(),
+        fetchClaudeHealth()
+      ]);
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to refresh data');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await claudeApi.sync();
+      // 同步完成后刷新数据
+      await handleRefresh();
+    } catch (err) {
+      console.error('Failed to sync:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sync');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,13 +105,10 @@ const Dashboard = () => {
         setLoading(true);
         setError(null);
 
-        // 获取仪表板统计数据
-        const statsData = await dashboardApi.getStats();
-        setStats(statsData);
-
-        // 获取最近的执行历史
-        const executionsData = await executionsApi.list({ limit: 4 });
-        setExecutions(executionsData.items || []);
+        await Promise.all([
+          fetchDashboardData(),
+          fetchClaudeHealth()
+        ]);
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -174,8 +221,19 @@ const Dashboard = () => {
           <p className="text-gray-400">{t("overviewDesc")}</p>
         </div>
         <div className="flex gap-3">
-          <ActionButton variant="secondary">Export Config</ActionButton>
-          <ActionButton onClick={() => {}}>Sync Environments</ActionButton>
+          <ActionButton
+            variant="secondary"
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </ActionButton>
+          <ActionButton
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing ? 'Syncing...' : 'Sync Environments'}
+          </ActionButton>
         </div>
       </header>
 
@@ -184,28 +242,63 @@ const Dashboard = () => {
         <GlassCard className="lg:col-span-2 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-green-500/20 border border-green-500/50 flex items-center justify-center text-green-500">
+              <div className={`w-12 h-12 rounded-xl ${
+                claudeHealth?.cli_available
+                  ? 'bg-green-500/20 border border-green-500/50 text-green-500'
+                  : 'bg-red-500/20 border border-red-500/50 text-red-500'
+              } flex items-center justify-center`}>
                 <Activity size={24} />
               </div>
               <div>
                 <h2 className="text-lg font-bold">Claude CLI Status</h2>
-                <p className="text-xs text-green-500 font-medium">System Online & Synchronized</p>
+                <p className={`text-xs font-medium ${
+                  claudeHealth?.cli_available
+                    ? 'text-green-500'
+                    : 'text-red-500'
+                }`}>
+                  {claudeHealth?.cli_available
+                    ? 'System Online & Synchronized'
+                    : 'System Offline'}
+                </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-xs text-gray-400">Version</p>
-              <p className="text-sm font-mono">v3.4.2-stable</p>
+              <p className="text-sm font-mono">
+                {claudeHealth?.version || 'N/A'}
+              </p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4 mt-auto">
             <div className="bg-white/5 rounded-xl p-3">
               <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Health Score</p>
-              <p className="text-2xl font-bold text-blue-400">98.4<span className="text-xs text-gray-500 ml-1">/100</span></p>
+              <p className="text-2xl font-bold text-blue-400">
+                {claudeHealth ? (
+                  <>
+                    {Math.round(
+                      ((claudeHealth.config_dir_exists ? 33 : 0) +
+                       (claudeHealth.skills_dir_exists ? 33 : 0) +
+                       (claudeHealth.cli_available ? 34 : 0))
+                    )}
+                    <span className="text-xs text-gray-500 ml-1">/100</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-500">N/A</span>
+                )}
+              </p>
             </div>
             <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Active Threads</p>
-              <p className="text-2xl font-bold text-purple-400">12<span className="text-xs text-gray-500 ml-1">concurrent</span></p>
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Status</p>
+              <p className="text-2xl font-bold text-purple-400">
+                {claudeHealth ? (
+                  <>
+                    {claudeHealth.issues.length === 0 ? 'OK' : `${claudeHealth.issues.length} Issues`}
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-500">N/A</span>
+                )}
+              </p>
             </div>
           </div>
         </GlassCard>
@@ -306,7 +399,10 @@ const Dashboard = () => {
         <div className="space-y-6">
           <h2 className="text-xl font-bold">Quick Actions</h2>
           <div className="grid grid-cols-1 gap-4">
-            <button className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 hover:bg-white/5 transition-all text-left">
+            <button
+              onClick={() => navigate('/skills?action=create')}
+              className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 hover:bg-white/5 transition-all text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0">
                 <Plus size={20} />
               </div>
@@ -315,7 +411,10 @@ const Dashboard = () => {
                 <p className="text-xs text-gray-400">Add capability to Claude</p>
               </div>
             </button>
-            <button className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 hover:bg-white/5 transition-all text-left">
+            <button
+              onClick={() => navigate('/agents?action=create')}
+              className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 hover:bg-white/5 transition-all text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shrink-0">
                 <BrainCircuit size={20} />
               </div>
@@ -324,7 +423,10 @@ const Dashboard = () => {
                 <p className="text-xs text-gray-400">Initialize a new specialist</p>
               </div>
             </button>
-            <button className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left">
+            <button
+              onClick={() => navigate('/terminal')}
+              className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
+            >
               <div className="w-10 h-10 rounded-xl bg-gray-700 flex items-center justify-center text-white shrink-0">
                 <Terminal size={20} />
               </div>

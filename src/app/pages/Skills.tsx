@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router';
 import { 
   Search, 
   Filter, 
@@ -46,7 +47,8 @@ import {
 const Skills = () => {
   const { mode, lang } = useMode();
   const { t } = useTranslation();
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // ========== API 数据状态 ==========
   const [skills, setSkills] = useState<UISkill[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,17 @@ const Skills = () => {
   useEffect(() => {
     fetchSkills();
   }, [fetchSkills]);
+
+  // ========== 检测 URL 参数，自动打开创建表单 ==========
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create') {
+      setIsCreating(true);
+      setInitialEditorMode('ai');
+      // 清除 URL 参数
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
 
   // ========== 同步技能 ==========
   const handleSync = async () => {

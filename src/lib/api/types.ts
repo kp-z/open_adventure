@@ -64,14 +64,15 @@ export interface SyncResult {
 }
 
 export interface ClaudeHealthResponse {
+  available: boolean;
   cli_available: boolean;
-  cli_version: string | null;
+  version: string | null;
+  config_path: string;
   config_dir_exists: boolean;
+  config_dir_readable: boolean;
   skills_dir_exists: boolean;
-  plugins_dir_exists: boolean;
-  total_skills: number;
-  total_agents: number;
-  total_teams: number;
+  skills_path: string;
+  issues: string[];
 }
 
 // ============ Agent 相关类型 - Claude Code Subagent 规范 ============
