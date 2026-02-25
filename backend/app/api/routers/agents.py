@@ -372,7 +372,7 @@ async def test_agent(
     import time
 
     agent = await service.get_agent(agent_id)
-    cli_path = os.environ.get("CLAUDECODE", "claude")
+    cli_path = settings.claude_cli_path
 
     start_time = time.time()
 
@@ -401,11 +401,16 @@ Please respond according to your role and capabilities."""
         if agent.model and agent.model != "inherit":
             cmd.extend(["--model", agent.model])
 
+        # 创建环境变量副本，移除 CLAUDECODE 以避免嵌套会话检测
+        env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=180
+            timeout=180,
+            env=env
         )
 
         duration = time.time() - start_time
@@ -467,7 +472,7 @@ async def generate_agent(
     import re
     import os
 
-    cli_path = os.environ.get("CLAUDECODE", "claude")
+    cli_path = settings.claude_cli_path
 
     # 构建生成提示
     generation_prompt = f"""Generate a Claude Code subagent configuration based on this description:
@@ -508,11 +513,16 @@ You are a senior code reviewer. When invoked:
             "--setting-sources", "user"
         ]
 
+        # 创建环境变量副本，移除 CLAUDECODE 以避免嵌套会话检测
+        env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=120,
+            env=env
         )
 
         if result.returncode != 0:
@@ -656,3 +666,117 @@ async def save_generated_agent(
         status_code=500,
         detail="保存后解析失败"
     )
+
+
+@router.post(
+    "/cleanup-duplicates",
+    summary="清理重复的子代理记录"
+)
+async def cleanup_duplicate_agents(
+    dry_run: bool = Query(True, description="是否仅统计不删除"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    清理数据库中重复的子代理记录
+
+    重复定义：相同 scope + path 的记录
+
+    Args:
+        dry_run: True 时仅统计，False 时执行删除
+
+    Returns:
+        清理报告
+    """
+    from sqlalchemy import select, func
+    from app.models.agent import Agent
+
+    # 查找重复记录
+    # 按 scope + path 分组，找出数量 > 1 的组
+    stmt = (
+        select(
+            Agent.scope,
+            func.json_extract(Agent.meta, '$.path').label('path'),
+            func.count().label('count')
+        )
+        .where(Agent.meta.isnot(None))
+        .group_by(Agent.scope, func.json_extract(Agent.meta, '$.path'))
+        .having(func.count() > 1)
+    )
+
+    result = await db.execute(stmt)
+    duplicates = result.all()
+
+    if not duplicates:
+        return {
+            "success": True,
+            "message": "没有发现重复记录",
+            "duplicates_found": 0,
+            "records_to_delete": 0,
+            "deleted": 0
+        }
+
+    # 统计需要删除的记录数
+    total_to_delete = 0
+    duplicate_groups = []
+
+    for scope, path, count in duplicates:
+        # 对于每个重复组，保留最新的一条，删除其他的
+        records_to_delete = count - 1
+        total_to_delete += records_to_delete
+
+        duplicate_groups.append({
+            "scope": scope,
+            "path": path,
+            "total_count": count,
+            "to_delete": records_to_delete
+        })
+
+    if dry_run:
+        return {
+            "success": True,
+            "message": "统计完成（未执行删除）",
+            "duplicates_found": len(duplicates),
+            "records_to_delete": total_to_delete,
+            "duplicate_groups": duplicate_groups,
+            "deleted": 0
+        }
+
+    # 执行删除
+    deleted_count = 0
+    deleted_records = []
+
+    for scope, path, count in duplicates:
+        # 查找该组的所有记录，按 ID 排序
+        stmt = (
+            select(Agent)
+            .where(
+                Agent.scope == scope,
+                func.json_extract(Agent.meta, '$.path') == path
+            )
+            .order_by(Agent.id.desc())  # 最新的在前
+        )
+
+        result = await db.execute(stmt)
+        records = result.scalars().all()
+
+        # 保留第一条（最新的），删除其他的
+        for record in records[1:]:
+            deleted_records.append({
+                "id": record.id,
+                "name": record.name,
+                "scope": record.scope,
+                "path": path
+            })
+            await db.delete(record)
+            deleted_count += 1
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "message": f"成功清理 {deleted_count} 条重复记录",
+        "duplicates_found": len(duplicates),
+        "records_to_delete": total_to_delete,
+        "deleted": deleted_count,
+        "deleted_records": deleted_records
+    }
