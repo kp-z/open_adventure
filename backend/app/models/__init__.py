@@ -9,6 +9,9 @@ from app.models.agent_team import AgentTeam
 from app.models.workflow import Workflow, WorkflowNode, WorkflowEdge, WorkflowTemplate
 from app.models.task import Task
 from app.models.user import User
+from app.models.team_message import TeamMessage
+from app.models.team_task import TeamTask
+from app.models.team_state import TeamState
 
 __all__ = [
     "Skill",
@@ -20,5 +23,8 @@ __all__ = [
     "WorkflowEdge",
     "WorkflowTemplate",
     "Task",
-    "User"
+    "User",
+    "TeamMessage",
+    "TeamTask",
+    "TeamState"
 ]

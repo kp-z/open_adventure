@@ -38,22 +38,30 @@ class AgentRepository:
         return result.scalars().first()
 
     async def get_by_name_and_scope(self, name: str, scope: str) -> Optional[Agent]:
-        """通过名称和作用域获取子代理"""
+        """
+        通过名称和作用域获取子代理
+
+        如果存在多条记录，返回最新的一条（ID 最大）
+        """
         result = await self.session.execute(
-            select(Agent).where(
-                and_(Agent.name == name, Agent.scope == scope)
-            )
+            select(Agent)
+            .where(and_(Agent.name == name, Agent.scope == scope))
+            .order_by(Agent.id.desc())  # 最新的在前
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def get_by_path(self, path: str) -> Optional[Agent]:
-        """通过文件路径获取子代理"""
+        """
+        通过文件路径获取子代理
+
+        如果存在多条记录，返回最新的一条（ID 最大）
+        """
         result = await self.session.execute(
-            select(Agent).where(
-                func.json_extract(Agent.meta, "$.path") == path
-            )
+            select(Agent)
+            .where(func.json_extract(Agent.meta, "$.path") == path)
+            .order_by(Agent.id.desc())  # 最新的在前
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def get_all(
         self,
@@ -189,37 +197,101 @@ class AgentRepository:
         """
         批量更新或插入子代理
 
-        使用文件路径作为唯一标识
+        使用文件路径作为唯一标识，自动去重
 
         Returns:
-            Dict: {"created": int, "updated": int}
+            Dict: {"created": int, "updated": int, "skipped": int}
         """
         created = 0
         updated = 0
+        skipped = 0
+
+        # 第一步：对输入数据去重（相同 scope + path 只保留一个）
+        seen_keys = set()
+        deduplicated_data = []
 
         for data in agents_data:
             path = data.get("meta", {}).get("path", "")
+            scope = data.get("scope", "builtin")
+
+            # 生成唯一键
+            if path:
+                unique_key = f"{scope}:{path}"
+            else:
+                unique_key = f"{scope}:{data['name']}"
+
+            if unique_key in seen_keys:
+                skipped += 1
+                continue
+
+            seen_keys.add(unique_key)
+            deduplicated_data.append(data)
+
+        # 第二步：处理去重后的数据
+        for data in deduplicated_data:
+            path = data.get("meta", {}).get("path", "")
 
             if path:
-                existing = await self.get_by_path(path)
+                # 先清理该路径的所有重复记录（保留最新的）
+                result = await self.session.execute(
+                    select(Agent)
+                    .where(
+                        and_(
+                            Agent.scope == data.get("scope", "builtin"),
+                            func.json_extract(Agent.meta, "$.path") == path
+                        )
+                    )
+                    .order_by(Agent.id.desc())
+                )
+                existing_records = list(result.scalars().all())
+
+                if existing_records:
+                    # 保留第一条（最新的），删除其他的
+                    existing = existing_records[0]
+                    for duplicate in existing_records[1:]:
+                        await self.session.delete(duplicate)
+
+                    # 更新保留的记录
+                    for field, value in data.items():
+                        if hasattr(existing, field):
+                            setattr(existing, field, value)
+                    updated += 1
+                else:
+                    # 创建新记录
+                    agent = Agent(**data)
+                    self.session.add(agent)
+                    created += 1
             else:
                 # 内置 agent 没有路径，使用 name + scope
-                existing = await self.get_by_name_and_scope(
-                    data["name"],
-                    data.get("scope", "builtin")
+                # 先清理该 name + scope 的所有重复记录
+                result = await self.session.execute(
+                    select(Agent)
+                    .where(
+                        and_(
+                            Agent.name == data["name"],
+                            Agent.scope == data.get("scope", "builtin")
+                        )
+                    )
+                    .order_by(Agent.id.desc())
                 )
+                existing_records = list(result.scalars().all())
 
-            if existing:
-                # 更新现有记录
-                for field, value in data.items():
-                    if hasattr(existing, field):
-                        setattr(existing, field, value)
-                updated += 1
-            else:
-                # 创建新记录
-                agent = Agent(**data)
-                self.session.add(agent)
-                created += 1
+                if existing_records:
+                    # 保留第一条（最新的），删除其他的
+                    existing = existing_records[0]
+                    for duplicate in existing_records[1:]:
+                        await self.session.delete(duplicate)
+
+                    # 更新保留的记录
+                    for field, value in data.items():
+                        if hasattr(existing, field):
+                            setattr(existing, field, value)
+                    updated += 1
+                else:
+                    # 创建新记录
+                    agent = Agent(**data)
+                    self.session.add(agent)
+                    created += 1
 
         await self.session.commit()
-        return {"created": created, "updated": updated}
+        return {"created": created, "updated": updated, "skipped": skipped}
