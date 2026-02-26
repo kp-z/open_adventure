@@ -30,12 +30,14 @@ import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, ActionButton } from '../components/ui-shared';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { CategoryFilter, type CategoryType } from '../components/CategoryFilter';
 import { motion, AnimatePresence } from 'motion/react';
 import { agentsApi } from '@/lib/api';
 import type { Agent, AgentScope, AgentSyncResponse } from '@/lib/api';
 import { AgentEditor } from '../components/AgentEditor';
 import { AgentTestPanel } from '../components/AgentTestPanel';
+import { getAgentAvatarUrl, getAgentGradient, getAgentInitials } from '../../imports/avatars';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -367,14 +369,7 @@ const Agents = () => {
   }
 
   if (loading && agents.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">加载子代理...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner text="加载子代理..." />;
   }
 
   return (
@@ -509,37 +504,14 @@ const Agents = () => {
                   ${agent.is_overridden ? 'opacity-60' : ''}
                 `}
               >
-                {/* 头部 - 图标和操作菜单 */}
+                {/* 头部 - 头像和操作菜单 */}
                 <div className="flex justify-between items-start mb-4">
-                  <div
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 border-2"
-                    style={{
-                      backgroundColor: agent.meta?.color
-                        ? `${agent.meta.color}20`
-                        : agent.scope === 'builtin'
-                        ? 'rgba(59, 130, 246, 0.2)'
-                        : agent.scope === 'user'
-                        ? 'rgba(34, 197, 94, 0.2)'
-                        : agent.scope === 'project'
-                        ? 'rgba(168, 85, 247, 0.2)'
-                        : 'rgba(249, 115, 22, 0.2)',
-                      borderColor: agent.meta?.color ||
-                        (agent.scope === 'builtin' ? '#3b82f6' :
-                         agent.scope === 'user' ? '#22c55e' :
-                         agent.scope === 'project' ? '#a855f7' : '#f97316')
-                    }}
-                  >
-                    {agent.is_builtin ? (
-                      <Shield size={32} style={{ 
-                        color: agent.meta?.color || '#3b82f6' 
-                      }} />
-                    ) : (
-                      <Cpu size={32} style={{ 
-                        color: agent.meta?.color || 
-                          (agent.scope === 'user' ? '#22c55e' : 
-                           agent.scope === 'project' ? '#a855f7' : '#f97316')
-                      }} />
-                    )}
+                  <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 border-2 border-white/20 bg-white/5">
+                    <img
+                      src={getAgentAvatarUrl(agent.id, agent.name)}
+                      alt={agent.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
 
                   {/* 操作下拉菜单 */}

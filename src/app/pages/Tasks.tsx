@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { motion } from 'motion/react';
 import { getAvatarById } from '../lib/avatars';
 import { tasksApi } from '@/lib/api';
@@ -120,14 +121,7 @@ const Tasks = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading tasks...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner text="Loading tasks..." />;
   }
 
   if (error) {

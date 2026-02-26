@@ -30,6 +30,7 @@ import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { CategoryFilter, type CategoryType } from '../components/CategoryFilter';
 import { motion, AnimatePresence } from 'motion/react';
 import { SkillEditor } from '../components/SkillEditor';
@@ -296,12 +297,7 @@ const Skills = () => {
 
   // ========== Loading 状态 ==========
   if (loading && skills.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-        <p className="text-gray-400">{t('loading' as any) || '加载中...'}</p>
-      </div>
-    );
+    return <LoadingSpinner text={t('loading' as any) || '加载中...'} />;
   }
 
   // ========== 错误状态 ==========

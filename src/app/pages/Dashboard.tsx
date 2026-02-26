@@ -19,6 +19,7 @@ import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { ClaudeConfigEditor } from '../components/ClaudeConfigEditor';
+import { LoadingSpinner, SkeletonCard, SkeletonListItem } from '../components/LoadingSpinner';
 import { getAvatarById } from '../lib/avatars';
 import {
   BarChart,
@@ -51,34 +52,61 @@ const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [claudeHealth, setClaudeHealth] = useState<ClaudeHealthResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [loadingHealth, setLoadingHealth] = useState(true);
+  const [loadingExecutions, setLoadingExecutions] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfigEditor, setShowConfigEditor] = useState(false);
 
   const fetchDashboardData = async () => {
-    // 获取仪表板统计数据
-    const statsData = await dashboardApi.getStats();
-    setStats(statsData);
+    try {
+      setLoadingStats(true);
+      // 获取仪表板统计数据
+      const statsData = await dashboardApi.getStats();
+      setStats(statsData);
+    } catch (err) {
+      console.error('Failed to fetch stats:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
-    // 获取最近的执行历史
-    const executionsData = await executionsApi.list({ limit: 4 });
-    setExecutions(executionsData.items || []);
+  const fetchExecutions = async () => {
+    try {
+      setLoadingExecutions(true);
+      // 获取最近的执行历史
+      const executionsData = await executionsApi.list({ limit: 4 });
+      setExecutions(executionsData.items || []);
+    } catch (err) {
+      console.error('Failed to fetch executions:', err);
+    } finally {
+      setLoadingExecutions(false);
+    }
   };
 
   const fetchClaudeHealth = async () => {
-    // 获取 Claude 健康状态
-    const healthData = await claudeApi.health();
-    setClaudeHealth(healthData);
+    try {
+      setLoadingHealth(true);
+      // 获取 Claude 健康状态
+      const healthData = await claudeApi.health();
+      setClaudeHealth(healthData);
+    } catch (err) {
+      console.error('Failed to fetch health:', err);
+    } finally {
+      setLoadingHealth(false);
+    }
   };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
+      // 并行刷新所有数据
       await Promise.all([
         fetchDashboardData(),
-        fetchClaudeHealth()
+        fetchClaudeHealth(),
+        fetchExecutions()
       ]);
     } catch (err) {
       console.error('Failed to refresh data:', err);
@@ -103,36 +131,11 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        await Promise.all([
-          fetchDashboardData(),
-          fetchClaudeHealth()
-        ]);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    // 独立加载各个数据源，不阻塞界面渲染
+    fetchDashboardData();
+    fetchClaudeHealth();
+    fetchExecutions();
   }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -242,7 +245,10 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Claude CLI Status Card - 占2列 */}
-        <GlassCard className="lg:col-span-2 flex flex-col justify-between">
+        {loadingHealth ? (
+          <SkeletonCard className="lg:col-span-2" />
+        ) : (
+          <GlassCard className="lg:col-span-2 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl ${
@@ -341,9 +347,13 @@ const Dashboard = () => {
             </div>
           </div>
         </GlassCard>
+        )}
 
         {/* Total Skills Card */}
-        <GlassCard className="flex flex-col justify-between">
+        {loadingStats ? (
+          <SkeletonCard />
+        ) : (
+          <GlassCard className="flex flex-col justify-between">
           <div className="flex justify-between items-start mb-4">
             <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
               <Cpu size={20} />
@@ -380,9 +390,13 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
         </GlassCard>
+        )}
 
         {/* Agents Running Card */}
-        <GlassCard className="flex flex-col justify-between">
+        {loadingStats ? (
+          <SkeletonCard />
+        ) : (
+          <GlassCard className="flex flex-col justify-between">
           <div className="flex justify-between items-start mb-4">
             <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
               <Code2 size={20} />
@@ -419,6 +433,7 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
         </GlassCard>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -429,7 +444,14 @@ const Dashboard = () => {
             <button className="text-sm text-blue-400 hover:underline">View All</button>
           </div>
           <div className="space-y-4">
-            {executions.length > 0 ? (
+            {loadingExecutions ? (
+              <>
+                <SkeletonListItem />
+                <SkeletonListItem />
+                <SkeletonListItem />
+                <SkeletonListItem />
+              </>
+            ) : executions.length > 0 ? (
               executions.map((execution, index) => {
                 const task = execution.task;
                 const avatars = ['vanguard_1', 'vanguard_2', 'vanguard_3', 'vanguard_4'];
