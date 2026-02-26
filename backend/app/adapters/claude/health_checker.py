@@ -6,6 +6,7 @@ Claude Health Checker
 import asyncio
 import json
 import subprocess
+import os
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -22,6 +23,120 @@ class ClaudeHealthChecker:
         self.cli_path = settings.claude_cli_path
         self.config_dir = settings.claude_config_dir
         self.skills_dir = settings.claude_skills_dir
+
+    async def check_model_availability(self, model_alias: str) -> bool:
+        """
+        检查特定模型是否可用
+
+        通过调用 Anthropic API 测试模型可用性
+
+        Args:
+            model_alias: 模型别名（opus/sonnet/haiku）
+
+        Returns:
+            bool: 模型是否可用
+        """
+        try:
+            # 读取环境变量配置
+            settings_file = self.config_dir / "settings.json"
+            api_key = None
+            base_url = None
+
+            if settings_file.exists():
+                with open(settings_file, 'r') as f:
+                    settings_data = json.load(f)
+                    env = settings_data.get("env", {})
+                    api_key = env.get("ANTHROPIC_AUTH_TOKEN")
+                    base_url = env.get("ANTHROPIC_BASE_URL")
+
+            # 如果没有配置，尝试从环境变量读取
+            if not api_key:
+                api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+            if not base_url:
+                base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+
+            # 如果 API key 是 PROXY_MANAGED，使用 test 作为占位符
+            if api_key == "PROXY_MANAGED":
+                api_key = "test"
+
+            # 如果没有 API key，无法检测
+            if not api_key:
+                logger.warning(f"No API key found, cannot check model {model_alias} availability")
+                return False
+
+            # 映射模型别名到完整模型名
+            model_map = {
+                "opus": "claude-opus-4-6",
+                "sonnet": "claude-sonnet-4-6",
+                "haiku": "claude-haiku-4-6"
+            }
+
+            model_name = model_map.get(model_alias, model_alias)
+
+            # 使用 aiohttp 测试 API
+            import aiohttp
+
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            }
+
+            # 简单的测试请求
+            data = {
+                "model": model_name,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "test"}]
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{base_url}/v1/messages",
+                    headers=headers,
+                    json=data,
+                    timeout=aiohttp.ClientTimeout(total=5)
+                ) as response:
+                    response_text = await response.text()
+
+                    # 检查响应状态和内容
+                    if response.status == 200:
+                        # 检查响应内容是否包含错误信息
+                        try:
+                            response_json = json.loads(response_text)
+                            # 检查是否有 error 字段
+                            if "error" in response_json:
+                                error_msg = response_json["error"].get("message", "")
+                                # 如果错误信息包含"令牌未绑定该模型"或类似信息，说明模型不可用
+                                if "令牌未绑定" in error_msg or "not available" in error_msg.lower() or "access denied" in error_msg.lower():
+                                    logger.info(f"Model {model_alias} not available: {error_msg}")
+                                    return False
+                            # 没有错误，模型可用
+                            logger.info(f"Model {model_alias} is available")
+                            return True
+                        except json.JSONDecodeError:
+                            # JSON 解析失败，假设可用
+                            logger.warning(f"Failed to parse response for {model_alias}, assuming available")
+                            return True
+                    elif response.status == 400:
+                        # 400 可能是参数错误，但模型存在
+                        logger.info(f"Model {model_alias} exists (400 response)")
+                        return True
+                    elif response.status == 404:
+                        # 404 说明模型不存在
+                        logger.info(f"Model {model_alias} not found (404)")
+                        return False
+                    else:
+                        # 其他状态码，假设不可用
+                        logger.warning(f"Model {model_alias} check returned status {response.status}")
+                        return False
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout checking model {model_alias} availability")
+            return False
+        except Exception as e:
+            logger.error(f"Error checking model {model_alias} availability: {e}")
+            # 出错时假设不可用（更保守）
+            return False
 
     async def get_model_info(self) -> Dict[str, Any]:
         """
@@ -49,8 +164,8 @@ class ClaudeHealthChecker:
                 logger.error(f"Failed to read settings.json: {e}")
                 model_info["model_source"] = "default"
 
-        # 2. 定义 Claude Code 支持的模型列表
-        model_info["available_models"] = [
+        # 2. 并发检测所有模型的可用性
+        models = [
             {
                 "alias": "opus",
                 "full_name": "claude-opus-4-6[1m]",
@@ -67,6 +182,26 @@ class ClaudeHealthChecker:
                 "description": "Fast and efficient"
             }
         ]
+
+        # 并发检测所有模型
+        availability_tasks = [
+            self.check_model_availability(model["alias"])
+            for model in models
+        ]
+
+        availabilities = await asyncio.gather(*availability_tasks, return_exceptions=True)
+
+        # 组装结果
+        for model, available in zip(models, availabilities):
+            # 如果检测出错，默认为可用
+            if isinstance(available, Exception):
+                logger.error(f"Exception checking {model['alias']}: {available}")
+                available = True
+
+            model_info["available_models"].append({
+                **model,
+                "available": available
+            })
 
         return model_info
 

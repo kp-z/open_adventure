@@ -26,7 +26,7 @@ class ClaudeFileScanner:
         扫描所有技能
 
         扫描路径：
-        1. ~/.claude/skills/ (全局技能)
+        1. ~/.claude/skills/ (用户技能 - 在 /Users 或 /home 下)
         2. 项目目录 .claude/skills/ (项目技能)
         3. plugins/*/skills/ (插件技能)
 
@@ -37,14 +37,22 @@ class ClaudeFileScanner:
         """
         skills = []
 
-        # 步骤 1: 扫描全局技能
+        # 步骤 1: 扫描用户技能
         if self.skills_dir.exists():
-            global_skills = await self._scan_skills_in_dir(
+            # 判断是 user 还是 global
+            # 如果路径在 /Users 或 /home 下，则为 user，否则为 global
+            skills_dir_str = str(self.skills_dir.resolve())
+            if skills_dir_str.startswith('/Users/') or skills_dir_str.startswith('/home/'):
+                source = "user"
+            else:
+                source = "global"
+
+            user_skills = await self._scan_skills_in_dir(
                 self.skills_dir,
-                source="global"
+                source=source
             )
-            skills.extend(global_skills)
-            logger.info(f"Found {len(global_skills)} global skills")
+            skills.extend(user_skills)
+            logger.info(f"Found {len(user_skills)} {source} skills")
 
         # 步骤 2: 扫描插件技能
         if self.plugins_dir.exists():
@@ -105,6 +113,8 @@ class ClaudeFileScanner:
                 for dup in duplicates:
                     if dup["source"] == "plugin" and dup["plugin_name"]:
                         locations.append(f"plugin:{dup['plugin_name']}")
+                    elif dup["source"] == "user":
+                        locations.append("user")
                     elif dup["source"] == "global":
                         locations.append("global")
                     elif dup["source"] == "project":
@@ -130,7 +140,7 @@ class ClaudeFileScanner:
 
         Args:
             directory: 目录路径
-            source: 来源标识（global/plugin/project）
+            source: 来源标识（user/global/plugin/project）
 
         Returns:
             List[Dict]: 技能列表

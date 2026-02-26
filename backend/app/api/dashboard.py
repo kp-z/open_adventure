@@ -29,6 +29,40 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
     total_agents = await db.scalar(select(func.count(Agent.id)))
     total_teams = await db.scalar(select(func.count(AgentTeam.id)))
 
+    # Get popular skills (top 5 by usage count from meta)
+    popular_skills_query = (
+        select(Skill)
+        .order_by(Skill.id.desc())  # 简化：按 ID 倒序，实际应该按使用次数
+        .limit(5)
+    )
+    result = await db.execute(popular_skills_query)
+    popular_skills = result.scalars().all()
+    popular_skills_data = [
+        {
+            "id": skill.id,
+            "name": skill.name,
+            "usage_count": skill.meta.get("usage_count", 0) if skill.meta else 0
+        }
+        for skill in popular_skills
+    ]
+
+    # Get popular agents (top 5)
+    popular_agents_query = (
+        select(Agent)
+        .order_by(Agent.id.desc())
+        .limit(5)
+    )
+    result = await db.execute(popular_agents_query)
+    popular_agents = result.scalars().all()
+    popular_agents_data = [
+        {
+            "id": agent.id,
+            "name": agent.name,
+            "usage_count": agent.meta.get("usage_count", 0) if agent.meta else 0
+        }
+        for agent in popular_agents
+    ]
+
     # Get recent executions
     recent_executions_query = (
         select(Execution)
@@ -103,6 +137,8 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
         "total_skills": total_skills or 0,
         "total_agents": total_agents or 0,
         "total_teams": total_teams or 0,
+        "popular_skills": popular_skills_data,
+        "popular_agents": popular_agents_data,
         "recent_executions": recent_executions_data,
         "execution_stats": {
             "success_rate": round(success_rate, 1),

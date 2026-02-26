@@ -8,6 +8,7 @@ import re
 from typing import Optional, List
 from pathlib import Path
 from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
@@ -83,6 +84,9 @@ class SaveSkillResponse(BaseModel):
 # Claude AI 生成 Skill 的系统 Prompt
 SKILL_CREATOR_SYSTEM_PROMPT = '''你是一个 Claude Skill 创建专家。根据用户的需求描述，生成符合规范的 Skill 结构。
 
+## 重要：输出格式
+你必须只输出一个 JSON 对象，不要添加任何解释、说明或其他文字。直接输出 JSON，不要使用 markdown 代码块包裹。
+
 ## Skill 结构规范
 每个 Skill 必须包含：
 1. SKILL.md（必需）：包含 YAML frontmatter (name, description) + Markdown 指令
@@ -93,7 +97,6 @@ SKILL_CREATOR_SYSTEM_PROMPT = '''你是一个 Claude Skill 创建专家。根据
 - assets/：资源文件（模板、图标等），仅在需要输出模板时生成
 
 ## SKILL.md 格式示例
-```markdown
 ---
 name: skill-name
 description: 简短的技能描述（一句话）
@@ -109,11 +112,10 @@ description: 简短的技能描述（一句话）
 
 ## 示例
 提供使用示例...
-```
 
-## 输出格式要求
-请严格按照以下 JSON 格式输出，不要添加任何其他文字：
-```json
+## 输出格式（必须严格遵守）
+直接输出以下格式的 JSON 对象，不要添加任何其他内容：
+
 {
   "name": "skill-name-kebab-case",
   "skill_md": "完整的 SKILL.md 内容，使用 \\n 表示换行",
@@ -125,13 +127,14 @@ description: 简短的技能描述（一句话）
   ],
   "assets": []
 }
-```
 
 注意事项：
 1. name 使用 kebab-case 格式
 2. 根据实际需求决定是否生成 scripts/references/assets，不需要的留空数组
 3. 脚本应该实用且可执行
-4. JSON 内容需要正确转义'''
+4. JSON 内容需要正确转义
+5. 不要使用 ```json 代码块，直接输出 JSON
+6. 不要添加任何解释文字，只输出 JSON'''
 
 
 def get_skill_service(db: AsyncSession = Depends(get_db)) -> SkillService:
@@ -173,6 +176,67 @@ async def list_skills(
 ):
     """List all skills with pagination and filters"""
     return await service.list_skills(skip=skip, limit=limit, source=source, enabled=enabled)
+
+
+@router.get(
+    "/categories",
+    summary="Get skill categories and subcategories"
+)
+async def get_skill_categories(
+    service: SkillService = Depends(get_skill_service)
+):
+    """Get all skill categories with their subcategories (plugins and projects)"""
+    skills = await service.list_skills(skip=0, limit=10000)
+
+    # Count by source
+    counts = {
+        "builtin": 0,
+        "user": 0,
+        "project": 0,
+        "plugin": 0
+    }
+
+    # Collect unique plugins and projects
+    plugins = {}  # plugin_name -> count
+    projects = {}  # project_name -> count
+
+    for skill in skills.items:
+        source = skill.source.value if hasattr(skill.source, 'value') else skill.source
+        # Map 'global' to 'builtin'
+        if source == "global":
+            source = "builtin"
+        counts[source] = counts.get(source, 0) + 1
+
+        # Extract plugin name
+        if source == "plugin" and skill.meta:
+            plugin_name = skill.meta.get("plugin_name", "unknown")
+            if plugin_name and plugin_name != "unknown":
+                plugins[plugin_name] = plugins.get(plugin_name, 0) + 1
+
+        # Extract project name from path
+        if source == "project" and skill.meta:
+            path = skill.meta.get("path", "")
+            if path:
+                # Extract project directory name from path
+                # Example: /path/to/project/.claude/skills/skill_name -> project
+                parts = Path(path).parts
+                if ".claude" in parts:
+                    claude_index = parts.index(".claude")
+                    if claude_index > 0:
+                        project_name = parts[claude_index - 1]
+                        projects[project_name] = projects.get(project_name, 0) + 1
+
+    return {
+        "counts": counts,
+        "plugins": [
+            {"id": name, "name": name, "count": count}
+            for name, count in sorted(plugins.items())
+        ],
+        "projects": [
+            {"id": name, "name": name, "count": count}
+            for name, count in sorted(projects.items())
+        ]
+    }
 
 
 @router.get(

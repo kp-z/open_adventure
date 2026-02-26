@@ -12,6 +12,7 @@ from app.core.database import Base
 
 class SkillSource(str, enum.Enum):
     """Skill source types"""
+    USER = "user"
     GLOBAL = "global"
     PLUGIN = "plugin"
     PROJECT = "project"
