@@ -3,7 +3,7 @@ Task and Execution Models
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Integer, JSON, DateTime, ForeignKey, Enum as SQLEnum
+from sqlalchemy import String, Integer, JSON, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
@@ -26,6 +26,12 @@ class ExecutionStatus(str, enum.Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+
+
+class ExecutionType(str, enum.Enum):
+    """执行类型"""
+    WORKFLOW = "workflow"
+    AGENT_TEST = "agent_test"
 
 
 class Task(Base):
@@ -86,6 +92,17 @@ class Execution(Base):
     )
     error_message: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # 新增字段
+    execution_type: Mapped[ExecutionType] = mapped_column(
+        SQLEnum(ExecutionType, native_enum=False),
+        default=ExecutionType.WORKFLOW,
+        nullable=False,
+        index=True
+    )
+    agent_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    test_input: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
+    test_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
