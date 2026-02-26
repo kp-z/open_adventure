@@ -538,7 +538,7 @@ const Agents = () => {
                         >
                           {[
                             { icon: Settings2, label: 'Configure', action: 'configure', color: 'blue', disabled: agent.is_builtin },
-                            { icon: Play, label: 'Test', action: 'test', color: 'green', disabled: false },
+                            { icon: Play, label: 'Run', action: 'test', color: 'green', disabled: false },
                             { icon: Edit, label: 'Edit', action: 'edit', color: 'gray', disabled: agent.is_builtin },
                             { icon: Copy, label: 'Duplicate', action: 'duplicate', color: 'gray', disabled: true },
                             { icon: Trash2, label: 'Delete', action: 'delete', color: 'red', disabled: agent.is_builtin },
@@ -705,7 +705,7 @@ const Agents = () => {
                     className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl transition-all font-bold text-sm"
                   >
                     <Play size={16} className="text-green-400" />
-                    <span className="text-green-400">Test</span>
+                    <span className="text-green-400">Run</span>
                   </button>
                   <button
                     type="button"
