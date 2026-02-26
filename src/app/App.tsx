@@ -5,6 +5,7 @@ import { AgentsProvider } from './contexts/AgentsContext';
 import { TeamsProvider } from './contexts/TeamsContext';
 import { ModeProvider } from './contexts/ModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ExecutionProvider } from './contexts/ExecutionContext';
 import '../styles/theme.css';
 import '../styles/fonts.css';
 
@@ -156,7 +157,9 @@ export default function App() {
           <AppProvider>
             <AgentsProvider>
               <TeamsProvider>
-                <RouterProvider router={router} />
+                <ExecutionProvider>
+                  <RouterProvider router={router} />
+                </ExecutionProvider>
               </TeamsProvider>
             </AgentsProvider>
           </AppProvider>
