@@ -255,6 +255,58 @@ class AgentService:
         """获取各作用域的子代理数量统计"""
         return await self.repository.get_scope_counts()
 
+    async def get_categories(self) -> Dict[str, Any]:
+        """
+        获取子代理的分类统计和子分类列表
+
+        返回：
+        - counts: 各作用域的数量统计
+        - plugins: 插件子分类列表 [{id, name, count}]
+        - projects: 项目子分类列表 [{id, name, count}]
+        """
+        # 获取基础统计
+        counts = await self.repository.get_scope_counts()
+
+        # 获取所有 agents
+        all_agents, _ = await self.repository.get_all(skip=0, limit=10000)
+
+        # 统计插件子分类
+        plugin_counts: Dict[str, int] = {}
+        for agent in all_agents:
+            if agent.scope == "plugin" and agent.meta:
+                plugin_name = agent.meta.get("plugin_name")
+                if plugin_name:
+                    plugin_counts[plugin_name] = plugin_counts.get(plugin_name, 0) + 1
+
+        plugins = [
+            {"id": name, "name": name, "count": count}
+            for name, count in sorted(plugin_counts.items())
+        ]
+
+        # 统计项目子分类
+        project_counts: Dict[str, int] = {}
+        for agent in all_agents:
+            if agent.scope == "project" and agent.meta:
+                path = agent.meta.get("path", "")
+                # 从路径中提取项目名称
+                parts = path.split("/")
+                if ".claude" in parts:
+                    claude_index = parts.index(".claude")
+                    if claude_index > 0:
+                        project_name = parts[claude_index - 1]
+                        project_counts[project_name] = project_counts.get(project_name, 0) + 1
+
+        projects = [
+            {"id": name, "name": name, "count": count}
+            for name, count in sorted(project_counts.items())
+        ]
+
+        return {
+            "counts": counts,
+            "plugins": plugins,
+            "projects": projects
+        }
+
     async def sync_agents(self, scanned_agents: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         同步扫描到的子代理到数据库

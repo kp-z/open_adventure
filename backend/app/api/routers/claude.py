@@ -3,14 +3,29 @@ Claude Sync API Router
 
 提供 Claude 环境同步和健康检查的 API 端点
 """
-from fastapi import APIRouter, Depends
+import json
+from pathlib import Path
+from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.services.sync_service import SyncService
 from app.adapters.claude import ClaudeAdapter
+from app.config.settings import settings
 
 router = APIRouter(prefix="/claude", tags=["claude"])
+
+
+class ClaudeSettingsUpdate(BaseModel):
+    """Claude settings.json 更新模型"""
+    env: Dict[str, str] | None = None
+    permissions: Dict[str, list[str]] | None = None
+    model: str | None = None
+    enabledPlugins: Dict[str, bool] | None = None
+    language: str | None = None
+    effortLevel: str | None = None
 
 
 @router.post("/sync")
@@ -59,3 +74,75 @@ async def check_claude_health():
     adapter = ClaudeAdapter()
     health = await adapter.check_health()
     return health
+
+
+@router.get("/settings")
+async def get_claude_settings():
+    """
+    获取 Claude settings.json 配置
+
+    Returns:
+        Dict: settings.json 的完整内容
+    """
+    settings_file = settings.claude_config_dir / "settings.json"
+
+    if not settings_file.exists():
+        raise HTTPException(status_code=404, detail="settings.json not found")
+
+    try:
+        with open(settings_file, 'r', encoding='utf-8') as f:
+            settings_data = json.load(f)
+        return settings_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read settings.json: {str(e)}")
+
+
+@router.put("/settings")
+async def update_claude_settings(update: ClaudeSettingsUpdate):
+    """
+    更新 Claude settings.json 配置
+
+    Args:
+        update: 要更新的配置项（只更新提供的字段）
+
+    Returns:
+        Dict: 更新后的完整配置
+    """
+    settings_file = settings.claude_config_dir / "settings.json"
+
+    if not settings_file.exists():
+        raise HTTPException(status_code=404, detail="settings.json not found")
+
+    try:
+        # 读取现有配置
+        with open(settings_file, 'r', encoding='utf-8') as f:
+            current_settings = json.load(f)
+
+        # 更新提供的字段
+        update_dict = update.model_dump(exclude_none=True)
+        for key, value in update_dict.items():
+            if key == 'permissions' and value is not None:
+                # 权限需要合并，不是替换
+                if 'permissions' not in current_settings:
+                    current_settings['permissions'] = {}
+                current_settings['permissions'].update(value)
+            elif key == 'env' and value is not None:
+                # 环境变量需要合并
+                if 'env' not in current_settings:
+                    current_settings['env'] = {}
+                current_settings['env'].update(value)
+            elif key == 'enabledPlugins' and value is not None:
+                # 插件配置需要合并
+                if 'enabledPlugins' not in current_settings:
+                    current_settings['enabledPlugins'] = {}
+                current_settings['enabledPlugins'].update(value)
+            else:
+                current_settings[key] = value
+
+        # 写回文件
+        with open(settings_file, 'w', encoding='utf-8') as f:
+            json.dump(current_settings, f, indent=2, ensure_ascii=False)
+
+        return current_settings
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update settings.json: {str(e)}")

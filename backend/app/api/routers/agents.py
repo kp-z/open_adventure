@@ -141,6 +141,64 @@ async def list_agents(
 
 
 @router.get(
+    "/categories",
+    summary="Get agent categories and subcategories"
+)
+async def get_agent_categories(
+    service: AgentService = Depends(get_agent_service)
+):
+    """Get all agent categories with their subcategories (plugins and projects)"""
+    agents = await service.list_agents(skip=0, limit=10000)
+
+    # Count by scope
+    counts = {
+        "builtin": 0,
+        "user": 0,
+        "project": 0,
+        "plugin": 0
+    }
+
+    # Collect unique plugins and projects
+    plugins = {}  # plugin_name -> count
+    projects = {}  # project_name -> count
+
+    for agent in agents.items:
+        scope = agent.scope.value if hasattr(agent.scope, 'value') else agent.scope
+        counts[scope] = counts.get(scope, 0) + 1
+
+        # Extract plugin name
+        if scope == "plugin" and agent.meta:
+            plugin_name = agent.meta.get("plugin_name", "unknown")
+            if plugin_name and plugin_name != "unknown":
+                plugins[plugin_name] = plugins.get(plugin_name, 0) + 1
+
+        # Extract project name from path
+        if scope == "project" and agent.meta:
+            path = agent.meta.get("path", "")
+            if path:
+                # Extract project directory name from path
+                parts = Path(path).parts
+                if ".claude" in parts:
+                    claude_index = parts.index(".claude")
+                    if claude_index > 0:
+                        project_name = parts[claude_index - 1]
+                        projects[project_name] = projects.get(project_name, 0) + 1
+
+    return {
+        "counts": counts,
+        "plugins": [
+            {"id": name, "name": name, "count": count}
+            for name, count in sorted(plugins.items())
+        ],
+        "projects": [
+            {"id": name, "name": name, "count": count}
+            for name, count in sorted(projects.items())
+        ]
+    }
+
+
+
+@router.get(
     "/search",
     response_model=AgentListResponse,
     summary="搜索子代理"
@@ -164,6 +222,24 @@ async def get_scope_stats(
 ):
     """获取各作用域的子代理数量统计"""
     return await service.get_scope_stats()
+
+
+@router.get(
+    "/categories",
+    summary="获取分类和子分类"
+)
+async def get_categories(
+    service: AgentService = Depends(get_agent_service)
+):
+    """
+    获取子代理的分类统计和子分类列表
+
+    返回：
+    - counts: 各作用域的数量统计
+    - plugins: 插件子分类列表
+    - projects: 项目子分类列表
+    """
+    return await service.get_categories()
 
 
 @router.get(

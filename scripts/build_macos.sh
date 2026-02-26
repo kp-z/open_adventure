@@ -2,7 +2,7 @@
 set -e
 
 echo "======================================"
-echo "Claude Manager - Linux 打包脚本"
+echo "Claude Manager - macOS 打包脚本"
 echo "======================================"
 
 # 1. 检查前端构建产物
@@ -60,6 +60,10 @@ if [ -d "../dist/claude-manager" ] && [ -f "../dist/claude-manager/claude-manage
     echo "  ./dist/claude-manager/claude-manager"
     echo "  ./dist/claude-manager/claude-manager --port 9000"
     echo "  ./dist/claude-manager/claude-manager --no-browser"
+    echo ""
+    echo "测试方法:"
+    echo "  1. 复制整个目录: cp -r dist/claude-manager ~/Desktop/"
+    echo "  2. 运行测试: ~/Desktop/claude-manager/claude-manager"
     echo "======================================"
 else
     echo "❌ 打包失败"

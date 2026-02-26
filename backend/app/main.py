@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -56,6 +56,7 @@ app.include_router(auth.router, prefix=f"{settings.api_prefix}")
 app.include_router(health.router, prefix=f"{settings.api_prefix}/system")
 app.include_router(claude.router, prefix=f"{settings.api_prefix}")
 app.include_router(skills.router, prefix=f"{settings.api_prefix}")
+app.include_router(skills_stream.router, prefix=f"{settings.api_prefix}")
 app.include_router(agents.router, prefix=f"{settings.api_prefix}")
 app.include_router(agent_teams.router, prefix=f"{settings.api_prefix}")
 app.include_router(workflows.router, prefix=f"{settings.api_prefix}")
@@ -71,18 +72,7 @@ app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", 
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
 
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {
-        "message": f"Welcome to {settings.app_name} API",
-        "version": settings.app_version,
-        "docs": "/docs",
-        "health": f"{settings.api_prefix}/system/health",
-    }
-
-
-# 静态文件服务（用于打包版本）
+# 静态文件服务（用于打包版本）- 必须在所有路由之后
 FRONTEND_DIR = os.environ.get("FRONTEND_DIST_DIR")
 if FRONTEND_DIR and os.path.exists(FRONTEND_DIR):
     from fastapi.staticfiles import StaticFiles
