@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -70,6 +70,7 @@ app.include_router(team_state.router, prefix=f"{settings.api_prefix}")
 app.include_router(settings_router.router, prefix=f"{settings.api_prefix}")
 app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
+app.include_router(websocket.router)
 
 
 # 静态文件服务（用于打包版本）- 必须在所有路由之后
