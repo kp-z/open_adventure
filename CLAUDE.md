@@ -22,7 +22,15 @@ Claude Manager 是一个管理 Claude AI 生态的系统，包含技能(Skills)�
 | AgentTeam | 多智能体协作队伍 |
 | Workflow | 节点+边组成的 DAG 流程 |
 | Task | 工作流的实例化执行 |
-| Execution | 执行过程记录与回放 |
+| Execution | 执行过程记录与回放（支持 Workflow 和 Agent 测试） |
+
+## 核心功能
+
+### 实时执行监控
+- **统一执行历史**：Agent 测试和 Workflow 执行统一展示
+- **WebSocket 实时更新**：执行状态变化实时推送（< 500ms 延迟）
+- **后台执行支持**：用户可以离开页面，执行继续进行
+- **可视化监控**：Dashboard 高亮显示运行中的任务，右下角实时监控
 
 ## 目录结构
 ```
