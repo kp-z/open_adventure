@@ -223,7 +223,7 @@ const Tasks = () => {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Execution Tasks</h1>
+        <h1 className="text-3xl font-bold tracking-tight uppercase">EXECUTION TASKS</h1>
         <p className="text-gray-400">Track and monitor the history of all AI agent activities.</p>
       </header>
 

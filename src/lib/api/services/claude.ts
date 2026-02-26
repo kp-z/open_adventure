@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from '../client';
-import type { SyncResult, ClaudeHealthResponse } from '../types';
+import type { SyncResult, ClaudeHealthResponse, ClaudeSettings, ClaudeSettingsUpdate } from '../types';
 
 // 同步结果类型
 export interface SyncSkillsResult {
@@ -39,4 +39,15 @@ export const claudeApi = {
    * 检查 Claude 环境健康状态
    */
   health: () => apiClient.get<ClaudeHealthResponse>('/claude/health'),
+
+  /**
+   * 获取 Claude settings.json 配置
+   */
+  getSettings: () => apiClient.get<ClaudeSettings>('/claude/settings'),
+
+  /**
+   * 更新 Claude settings.json 配置
+   */
+  updateSettings: (settings: ClaudeSettingsUpdate) =>
+    apiClient.put<ClaudeSettings>('/claude/settings', settings),
 };

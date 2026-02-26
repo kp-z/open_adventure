@@ -48,6 +48,16 @@ export const agentsApi = {
     apiClient.get<AgentListResponse>('/agents', { params }),
 
   /**
+   * 获取代理分类和子分类
+   */
+  getCategories: () =>
+    apiClient.get<{
+      counts: { builtin: number; user: number; project: number; plugin: number };
+      plugins: Array<{ id: string; name: string; count: number }>;
+      projects: Array<{ id: string; name: string; count: number }>;
+    }>('/agents/categories'),
+
+  /**
    * 搜索子代理
    */
   search: (params: {

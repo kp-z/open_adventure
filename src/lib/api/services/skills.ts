@@ -94,6 +94,16 @@ export const skillsApi = {
     apiClient.get<SkillListResponse>('/skills', { params }),
 
   /**
+   * 获取技能分类和子分类
+   */
+  getCategories: () =>
+    apiClient.get<{
+      counts: { builtin: number; user: number; project: number; plugin: number };
+      plugins: Array<{ id: string; name: string; count: number }>;
+      projects: Array<{ id: string; name: string; count: number }>;
+    }>('/skills/categories'),
+
+  /**
    * 搜索技能
    * @param params 搜索参数（q 为必填）
    */
@@ -142,6 +152,105 @@ export const skillsApi = {
    */
   generate: (data: SkillGenerateRequest) =>
     apiClient.post<SkillGenerateResponse>('/skills/generate', data),
+
+  /**
+   * 使用 Claude AI 生成完整 Skill（流式输出）
+   * 返回 EventSource 用于接收实时日志
+   * @param data 生成请求
+   * @param onLog 日志回调
+   * @param onComplete 完成回调
+   * @param onError 错误回调
+   */
+  generateWithClaudeStream: (
+    data: ClaudeGenerateRequest,
+    onLog: (message: string) => void,
+    onComplete: (data: ClaudeGenerateResponse) => void,
+    onError: (error: string) => void
+  ) => {
+    const baseURL = apiClient.getBaseURL();
+    const url = `${baseURL}/skills/generate-with-claude-stream`;
+
+    // 使用 fetch 实现 SSE
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    }).then(async (response) => {
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Response body is null');
+      }
+
+      let buffer = ''; // 缓冲区，用于处理不完整的行
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // 将新数据添加到缓冲区
+        buffer += decoder.decode(value, { stream: true });
+
+        // 按行分割
+        const lines = buffer.split('\n');
+
+        // 保留最后一个不完整的行
+        buffer = lines.pop() || '';
+
+        // 处理完整的行
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const jsonStr = line.substring(6).trim();
+              if (!jsonStr) continue;
+
+              const event = JSON.parse(jsonStr);
+
+              if (event.type === 'log') {
+                onLog(event.message);
+              } else if (event.type === 'complete') {
+                onComplete(event.data);
+              } else if (event.type === 'error') {
+                onError(event.message);
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e, 'Line:', line);
+            }
+          }
+        }
+      }
+
+      // 处理缓冲区中剩余的数据
+      if (buffer.trim() && buffer.startsWith('data: ')) {
+        try {
+          const jsonStr = buffer.substring(6).trim();
+          if (jsonStr) {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'log') {
+              onLog(event.message);
+            } else if (event.type === 'complete') {
+              onComplete(event.data);
+            } else if (event.type === 'error') {
+              onError(event.message);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse final SSE event:', e);
+        }
+      }
+    }).catch((error) => {
+      console.error('Stream error:', error);
+      onError(error.message || '连接失败');
+    });
+  },
 
   /**
    * 使用 Claude AI 生成完整 Skill

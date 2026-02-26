@@ -13,7 +13,7 @@ export interface PaginatedResponse<T> {
 
 // ============ Skill 相关类型 ============
 // 技能来源枚举
-export type SkillSource = 'global' | 'plugin' | 'project';
+export type SkillSource = 'user' | 'global' | 'plugin' | 'project';
 
 // 后端返回的 Skill 模型
 export interface Skill {
@@ -63,6 +63,17 @@ export interface SyncResult {
   teams: { created: number; updated: number; unchanged: number };
 }
 
+export interface ModelInfo {
+  current_model: string | null;
+  available_models: Array<{
+    alias: string;
+    full_name: string;
+    description: string;
+    available: boolean;
+  }>;
+  model_source: 'settings' | 'default' | null;
+}
+
 export interface ClaudeHealthResponse {
   available: boolean;
   cli_available: boolean;
@@ -73,6 +84,32 @@ export interface ClaudeHealthResponse {
   skills_dir_exists: boolean;
   skills_path: string;
   issues: string[];
+  model_info?: ModelInfo;
+}
+
+// Claude settings.json 配置类型
+export interface ClaudeSettings {
+  env?: Record<string, string>;
+  permissions?: {
+    allow: string[];
+    deny: string[];
+  };
+  model?: string;
+  enabledPlugins?: Record<string, boolean>;
+  language?: string;
+  effortLevel?: string;
+}
+
+export interface ClaudeSettingsUpdate {
+  env?: Record<string, string>;
+  permissions?: {
+    allow?: string[];
+    deny?: string[];
+  };
+  model?: string;
+  enabledPlugins?: Record<string, boolean>;
+  language?: string;
+  effortLevel?: string;
 }
 
 // ============ Agent 相关类型 - Claude Code Subagent 规范 ============
@@ -400,6 +437,12 @@ export interface Execution {
 export type ExecutionListResponse = PaginatedResponse<Execution>;
 
 // ============ Dashboard 相关类型 ============
+export interface PopularItem {
+  id: number;
+  name: string;
+  usage_count: number;
+}
+
 export interface DashboardStats {
   total_skills: number;
   total_agents: number;
@@ -408,8 +451,8 @@ export interface DashboardStats {
   total_tasks: number;
   total_executions: number;
   recent_executions: Execution[];
-  popular_skills: Skill[];
-  popular_agents: Agent[];
+  popular_skills: PopularItem[];
+  popular_agents: PopularItem[];
   task_status_distribution: Record<string, number>;
 }
 

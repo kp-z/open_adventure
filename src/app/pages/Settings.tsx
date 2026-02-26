@@ -26,7 +26,7 @@ const Settings = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">{t("settings")}</h1>
+        <h1 className="text-3xl font-bold tracking-tight uppercase">SETTINGS</h1>
         <p className="text-gray-400">{t("advDesc")}</p>
       </header>
 

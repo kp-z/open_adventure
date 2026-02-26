@@ -122,6 +122,10 @@ class ApiClient {
       body: data ? JSON.stringify(data) : undefined,
     });
   }
+
+  getBaseURL(): string {
+    return this.baseURL;
+  }
 }
 
 // 创建默认客户端实例

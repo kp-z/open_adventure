@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  Code2, 
-  FileText, 
-  Library, 
-  Image as ImageIcon, 
-  Plus, 
-  Save, 
-  Zap, 
+import {
+  ArrowLeft,
+  Sparkles,
+  Code2,
+  FileText,
+  Library,
+  Image as ImageIcon,
+  Plus,
+  Save,
+  Zap,
   Send,
   ChevronRight,
   FolderOpen,
@@ -21,13 +21,49 @@ import {
   MessageSquare,
   Bot,
   AlertCircle,
-  Loader2
+  Loader2,
+  Wand2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, GameCard, ActionButton } from './ui-shared';
 import { cn } from '../lib/utils';
 import { skillsApi, type ClaudeGenerateResponse, type SkillFileItem, type SaveSkillRequest, type SkillContentResponse } from '@/lib/api';
+
+// 预设推荐
+const PRESET_RECOMMENDATIONS = [
+  { title: "代码审查助手", desc: "审查代码质量、安全漏洞和最佳实践", icon: "🔍" },
+  { title: "测试生成器", desc: "自动生成单元测试和集成测试", icon: "🧪" },
+  { title: "文档生成器", desc: "从代码注释生成 API 文档", icon: "📚" },
+  { title: "重构助手", desc: "识别代码异味并建议重构方案", icon: "🔧" },
+  { title: "性能分析器", desc: "分析代码性能瓶颈并提供优化建议", icon: "⚡" },
+  { title: "依赖管理器", desc: "管理和更新项目依赖", icon: "📦" }
+];
+
+// 智能推荐（基于用户输入）
+const getSmartRecommendations = (input: string): string[] => {
+  const keywords = input.toLowerCase();
+  const recommendations: string[] = [];
+
+  if (keywords.includes('test') || keywords.includes('测试')) {
+    recommendations.push("生成单元测试用例，包含边界条件和异常处理");
+  }
+  if (keywords.includes('doc') || keywords.includes('文档')) {
+    recommendations.push("生成详细的 API 文档，包含参数说明和示例代码");
+  }
+  if (keywords.includes('review') || keywords.includes('审查')) {
+    recommendations.push("审查代码安全性、性能和可维护性");
+  }
+  if (keywords.includes('refactor') || keywords.includes('重构')) {
+    recommendations.push("识别重复代码并提供重构建议");
+  }
+  if (keywords.includes('debug') || keywords.includes('调试')) {
+    recommendations.push("分析错误日志并定位问题根源");
+  }
+
+  return recommendations;
+};
 
 type SkillFile = {
   name: string;
@@ -50,10 +86,10 @@ interface SkillEditorProps {
 
 export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: SkillEditorProps) => {
   const { mode } = useMode();
-  const [editorMode, setEditorMode] = useState<'ai' | 'manual'>(editingSkillId ? 'manual' : initialMode);
+  const { addNotification, updateNotification } = useNotifications();
+  const [editorMode, setEditorMode] = useState<'visual' | 'manual'>(editingSkillId ? 'visual' : 'visual');
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationStep, setGenerationStep] = useState(0);
   const [selectedFile, setSelectedFile] = useState<string>('SKILL.md');
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   
@@ -72,6 +108,8 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   const [skillPath, setSkillPath] = useState<string | null>(null);  // 技能的实际路径
   const [generationComplete, setGenerationComplete] = useState(false);
   const [isLoadingSkill, setIsLoadingSkill] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(true);  // 显示推荐
+  const [smartRecommendations, setSmartRecommendations] = useState<string[]>([]);  // 智能推荐
 
   // 加载现有技能数据
   useEffect(() => {
@@ -121,6 +159,16 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
     }
   }, [generationComplete, isGenerating, skillData]);
 
+  // 监听 prompt 变化，更新智能推荐
+  useEffect(() => {
+    if (prompt.trim().length > 10) {
+      const recommendations = getSmartRecommendations(prompt);
+      setSmartRecommendations(recommendations);
+    } else {
+      setSmartRecommendations([]);
+    }
+  }, [prompt]);
+
   const steps = [
     "Analyzing intent...",
     "Calling Claude AI...",
@@ -145,39 +193,38 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
-    
+
+    const notificationId = addNotification({
+      type: 'loading',
+      title: 'Generating skill',
+      message: 'Using Claude AI to generate skill...',
+    });
+
     setIsGenerating(true);
-    setGenerationStep(0);
     setGenerateError(null);
-    
-    // 启动进度动画
-    const interval = setInterval(() => {
-      setGenerationStep(prev => {
-        if (prev >= steps.length - 1) return prev;
-        return prev + 1;
-      });
-    }, 2000);
-    
+
     try {
       console.log('[SkillEditor] Calling generateWithClaude API with prompt:', prompt);
-      
+
       // 调用真实 API
       const response = await skillsApi.generateWithClaude({
         description: prompt,
         save_to_global: false  // 先预览，用户确认后再保存
       });
-      
+
       console.log('[SkillEditor] API Response:', response);
-      
-      clearInterval(interval);
-      
+
       if (response.success) {
+        updateNotification(notificationId, {
+          type: 'success',
+          title: 'Skill generated',
+          message: `Successfully generated: ${response.name || 'new-skill'}`,
+        });
+
         // 保存生成的技能名称
         setGeneratedSkillName(response.name);
         console.log('[SkillEditor] Generated skill name:', response.name);
-        console.log('[SkillEditor] SKILL.md content length:', response.skill_md?.length || 0);
-        console.log('[SkillEditor] SKILL.md content preview:', response.skill_md?.substring(0, 200));
-        
+
         // 将 API 响应转换为编辑器数据结构
         const newSkillData: SkillStructure = {
           'SKILL.md': response.skill_md || '',
@@ -185,13 +232,12 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
           'references': (response.references || []).map(convertToSkillFile),
           'assets': (response.assets || []).map(convertToSkillFile)
         };
-        
+
         console.log('[SkillEditor] Setting skillData:', newSkillData);
-        
+
         // 批量更新状态
         setSkillData(newSkillData);
-        setGenerationStep(steps.length - 1);
-        
+
         // 延迟一下让动画完成，然后标记生成完成
         setTimeout(() => {
           setIsGenerating(false);
@@ -200,13 +246,26 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
         }, 800);
       } else {
         console.error('[SkillEditor] Generation failed:', response.message);
+
+        updateNotification(notificationId, {
+          type: 'error',
+          title: 'Generation failed',
+          message: response.message || 'Unknown error',
+        });
+
         throw new Error(response.message || '生成失败');
       }
     } catch (err) {
-      clearInterval(interval);
       setIsGenerating(false);
       const errorMessage = err instanceof Error ? err.message : '生成 Skill 失败，请稍后重试';
       setGenerateError(errorMessage);
+
+      updateNotification(notificationId, {
+        type: 'error',
+        title: 'Generation error',
+        message: errorMessage,
+      });
+
       console.error('[SkillEditor] Failed to generate skill:', err);
     }
   };
@@ -323,296 +382,531 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className={cn(
-        "h-16 flex items-center justify-between px-6 border-b shrink-0",
-        mode === 'adventure' ? "bg-[#121225] border-yellow-500/20" : "bg-white/[0.02] border-white/5 backdrop-blur-md"
-      )}>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={onBack}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-gray-400 hover:text-white"
-          >
-            <ArrowLeft size={20} />
-          </button>
+    <div className="max-w-6xl mx-auto pb-20">
+      {/* 头部 */}
+      <div className="flex items-center gap-4 mb-8">
+        <button
+          onClick={onBack}
+          className="p-3 hover:bg-white/10 rounded-xl transition-colors"
+          title={isGenerating ? "返回列表（生成将继续在后台运行）" : "返回列表"}
+        >
+          <ArrowLeft size={24} />
+        </button>
+        <div className="flex items-center gap-4 flex-1">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-purple-500/20 border border-purple-500/30">
+            <Sparkles size={28} className="text-purple-400" />
+          </div>
           <div>
-            <h2 className={cn(
-              "font-bold",
-              mode === 'adventure' ? "text-yellow-500 uppercase tracking-widest text-sm" : "text-lg"
-            )}>
-              {editingSkillId ? `Edit: ${generatedSkillName || 'Skill'}` : (editorMode === 'ai' ? 'Forge Skill with AI' : 'Skill Editor')}
-            </h2>
-            <p className="text-[10px] text-gray-500 font-mono">{editingSkillId ? (skillPath || `~/.claude/skills/${generatedSkillName}`) : '~/.claude/skills/new_skill'}</p>
+            <h1 className="text-3xl font-bold tracking-tight">
+              {editingSkillId ? '编辑技能' : '创建新技能'}
+            </h1>
+            <p className="text-gray-400 mt-1">
+              {editingSkillId ? (skillPath || `~/.claude/skills/${generatedSkillName}`) : '配置你的 AI 技能'}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex bg-black/20 rounded-lg p-1 border border-white/5">
-            <button 
-              onClick={() => setEditorMode('ai')}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2",
-                editorMode === 'ai' 
-                  ? (mode === 'adventure' ? "bg-yellow-600 text-white" : "bg-blue-600 text-white") 
-                  : "text-gray-500 hover:text-gray-300"
-              )}
+          {/* 模式切换 */}
+          <div className="flex bg-white/5 rounded-xl p-1">
+            <button
+              onClick={() => setEditorMode('visual')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editorMode === 'visual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
-              <Sparkles size={14} />
-              AI Generate
+              <Settings size={16} />
+              可视化
             </button>
-            <button 
+            <button
               onClick={() => setEditorMode('manual')}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-2",
-                editorMode === 'manual' 
-                  ? (mode === 'adventure' ? "bg-yellow-600 text-white" : "bg-blue-600 text-white") 
-                  : "text-gray-500 hover:text-gray-300"
-              )}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editorMode === 'manual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
-              <Code2 size={14} />
-              Direct Edit
+              <Code2 size={16} />
+              源码
             </button>
           </div>
-          
-          <div className="h-8 w-[1px] bg-white/10 mx-2" />
-          
-          <ActionButton 
-            className="h-9 px-4 py-0 text-xs"
+
+          <button
             onClick={handleSave}
             disabled={isSaving || saveSuccess}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all shadow-lg"
           >
             {isSaving ? (
               <>
-                <Loader2 size={14} className="mr-2 animate-spin" />
-                Saving...
+                <Loader2 size={20} className="animate-spin" />
+                保存中...
               </>
             ) : saveSuccess ? (
               <>
-                <CheckCircle2 size={14} className="mr-2" />
-                Saved!
+                <CheckCircle2 size={20} />
+                已保存
               </>
             ) : (
               <>
-                <Save size={14} className="mr-2" />
-                Deploy Skill
+                <Save size={20} />
+                {editingSkillId ? '保存' : '创建'}
               </>
             )}
-          </ActionButton>
+          </button>
         </div>
       </div>
 
-      <div className="flex-1 relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          {editorMode === 'ai' ? (
-            <motion.div 
-              key="ai-mode"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="h-full flex flex-col items-center justify-center p-8 max-w-4xl mx-auto"
+      {/* AI 助手卡片 - 在可视化模式显示 */}
+      {editorMode === 'visual' && (
+        <GlassCard className="p-6 border-2 border-purple-500/30 mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+              <Sparkles className="text-purple-400" size={20} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold">AI 助手</h3>
+              <p className="text-xs text-gray-400">
+                描述你的技能，让 AI 帮你生成完整的 Skill 结构
+              </p>
+            </div>
+          </div>
+
+          {/* 生成中提示 */}
+          {isGenerating && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 mb-4">
+              <Loader2 size={20} className="animate-spin" />
+              <span className="text-sm flex-1">
+                AI 正在生成技能结构... 你可以返回列表查看其他内容，生成状态会在右下角通知中显示
+              </span>
+            </div>
+          )}
+
+          {/* 错误提示 */}
+          {generateError && (
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 mb-4">
+              <AlertCircle size={20} />
+              <span className="text-sm flex-1">{generateError}</span>
+              <button
+                onClick={() => setGenerateError(null)}
+                className="text-red-400 hover:text-red-300"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+
+          <div className="flex gap-3 mb-4">
+            <input
+              type="text"
+              placeholder="例如：'一个能够总结技术博客并生成周报的技能'"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && prompt.trim() && !isGenerating && handleGenerate()}
+              className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
+              disabled={isGenerating}
+            />
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt.trim()}
+              className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all"
             >
-              {!isGenerating ? (
-                <div className="w-full space-y-8">
-                  <div className="text-center space-y-2">
-                    <div className={cn(
-                      "w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-6",
-                      mode === 'adventure' ? "bg-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.4)]" : "bg-blue-600 shadow-xl"
-                    )}>
-                      <Sparkles size={32} className="text-white" />
-                    </div>
-                    <h1 className={cn(
-                      "text-3xl font-black italic tracking-tighter uppercase",
-                      mode === 'adventure' ? "text-yellow-500" : "text-white"
-                    )}>
-                      Describe your creation
-                    </h1>
-                    <p className="text-gray-400">The AI will generate the documentation, code, and resources needed for your skill.</p>
+              {isGenerating ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Wand2 size={20} />
+              )}
+              生成
+            </button>
+          </div>
+
+          {/* 推荐区域 */}
+          {showRecommendations && (
+            <div className="space-y-4">
+              {/* 智能推荐 */}
+              {smartRecommendations.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+                      <Sparkles size={14} />
+                      智能推荐
+                    </h4>
                   </div>
-
-                  {/* 错误提示 */}
-                  {generateError && (
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
-                      <AlertCircle size={20} />
-                      <span className="text-sm flex-1">{generateError}</span>
-                      <button 
-                        onClick={() => setGenerateError(null)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-
-                  <div className={cn(
-                    "relative p-1 rounded-2xl border transition-all duration-500",
-                    mode === 'adventure' ? "bg-black/60 border-yellow-500/30" : "bg-white/5 border-white/10"
-                  )}>
-                    <textarea 
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.ctrlKey && e.key === 'Enter' && prompt.trim()) {
-                          handleGenerate();
-                        }
-                      }}
-                      placeholder="e.g., A skill that summarizes daily news from tech blogs and formats them into a weekly digest PDF..."
-                      className="w-full h-40 bg-transparent p-6 text-white placeholder:text-gray-600 focus:outline-none resize-none"
-                    />
-                    <div className="absolute bottom-4 right-4 flex items-center gap-3">
-                      <span className="text-[10px] text-gray-600 font-mono">CTRL + ENTER to forge</span>
-                      <button 
-                        onClick={handleGenerate}
-                        disabled={!prompt.trim()}
-                        className={cn(
-                          "flex items-center gap-2 px-6 py-2 rounded-xl font-black uppercase tracking-widest transition-all",
-                          prompt.trim() 
-                            ? (mode === 'adventure' ? "bg-yellow-500 text-black hover:scale-105 active:scale-95" : "bg-blue-600 text-white hover:bg-blue-500") 
-                            : "bg-white/5 text-gray-600 cursor-not-allowed"
-                        )}
-                      >
-                        Forge Artifact
-                        <Zap size={16} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {[
-                      { title: "Smart Summarizer", desc: "A skill that processes long documents and extracts key points into concise bullet summaries." },
-                      { title: "Code Auditor", desc: "A skill that reviews code for security vulnerabilities, code smells, and best practice violations." },
-                      { title: "API Doc Generator", desc: "A skill that generates API documentation from code comments and function signatures." }
-                    ].map((example, i) => (
-                      <button 
+                  <div className="space-y-2">
+                    {smartRecommendations.map((rec, i) => (
+                      <button
                         key={i}
-                        onClick={() => setPrompt(example.desc)}
-                        className="p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 transition-all text-left group"
+                        onClick={() => setPrompt(rec)}
+                        className="w-full p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-all text-left group"
                       >
-                        <p className="text-xs font-bold text-gray-400 group-hover:text-blue-400 mb-1">{example.title}</p>
-                        <p className="text-[10px] text-gray-500 line-clamp-2">{example.desc}</p>
+                        <p className="text-xs text-gray-300 group-hover:text-blue-300">{rec}</p>
                       </button>
                     ))}
                   </div>
                 </div>
-              ) : (
-                <div className="flex flex-col items-center gap-8">
-                  <div className="relative">
-                    <div className={cn(
-                      "w-32 h-32 rounded-full border-4 border-t-transparent animate-spin",
-                      mode === 'adventure' ? "border-yellow-500 shadow-[0_0_50px_rgba(234,179,8,0.2)]" : "border-blue-600 shadow-xl"
-                    )} />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Zap size={40} className={cn(
-                        "animate-pulse",
-                        mode === 'adventure' ? "text-yellow-500" : "text-blue-500"
-                      )} />
-                    </div>
+              )}
+
+              {/* 预设推荐 */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-gray-400">预设模板</h4>
+                  <button
+                    onClick={() => setShowRecommendations(false)}
+                    className="text-xs text-gray-500 hover:text-gray-300"
+                  >
+                    隐藏
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {PRESET_RECOMMENDATIONS.map((preset, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPrompt(`创建一个${preset.title}：${preset.desc}`)}
+                      className="p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 transition-all text-left group"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">{preset.icon}</span>
+                        <p className="text-xs font-bold text-gray-400 group-hover:text-blue-400">{preset.title}</p>
+                      </div>
+                      <p className="text-[10px] text-gray-500 line-clamp-2">{preset.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!showRecommendations && (
+            <button
+              onClick={() => setShowRecommendations(true)}
+              className="text-sm text-gray-500 hover:text-gray-300 flex items-center gap-2 mx-auto"
+            >
+              <Sparkles size={14} />
+              显示推荐
+            </button>
+          )}
+        </GlassCard>
+      )}
+
+      {/* 内容区域 */}
+      <div className="relative">
+        <AnimatePresence mode="wait">
+          {editorMode === 'visual' ? (
+            <motion.div
+              key="visual-mode"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {/* 基本信息卡片 */}
+              <GlassCard className="p-6">
+                <div className="flex items-center gap-2 mb-6">
+                  <FileText size={18} className="text-blue-400" />
+                  <h3 className="font-bold">基本信息</h3>
+                  <span className="text-xs text-red-400">* 必填</span>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-2">技能名称 *</label>
+                    <input
+                      type="text"
+                      value={generatedSkillName}
+                      onChange={(e) => setGeneratedSkillName(e.target.value)}
+                      placeholder="my-skill"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500/50 transition-all"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">小写字母、数字和连字符</p>
                   </div>
-                  
-                  <div className="text-center space-y-4">
-                    <h3 className={cn(
-                      "text-xl font-black italic tracking-widest uppercase",
-                      mode === 'adventure' ? "text-yellow-500" : "text-white"
-                    )}>
-                      {steps[generationStep]}
-                    </h3>
-                    <div className="flex gap-2 justify-center">
-                      {steps.map((_, i) => (
-                        <div 
-                          key={i} 
-                          className={cn(
-                            "w-8 h-1 rounded-full transition-all duration-500",
-                            i <= generationStep 
-                              ? (mode === 'adventure' ? "bg-yellow-500" : "bg-blue-600") 
-                              : "bg-white/10"
-                          )} 
-                        />
-                      ))}
-                    </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-2">描述 *</label>
+                    <textarea
+                      value={skillData['SKILL.md']}
+                      onChange={(e) => setSkillData({ ...skillData, 'SKILL.md': e.target.value })}
+                      placeholder="描述你的技能功能..."
+                      rows={6}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500/50 resize-none transition-all"
+                    />
                   </div>
                 </div>
-              )}
+              </GlassCard>
+
+              {/* Scripts 卡片 */}
+              <GlassCard className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <FileCode size={18} className="text-yellow-400" />
+                    <h3 className="font-bold">脚本文件</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newScript: SkillFile = {
+                        name: `script-${skillData.scripts.length + 1}.js`,
+                        content: '// 新脚本\n',
+                        type: 'js'
+                      };
+                      setSkillData({ ...skillData, scripts: [...skillData.scripts, newScript] });
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 rounded-lg text-sm font-bold text-yellow-400 transition-all"
+                  >
+                    <Plus size={16} />
+                    添加脚本
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {skillData.scripts.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">暂无脚本文件</p>
+                    </div>
+                  ) : (
+                    skillData.scripts.map((script, index) => (
+                      <div key={index} className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <FileCode size={16} className="text-yellow-400" />
+                            <input
+                              type="text"
+                              value={script.name}
+                              onChange={(e) => {
+                                const newScripts = [...skillData.scripts];
+                                newScripts[index].name = e.target.value;
+                                setSkillData({ ...skillData, scripts: newScripts });
+                              }}
+                              className="bg-transparent text-sm font-medium focus:outline-none"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newScripts = skillData.scripts.filter((_, i) => i !== index);
+                              setSkillData({ ...skillData, scripts: newScripts });
+                            }}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <textarea
+                          value={script.content}
+                          onChange={(e) => {
+                            const newScripts = [...skillData.scripts];
+                            newScripts[index].content = e.target.value;
+                            setSkillData({ ...skillData, scripts: newScripts });
+                          }}
+                          rows={4}
+                          className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs font-mono focus:outline-none focus:border-yellow-500/50 resize-none"
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </GlassCard>
+
+              {/* References 卡片 */}
+              <GlassCard className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <Library size={18} className="text-green-400" />
+                    <h3 className="font-bold">参考文档</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newRef: SkillFile = {
+                        name: `reference-${skillData.references.length + 1}.md`,
+                        content: '# 参考文档\n\n',
+                        type: 'md'
+                      };
+                      setSkillData({ ...skillData, references: [...skillData.references, newRef] });
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-sm font-bold text-green-400 transition-all"
+                  >
+                    <Plus size={16} />
+                    添加文档
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {skillData.references.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">暂无参考文档</p>
+                    </div>
+                  ) : (
+                    skillData.references.map((ref, index) => (
+                      <div key={index} className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <FileText size={16} className="text-green-400" />
+                            <input
+                              type="text"
+                              value={ref.name}
+                              onChange={(e) => {
+                                const newRefs = [...skillData.references];
+                                newRefs[index].name = e.target.value;
+                                setSkillData({ ...skillData, references: newRefs });
+                              }}
+                              className="bg-transparent text-sm font-medium focus:outline-none"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newRefs = skillData.references.filter((_, i) => i !== index);
+                              setSkillData({ ...skillData, references: newRefs });
+                            }}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                        <textarea
+                          value={ref.content}
+                          onChange={(e) => {
+                            const newRefs = [...skillData.references];
+                            newRefs[index].content = e.target.value;
+                            setSkillData({ ...skillData, references: newRefs });
+                          }}
+                          rows={4}
+                          className="w-full px-3 py-2 bg-black/40 border border-white/10 rounded-lg text-xs font-mono focus:outline-none focus:border-green-500/50 resize-none"
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </GlassCard>
+
+              {/* Assets 卡片 */}
+              <GlassCard className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon size={18} className="text-orange-400" />
+                    <h3 className="font-bold">资源文件</h3>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newAsset: SkillFile = {
+                        name: `asset-${skillData.assets.length + 1}.txt`,
+                        content: '',
+                        type: 'asset'
+                      };
+                      setSkillData({ ...skillData, assets: [...skillData.assets, newAsset] });
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 rounded-lg text-sm font-bold text-orange-400 transition-all"
+                  >
+                    <Plus size={16} />
+                    添加资源
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {skillData.assets.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm">暂无资源文件</p>
+                    </div>
+                  ) : (
+                    skillData.assets.map((asset, index) => (
+                      <div key={index} className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ImageIcon size={16} className="text-orange-400" />
+                            <input
+                              type="text"
+                              value={asset.name}
+                              onChange={(e) => {
+                                const newAssets = [...skillData.assets];
+                                newAssets[index].name = e.target.value;
+                                setSkillData({ ...skillData, assets: newAssets });
+                              }}
+                              className="bg-transparent text-sm font-medium focus:outline-none"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              const newAssets = skillData.assets.filter((_, i) => i !== index);
+                              setSkillData({ ...skillData, assets: newAssets });
+                            }}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </GlassCard>
             </motion.div>
-          ) : (
-            <motion.div 
+          ) : editorMode === 'manual' ? (
+            <motion.div
               key="manual-mode"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="h-full flex"
             >
-              {/* Sidebar File Tree */}
-              <div className={cn(
-                "w-64 border-r shrink-0 flex flex-col",
-                mode === 'adventure' ? "bg-[#0c0c1a] border-yellow-500/10" : "bg-black/20 border-white/5"
-              )}>
-                <div className="p-4 flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Explorer</span>
-                  <Plus size={14} className="text-gray-500 hover:text-white cursor-pointer" />
-                </div>
-                
-                <div className="flex-1 overflow-y-auto px-2 space-y-1">
-                  {/* Root Files */}
-                  <button 
-                    onClick={() => { setSelectedFile('SKILL.md'); setSelectedFolder(null); }}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all",
-                      selectedFile === 'SKILL.md' ? "bg-white/10 text-white" : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
-                    )}
-                  >
-                    <FileText size={14} className="text-blue-400" />
-                    SKILL.md
-                  </button>
+              {/* Manual 模式的文件编辑器 */}
+              <div className="flex h-[600px] bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+                {/* Sidebar File Tree */}
+                <div className="w-64 border-r shrink-0 flex flex-col border-white/5 overflow-hidden">
+                  <div className="p-4 flex items-center justify-between border-b border-white/5">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Explorer</span>
+                    <Plus size={14} className="text-gray-500 hover:text-white cursor-pointer" />
+                  </div>
 
-                  {/* Folders */}
-                  {(['scripts', 'references', 'assets'] as const).map(folder => (
-                    <div key={folder} className="space-y-1">
-                      <button 
-                        onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-all"
-                      >
-                        <FolderOpen size={14} className={selectedFolder === folder ? "text-yellow-500" : "text-gray-600"} />
-                        <span className="capitalize">{folder}</span>
-                        <ChevronRight size={12} className={cn("ml-auto transition-transform", selectedFolder === folder && "rotate-90")} />
-                      </button>
-                      
-                      {selectedFolder === folder && (
-                        <div className="pl-6 space-y-1">
-                          {skillData[folder].map(file => (
-                            <button 
-                              key={file.name}
-                              onClick={() => setSelectedFile(`${folder}/${file.name}`)}
-                              className={cn(
-                                "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] transition-all",
-                                selectedFile === `${folder}/${file.name}` ? "bg-white/10 text-white" : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
-                              )}
-                            >
-                              <FileIcon type={file.type} />
-                              {file.name}
-                            </button>
-                          ))}
-                          <button className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] text-gray-600 hover:text-gray-400 italic">
-                            <Plus size={12} />
-                            Add item...
-                          </button>
-                        </div>
+                  <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+                    {/* Root Files */}
+                    <button
+                      onClick={() => { setSelectedFile('SKILL.md'); setSelectedFolder(null); }}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all",
+                        selectedFile === 'SKILL.md' ? "bg-white/10 text-white" : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
                       )}
-                    </div>
-                  ))}
-                </div>
+                    >
+                      <FileText size={14} className="text-blue-400" />
+                      SKILL.md
+                    </button>
 
-                <div className="p-4 border-t border-white/5">
-                  <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
-                      <Settings size={16} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-bold text-white truncate">Skill Settings</p>
-                      <p className="text-[9px] text-gray-500 truncate">Metadata & Env</p>
+                    {/* Folders */}
+                    {(['scripts', 'references', 'assets'] as const).map(folder => (
+                      <div key={folder} className="space-y-1">
+                        <button
+                          onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-500 hover:bg-white/5 hover:text-gray-300 transition-all"
+                        >
+                          <FolderOpen size={14} className={selectedFolder === folder ? "text-yellow-500" : "text-gray-600"} />
+                          <span className="capitalize">{folder}</span>
+                          <ChevronRight size={12} className={cn("ml-auto transition-transform", selectedFolder === folder && "rotate-90")} />
+                        </button>
+
+                        {selectedFolder === folder && (
+                          <div className="pl-6 space-y-1">
+                            {skillData[folder].map(file => (
+                              <button
+                                key={file.name}
+                                onClick={() => setSelectedFile(`${folder}/${file.name}`)}
+                                className={cn(
+                                  "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] transition-all",
+                                  selectedFile === `${folder}/${file.name}` ? "bg-white/10 text-white" : "text-gray-500 hover:bg-white/5 hover:text-gray-300"
+                                )}
+                              >
+                                <FileIcon type={file.type} />
+                                {file.name}
+                              </button>
+                            ))}
+                            <button className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] text-gray-600 hover:text-gray-400 italic">
+                              <Plus size={12} />
+                              Add item...
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 border-t border-white/5">
+                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                        <Settings size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-white truncate">Skill Settings</p>
+                        <p className="text-[9px] text-gray-500 truncate">Metadata & Env</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
               {/* Main Editor Area */}
               <div className="flex-1 flex flex-col relative border-r border-white/5">
@@ -731,8 +1025,9 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                   <p className="text-[9px] text-gray-600 mt-2 text-center uppercase font-bold tracking-tighter">Powered by Claude 3.5 Sonnet</p>
                 </div>
               </div>
-            </motion.div>
-          )}
+            </div>
+          </motion.div>
+          ) : null}
         </AnimatePresence>
       </div>
     </div>

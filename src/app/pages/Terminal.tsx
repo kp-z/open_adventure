@@ -107,7 +107,7 @@ const Terminal = () => {
             <TerminalIcon className="text-white" size={20} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Debug Terminal</h1>
+            <h1 className="text-3xl font-bold tracking-tight uppercase">DEBUG TERMINAL</h1>
             <p className="text-sm text-gray-400">
               {connected ? (
                 <span className="text-green-500">● Connected</span>

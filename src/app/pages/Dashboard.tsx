@@ -12,11 +12,13 @@ import {
   BookOpen,
   Map as MapIcon,
   Trophy,
-  Plus
+  Plus,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
+import { ClaudeConfigEditor } from '../components/ClaudeConfigEditor';
 import { getAvatarById } from '../lib/avatars';
 import {
   BarChart,
@@ -53,6 +55,7 @@ const Dashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showConfigEditor, setShowConfigEditor] = useState(false);
 
   const fetchDashboardData = async () => {
     // 获取仪表板统计数据
@@ -217,7 +220,7 @@ const Dashboard = () => {
     <div className="space-y-8">
       <header className="flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("overview")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight uppercase">SYSTEM OVERVIEW</h1>
           <p className="text-gray-400">{t("overviewDesc")}</p>
         </div>
         <div className="flex gap-3">
@@ -238,7 +241,7 @@ const Dashboard = () => {
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Status Card */}
+        {/* Claude CLI Status Card - 占2列 */}
         <GlassCard className="lg:col-span-2 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
@@ -262,11 +265,47 @@ const Dashboard = () => {
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-400">Version</p>
-              <p className="text-sm font-mono">
-                {claudeHealth?.version || 'N/A'}
-              </p>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="text-xs text-gray-400">Version</p>
+                <p className="text-sm font-mono">
+                  {claudeHealth?.version || 'N/A'}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowConfigEditor(true)}
+                className="w-8 h-8 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/50 flex items-center justify-center transition-colors"
+                title="Configure Settings"
+              >
+                <SettingsIcon size={16} className="text-blue-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Available Models */}
+          <div className="mb-4">
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-3">Available Models</p>
+            <div className="grid grid-cols-3 gap-2">
+              {claudeHealth?.model_info?.available_models.map((model) => (
+                <div
+                  key={model.alias}
+                  className={`p-3 rounded-lg border transition-colors ${
+                    claudeHealth?.model_info?.current_model === model.alias
+                      ? 'bg-blue-500/20 border-blue-500/50'
+                      : model.available
+                      ? 'bg-green-500/10 border-green-500/30'
+                      : 'bg-gray-500/10 border-gray-500/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold text-white capitalize">{model.alias}</p>
+                    <div className={`w-2 h-2 rounded-full ${
+                      model.available ? 'bg-green-500' : 'bg-gray-500'
+                    }`} />
+                  </div>
+                  <p className="text-[9px] text-gray-500">{model.description}</p>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -303,19 +342,37 @@ const Dashboard = () => {
           </div>
         </GlassCard>
 
-        {/* Stat Cards */}
+        {/* Total Skills Card */}
         <GlassCard className="flex flex-col justify-between">
-          <div className="flex justify-between">
+          <div className="flex justify-between items-start mb-4">
             <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
               <Cpu size={20} />
             </div>
             <span className="text-xs text-green-500 font-bold">+12%</span>
           </div>
-          <div>
+          <div className="mb-4">
             <p className="text-sm text-gray-400">Total Skills</p>
             <p className="text-3xl font-bold">{stats?.total_skills || 0}</p>
           </div>
-          <div className="h-12 w-full mt-4">
+
+          {/* Popular Skills - 横向排列 */}
+          <div className="mb-4">
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-2">Popular Skills</p>
+            {stats?.popular_skills && stats.popular_skills.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {stats.popular_skills.slice(0, 4).map((skill) => (
+                  <div key={skill.id} className="flex items-center justify-between p-2 bg-white/5 rounded-lg">
+                    <span className="text-xs text-gray-300 truncate flex-1">{skill.name}</span>
+                    <span className="text-[10px] text-blue-400 font-bold ml-2">{skill.usage_count}x</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">No skills yet</p>
+            )}
+          </div>
+
+          <div className="h-12 w-full mt-auto">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={mockChartData}>
                 <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} />
@@ -324,18 +381,37 @@ const Dashboard = () => {
           </div>
         </GlassCard>
 
+        {/* Agents Running Card */}
         <GlassCard className="flex flex-col justify-between">
-          <div className="flex justify-between">
+          <div className="flex justify-between items-start mb-4">
             <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
               <Code2 size={20} />
             </div>
             <span className="text-xs text-gray-500 font-bold">0%</span>
           </div>
-          <div>
+          <div className="mb-4">
             <p className="text-sm text-gray-400">Agents Running</p>
             <p className="text-3xl font-bold">{stats?.total_agents || 0}</p>
           </div>
-          <div className="h-12 w-full mt-4">
+
+          {/* Popular Agents - 横向排列 */}
+          <div className="mb-4">
+            <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-2">Popular Agents</p>
+            {stats?.popular_agents && stats.popular_agents.length > 0 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {stats.popular_agents.slice(0, 4).map((agent) => (
+                  <div key={agent.id} className="flex items-center justify-between p-2 bg-white/5 rounded-lg">
+                    <span className="text-xs text-gray-300 truncate flex-1">{agent.name}</span>
+                    <span className="text-[10px] text-purple-400 font-bold ml-2">{agent.usage_count}x</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500">No agents yet</p>
+            )}
+          </div>
+
+          <div className="h-12 w-full mt-auto">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={mockChartData}>
                 <Bar dataKey="value" fill="#a855f7" radius={[2, 2, 0, 0]} />
@@ -438,6 +514,17 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Config Editor Modal */}
+      {showConfigEditor && (
+        <ClaudeConfigEditor
+          onClose={() => setShowConfigEditor(false)}
+          onSaved={() => {
+            setShowConfigEditor(false);
+            handleRefresh();
+          }}
+        />
+      )}
     </div>
   );
 };

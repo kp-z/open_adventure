@@ -28,7 +28,9 @@ import {
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
+import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, ActionButton } from '../components/ui-shared';
+import { CategoryFilter, type CategoryType } from '../components/CategoryFilter';
 import { motion, AnimatePresence } from 'motion/react';
 import { agentsApi } from '@/lib/api';
 import type { Agent, AgentScope, AgentSyncResponse } from '@/lib/api';
@@ -64,18 +66,19 @@ const scopeColors: Record<AgentScope, string> = {
 // 从路径中提取项目名称
 const extractProjectName = (path: string): string => {
   const pathParts = path.split('/');
-  // 查找常见的项目目录标识
+
+  // 优先从 .claude 前面的目录获取（这是最准确的项目名称）
+  const claudeIndex = pathParts.findIndex(p => p === '.claude');
+  if (claudeIndex > 0) {
+    return pathParts[claudeIndex - 1];
+  }
+
+  // 如果没有 .claude，查找常见的项目目录标识
   const projectDirNames = ['项目', 'Proj', 'projects', 'Projects', 'workspace', 'Workspace'];
   const projectIndex = pathParts.findIndex(p => projectDirNames.includes(p));
 
   if (projectIndex >= 0 && projectIndex < pathParts.length - 1) {
     return pathParts[projectIndex + 1];
-  }
-
-  // 如果找不到，尝试从 .claude 前面的目录获取
-  const claudeIndex = pathParts.findIndex(p => p === '.claude');
-  if (claudeIndex > 0) {
-    return pathParts[claudeIndex - 1];
   }
 
   // 默认返回倒数第三个目录（通常是项目根目录）
@@ -93,6 +96,7 @@ const modelColors: Record<string, string> = {
 const Agents = () => {
   const { mode } = useMode();
   const { t } = useTranslation();
+  const { addNotification, updateNotification } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // 状态
@@ -102,19 +106,19 @@ const Agents = () => {
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<AgentSyncResponse | null>(null);
 
+  // 分类数据
+  const [categories, setCategories] = useState<{
+    counts: { builtin: number; user: number; project: number; plugin: number };
+    plugins: Array<{ id: string; name: string; count: number }>;
+    projects: Array<{ id: string; name: string; count: number }>;
+  } | null>(null);
+
   // 过滤和搜索
   const [searchQuery, setSearchQuery] = useState('');
-  const [scopeFilter, setScopeFilter] = useState<AgentScope | 'all' | 'project_plugin'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
+  const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [showOverridden, setShowOverridden] = useState(false);
   // 注意：后端已完全跳过 cache 目录，无需前端过滤
-
-  // 统计
-  const [scopeCounts, setScopeCounts] = useState({
-    builtin: 0,
-    user: 0,
-    project: 0,
-    plugin: 0
-  });
 
   // 编辑/测试/创建模式
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
@@ -136,27 +140,43 @@ const Agents = () => {
       setError(null);
 
       const response = await agentsApi.list({
-        limit: 500,
+        limit: 1000,
         active_only: !showOverridden
       });
 
       setAgents(response.items);
-      setScopeCounts({
-        builtin: response.builtin_count,
-        user: response.user_count,
-        project: response.project_count,
-        plugin: response.plugin_count
-      });
     } catch (err) {
       console.error('Failed to fetch agents:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load agents');
+      const message = err instanceof Error ? err.message : 'Failed to load agents';
+      setError(message);
+      addNotification({
+        type: 'error',
+        title: 'Failed to load agents',
+        message,
+      });
     } finally {
       setLoading(false);
     }
-  }, [showOverridden]);
+  }, [showOverridden, addNotification]);
+
+  // 获取分类数据
+  const fetchCategories = useCallback(async () => {
+    try {
+      const data = await agentsApi.getCategories();
+      setCategories(data);
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+    }
+  }, []);
 
   // 同步 agents
   const handleSync = async () => {
+    const notificationId = addNotification({
+      type: 'loading',
+      title: 'Syncing agents',
+      message: 'Scanning local agents...',
+    });
+
     try {
       setSyncing(true);
       setError(null);
@@ -168,9 +188,22 @@ const Agents = () => {
 
       setSyncResult(result);
       await fetchAgents();
+      await fetchCategories();
+
+      updateNotification(notificationId, {
+        type: 'success',
+        title: 'Sync completed',
+        message: `${result.created} created, ${result.updated} updated`,
+      });
     } catch (err) {
       console.error('Failed to sync agents:', err);
-      setError(err instanceof Error ? err.message : 'Sync failed');
+      const message = err instanceof Error ? err.message : 'Sync failed';
+      setError(message);
+      updateNotification(notificationId, {
+        type: 'error',
+        title: 'Sync failed',
+        message,
+      });
     } finally {
       setSyncing(false);
     }
@@ -227,10 +260,11 @@ const Agents = () => {
     }
   };
 
-  // 初始加载时同步
+  // 初始加载
   useEffect(() => {
-    handleSync();
-  }, []);
+    fetchAgents();
+    fetchCategories();
+  }, [fetchAgents, fetchCategories]);
 
   // 检测 URL 参数，自动打开创建表单
   useEffect(() => {
@@ -244,14 +278,29 @@ const Agents = () => {
 
   // 过滤 agents
   const filteredAgents = agents.filter(agent => {
-    // 作用域过滤
-    if (scopeFilter !== 'all') {
-      if (scopeFilter === 'project_plugin') {
-        if (agent.scope !== 'project' && agent.scope !== 'plugin') {
-          return false;
-        }
-      } else if (agent.scope !== scopeFilter) {
+    // Category filter
+    if (selectedCategory !== 'all') {
+      const scope = agent.scope.toLowerCase();
+      if (scope !== selectedCategory) {
         return false;
+      }
+
+      // Sub-category filter (multi-select)
+      if (selectedSubCategories.length > 0) {
+        if (selectedCategory === 'plugin') {
+          const pluginName = agent.meta?.plugin_name;
+          if (!pluginName || !selectedSubCategories.includes(pluginName)) {
+            return false;
+          }
+        } else if (selectedCategory === 'project') {
+          const path = agent.meta?.path || '';
+          const parts = path.split('/');
+          const claudeIndex = parts.indexOf('.claude');
+          const projectName = claudeIndex > 0 ? parts[claudeIndex - 1] : '';
+          if (!projectName || !selectedSubCategories.includes(projectName)) {
+            return false;
+          }
+        }
       }
     }
 
@@ -260,7 +309,8 @@ const Agents = () => {
       const query = searchQuery.toLowerCase();
       return (
         agent.name.toLowerCase().includes(query) ||
-        agent.description.toLowerCase().includes(query)
+        agent.description?.toLowerCase().includes(query) ||
+        agent.agent_type?.toLowerCase().includes(query)
       );
     }
 
@@ -332,8 +382,8 @@ const Agents = () => {
       {/* 页面标题和操作 */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {mode === 'adventure' ? '英雄殿堂' : '子代理管理'}
+          <h1 className="text-3xl font-bold tracking-tight uppercase">
+            AGENTS MANAGEMENT
           </h1>
           <p className="text-gray-400">
             {mode === 'adventure'
@@ -400,74 +450,18 @@ const Agents = () => {
         </div>
       )}
 
-      {/* 统计仪表板 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* 总数 */}
-        <GlassCard 
-          onClick={() => setScopeFilter('all')}
-          className={`transition-all ${scopeFilter === 'all' ? 'ring-2 ring-blue-500/50' : ''}`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-              <Users className="text-blue-400" size={24} />
-            </div>
-            <span className="text-3xl font-black">
-              {scopeCounts.builtin + scopeCounts.user + scopeCounts.project + scopeCounts.plugin}
-            </span>
-          </div>
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            Total Agents
-          </h3>
-        </GlassCard>
-
-        {/* 内置 */}
-        <GlassCard 
-          onClick={() => setScopeFilter(scopeFilter === 'builtin' ? 'all' : 'builtin')}
-          className={`transition-all ${scopeFilter === 'builtin' ? 'ring-2 ring-blue-500/50' : ''}`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-              <Box className="text-blue-400" size={24} />
-            </div>
-            <span className="text-3xl font-black">{scopeCounts.builtin}</span>
-          </div>
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            Built-in
-          </h3>
-        </GlassCard>
-
-        {/* 用户级 */}
-        <GlassCard 
-          onClick={() => setScopeFilter(scopeFilter === 'user' ? 'all' : 'user')}
-          className={`transition-all ${scopeFilter === 'user' ? 'ring-2 ring-green-500/50' : ''}`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-green-500/20 border border-green-500/30 flex items-center justify-center">
-              <User className="text-green-400" size={24} />
-            </div>
-            <span className="text-3xl font-black">{scopeCounts.user}</span>
-          </div>
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            User Level
-          </h3>
-        </GlassCard>
-
-        {/* 项目/插件 */}
-        <GlassCard 
-          onClick={() => setScopeFilter(scopeFilter === 'project_plugin' ? 'all' : 'project_plugin')}
-          className={`transition-all ${scopeFilter === 'project_plugin' ? 'ring-2 ring-purple-500/50' : ''}`}
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
-              <Package className="text-purple-400" size={24} />
-            </div>
-            <span className="text-3xl font-black">{scopeCounts.project + scopeCounts.plugin}</span>
-          </div>
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-            Project/Plugin
-          </h3>
-        </GlassCard>
-      </div>
+      {/* 分类过滤 */}
+      {categories && (
+        <CategoryFilter
+          selectedCategory={selectedCategory}
+          selectedSubCategories={selectedSubCategories}
+          counts={categories.counts}
+          projectSubCategories={categories.projects}
+          pluginSubCategories={categories.plugins}
+          onCategoryChange={setSelectedCategory}
+          onSubCategoriesChange={setSelectedSubCategories}
+        />
+      )}
 
       {/* 搜索和过滤 */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -522,16 +516,16 @@ const Agents = () => {
                     style={{
                       backgroundColor: agent.meta?.color
                         ? `${agent.meta.color}20`
-                        : scopeFilter === 'builtin' || agent.scope === 'builtin'
+                        : agent.scope === 'builtin'
                         ? 'rgba(59, 130, 246, 0.2)'
                         : agent.scope === 'user'
                         ? 'rgba(34, 197, 94, 0.2)'
                         : agent.scope === 'project'
                         ? 'rgba(168, 85, 247, 0.2)'
                         : 'rgba(249, 115, 22, 0.2)',
-                      borderColor: agent.meta?.color || 
-                        (agent.scope === 'builtin' ? '#3b82f6' : 
-                         agent.scope === 'user' ? '#22c55e' : 
+                      borderColor: agent.meta?.color ||
+                        (agent.scope === 'builtin' ? '#3b82f6' :
+                         agent.scope === 'user' ? '#22c55e' :
                          agent.scope === 'project' ? '#a855f7' : '#f97316')
                     }}
                   >
@@ -625,30 +619,57 @@ const Agents = () => {
                   </p>
                 </div>
 
-                {/* Model 和 Scope 网格 */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="p-3 bg-white/5 rounded-xl">
-                    <p className="text-xs text-gray-500 uppercase font-black mb-1">Model</p>
-                    <p className={`text-sm font-bold ${modelColors[agent.model || 'inherit']}`}>
+                {/* Model、Status、Call、Health 网格 */}
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {/* Model */}
+                  <div className="p-2 bg-white/5 rounded-xl">
+                    <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Model</p>
+                    <p className={`text-xs font-bold ${modelColors[agent.model || 'inherit']}`}>
                       {(agent.model || 'inherit').toUpperCase()}
                     </p>
                   </div>
-                  <div className="p-3 bg-white/5 rounded-xl">
-                    <p className="text-xs text-gray-500 uppercase font-black mb-1">Scope</p>
-                    <div className="flex items-center gap-2">
-                      {scopeIcons[agent.scope]}
-                      <p className={`text-sm font-bold capitalize ${
-                        agent.scope === 'builtin' ? 'text-blue-400' :
-                        agent.scope === 'user' ? 'text-green-400' :
-                        agent.scope === 'project' ? 'text-purple-400' :
-                        'text-orange-400'
+
+                  {/* Status */}
+                  <div className="p-2 bg-white/5 rounded-xl">
+                    <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Status</p>
+                    <div className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${
+                        !agent.enabled ? 'bg-gray-400' :
+                        agent.is_overridden ? 'bg-orange-400' :
+                        'bg-green-400'
+                      }`} />
+                      <p className={`text-xs font-bold ${
+                        !agent.enabled ? 'text-gray-400' :
+                        agent.is_overridden ? 'text-orange-400' :
+                        'text-green-400'
                       }`}>
-                        {agent.scope}
+                        {!agent.enabled ? 'Off' : agent.is_overridden ? 'Over' : 'On'}
                       </p>
                     </div>
-                    {agent.is_overridden && (
-                      <span className="mt-1 block text-[10px] text-orange-400">已覆盖</span>
-                    )}
+                  </div>
+
+                  {/* Call */}
+                  <div className="p-2 bg-white/5 rounded-xl">
+                    <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Call</p>
+                    <p className="text-xs font-bold text-blue-400">
+                      {agent.meta?.usage_count || 0}
+                    </p>
+                  </div>
+
+                  {/* Health */}
+                  <div className="p-2 bg-white/5 rounded-xl">
+                    <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Health</p>
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full"
+                          style={{ width: `${Math.min(100, (agent.meta?.usage_count || 0) / 10)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] font-bold text-green-400">
+                        {Math.min(100, Math.floor((agent.meta?.usage_count || 0) / 10))}%
+                      </p>
+                    </div>
                   </div>
                 </div>
 
@@ -745,13 +766,13 @@ const Agents = () => {
         <div className="text-center py-16">
           <Layers size={48} className="mx-auto text-gray-600 mb-4" />
           <h3 className="text-xl font-bold text-gray-400 mb-2">
-            {searchQuery || scopeFilter !== 'all'
+            {searchQuery || selectedCategory !== 'all' || selectedSubCategories.length > 0
               ? '没有找到匹配的子代理'
               : '还没有子代理'
             }
           </h3>
           <p className="text-gray-500 mb-6">
-            {searchQuery || scopeFilter !== 'all'
+            {searchQuery || selectedCategory !== 'all' || selectedSubCategories.length > 0
               ? '尝试调整搜索条件'
               : '点击同步按钮扫描本地子代理，或创建新的子代理'
             }

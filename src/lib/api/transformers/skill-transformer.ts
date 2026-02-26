@@ -27,7 +27,7 @@ export interface UISkill {
   advIcon: string;
   desc: { en: string; zh: string };
   tags: { en: string[]; zh: string[] };
-  source: 'Global' | 'Plugin' | 'Project';
+  source: 'User' | 'Global' | 'Plugin' | 'Project';
   projectName?: string;
   pluginNamespace?: string;
   status: 'enabled' | 'disabled';
@@ -46,7 +46,8 @@ export interface UISkill {
 // ============ 映射配置 ============
 
 // 后端 source -> UI source 映射
-const SOURCE_MAP: Record<SkillSource, 'Global' | 'Plugin' | 'Project'> = {
+const SOURCE_MAP: Record<SkillSource, 'Global' | 'Plugin' | 'Project' | 'User'> = {
+  user: 'User',
   global: 'Global',
   plugin: 'Plugin',
   project: 'Project',
@@ -151,10 +152,10 @@ export function transformSkillToUI(skill: Skill): UISkill {
 
   return {
     id: skill.id,
-    // 名称：优先使用 meta 中的多语言配置，否则使用 full_name
+    // 名称：优先使用 meta 中的多语言配置，否则使用 name（不使用 full_name，因为它包含前缀）
     name: {
-      en: meta.name_en || skill.full_name,
-      zh: meta.name_zh || skill.full_name,
+      en: meta.name_en || skill.name,
+      zh: meta.name_zh || skill.name,
     },
     // 图标
     icon: getIcon(skill.type),

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router';
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  MoreVertical, 
-  Code2, 
-  FileText, 
-  Wrench, 
+import {
+  Search,
+  Filter,
+  Plus,
+  MoreVertical,
+  Code2,
+  FileText,
+  Wrench,
   Globe,
   Star,
   BookOpen,
@@ -28,7 +28,9 @@ import {
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
+import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
+import { CategoryFilter, type CategoryType } from '../components/CategoryFilter';
 import { motion, AnimatePresence } from 'motion/react';
 import { SkillEditor } from '../components/SkillEditor';
 import { getSkillIcon } from '../lib/skill-icons';
@@ -47,6 +49,7 @@ import {
 const Skills = () => {
   const { mode, lang } = useMode();
   const { t } = useTranslation();
+  const { addNotification, updateNotification } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ========== API 数据状态 ==========
@@ -55,9 +58,17 @@ const Skills = () => {
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
 
+  // ========== 分类数据 ==========
+  const [categories, setCategories] = useState<{
+    counts: { builtin: number; user: number; project: number; plugin: number };
+    plugins: Array<{ id: string; name: string; count: number }>;
+    projects: Array<{ id: string; name: string; count: number }>;
+  } | null>(null);
+
   // ========== UI 交互状态 ==========
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
+  const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [initialEditorMode, setInitialEditorMode] = useState<'ai' | 'manual'>('ai');
   const [editingSkillId, setEditingSkillId] = useState<number | undefined>(undefined);
@@ -73,22 +84,38 @@ const Skills = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await skillsApi.list({ limit: 100 });
+      const response = await skillsApi.list({ limit: 1000 });
       const transformed = transformSkillsToUI(response.items);
       setSkills(transformed);
     } catch (err) {
       const message = err instanceof Error ? err.message : '获取技能列表失败';
       setError(message);
+      addNotification({
+        type: 'error',
+        title: 'Failed to load skills',
+        message,
+      });
       console.error('Failed to fetch skills:', err);
     } finally {
       setLoading(false);
+    }
+  }, [addNotification]);
+
+  // ========== 获取分类数据 ==========
+  const fetchCategories = useCallback(async () => {
+    try {
+      const data = await skillsApi.getCategories();
+      setCategories(data);
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
     }
   }, []);
 
   // ========== 初始加载 ==========
   useEffect(() => {
     fetchSkills();
-  }, [fetchSkills]);
+    fetchCategories();
+  }, [fetchSkills, fetchCategories]);
 
   // ========== 检测 URL 参数，自动打开创建表单 ==========
   useEffect(() => {
@@ -103,14 +130,32 @@ const Skills = () => {
 
   // ========== 同步技能 ==========
   const handleSync = async () => {
+    const notificationId = addNotification({
+      type: 'loading',
+      title: 'Syncing skills',
+      message: 'Scanning local skills...',
+    });
+
     setSyncing(true);
     setError(null);
     try {
       await claudeApi.syncSkills();
       await fetchSkills();
+      await fetchCategories();
+
+      updateNotification(notificationId, {
+        type: 'success',
+        title: 'Sync completed',
+        message: 'Skills synchronized successfully',
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : '同步失败';
       setError(message);
+      updateNotification(notificationId, {
+        type: 'error',
+        title: 'Sync failed',
+        message,
+      });
       console.error('Failed to sync skills:', err);
     } finally {
       setSyncing(false);
@@ -223,8 +268,30 @@ const Skills = () => {
   const filteredSkills = skills.filter(s => {
     const name = s.name[lang] || s.name.en;
     const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === 'All' || s.source === filter;
-    return matchesSearch && matchesFilter;
+
+    // Category filter
+    let matchesCategory = true;
+    if (selectedCategory !== 'all') {
+      // Map source to category
+      let source = s.source.toLowerCase();
+      if (source === 'global') source = 'builtin';
+
+      matchesCategory = source === selectedCategory;
+
+      // Sub-category filter (multi-select)
+      if (matchesCategory && selectedSubCategories.length > 0) {
+        if (selectedCategory === 'plugin') {
+          const pluginName = (s as any).pluginNamespace || (s as any).meta?.plugin_name;
+          matchesCategory = selectedSubCategories.includes(pluginName);
+        } else if (selectedCategory === 'project') {
+          const path = (s as any).meta?.path || '';
+          const projectName = path.split('/.claude/')[0].split('/').pop();
+          matchesCategory = selectedSubCategories.includes(projectName);
+        }
+      }
+    }
+
+    return matchesSearch && matchesCategory;
   });
 
   // ========== Loading 状态 ==========
@@ -509,25 +576,31 @@ const Skills = () => {
     <div className="space-y-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('skillsTitle' as any)}</h1>
+          <h1 className="text-3xl font-bold tracking-tight uppercase">SKILLS MANAGEMENT</h1>
           <p className="text-gray-400">{t('skillsDesc' as any)}</p>
         </div>
         <div className="flex gap-3">
-          <ActionButton 
-            variant="secondary" 
+          <ActionButton
+            variant="secondary"
             onClick={handleSync}
             disabled={syncing}
           >
             {syncing ? (
               <span className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                {t('syncing' as any) || '同步中...'}
+                同步中...
               </span>
             ) : (
-              t('syncSkills' as any)
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                同步
+              </span>
             )}
           </ActionButton>
-          <ActionButton onClick={() => { setIsCreating(true); setInitialEditorMode('ai'); }}>{t('genAi' as any)}</ActionButton>
+          <ActionButton onClick={() => { setIsCreating(true); setInitialEditorMode('ai'); }}>
+            <Plus className="w-4 h-4" />
+            新建
+          </ActionButton>
         </div>
         {error && (
           <div className="text-red-400 text-sm flex items-center gap-2 mt-2">
@@ -537,31 +610,29 @@ const Skills = () => {
         )}
       </header>
 
-      {/* Search & Filter */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input 
-            type="text" 
-            placeholder={t('searchScrolls' as any)}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 focus:outline-none focus:border-blue-500/50 transition-all"
-          />
-        </div>
-        <div className="flex bg-white/5 rounded-xl p-1 border border-white/10">
-          {['All', 'Global', 'Plugin', 'Project'].map(f => (
-            <button 
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                filter === f ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {t(f.toLowerCase() as any)}
-            </button>
-          ))}
-        </div>
+      {/* Category Filter */}
+      {categories && (
+        <CategoryFilter
+          selectedCategory={selectedCategory}
+          selectedSubCategories={selectedSubCategories}
+          counts={categories.counts}
+          projectSubCategories={categories.projects}
+          pluginSubCategories={categories.plugins}
+          onCategoryChange={setSelectedCategory}
+          onSubCategoriesChange={setSelectedSubCategories}
+        />
+      )}
+
+      {/* Search */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <input
+          type="text"
+          placeholder={t('searchScrolls' as any)}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 focus:outline-none focus:border-blue-500/50 transition-all"
+        />
       </div>
 
       {/* Grid */}
