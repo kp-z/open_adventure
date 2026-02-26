@@ -6,6 +6,7 @@ import { TeamsProvider } from './contexts/TeamsContext';
 import { ModeProvider } from './contexts/ModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ExecutionProvider } from './contexts/ExecutionContext';
+import { ExecutionMonitor } from './components/ExecutionMonitor';
 import '../styles/theme.css';
 import '../styles/fonts.css';
 
@@ -159,6 +160,7 @@ export default function App() {
               <TeamsProvider>
                 <ExecutionProvider>
                   <RouterProvider router={router} />
+                  <ExecutionMonitor />
                 </ExecutionProvider>
               </TeamsProvider>
             </AgentsProvider>

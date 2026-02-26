@@ -1,4 +1,3 @@
-// frontend/src/app/contexts/ExecutionContext.tsx
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -20,8 +19,6 @@ interface ExecutionContextType {
   executions: Map<number, Execution>;
   runningExecutions: Execution[];
   isConnected: boolean;
-  connect: () => void;
-  disconnect: () => void;
 }
 
 const ExecutionContext = createContext<ExecutionContextType | undefined>(undefined);
@@ -43,58 +40,47 @@ export const ExecutionProvider: React.FC<ExecutionProviderProps> = ({ children }
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
-  const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = () => {
-    const clientId = `client-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const clientId = `client-${Date.now()}`;
     const wsUrl = `ws://localhost:8000/ws/executions?client_id=${clientId}`;
-
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       console.log('WebSocket connected');
       setIsConnected(true);
       setReconnectAttempts(0);
-
-      // 启动心跳
-      if (heartbeatRef.current) {
-        clearInterval(heartbeatRef.current);
-      }
-      heartbeatRef.current = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send('ping');
-        }
-      }, 30000);
     };
 
     ws.onclose = () => {
       console.log('WebSocket disconnected');
       setIsConnected(false);
-
-      // 清理心跳
-      if (heartbeatRef.current) {
-        clearInterval(heartbeatRef.current);
-        heartbeatRef.current = null;
-      }
-
-      // 自动重连（指数退避）
       const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-      console.log(`Reconnecting in ${delay}ms...`);
       setTimeout(() => {
         setReconnectAttempts(prev => prev + 1);
         connect();
       }, delay);
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
         if (message.type === 'execution_update') {
-          handleExecutionUpdate(message.data);
+          const data = message.data;
+          setExecutions(prev => {
+            const updated = new Map(prev);
+            const existing = prev.get(data.id);
+            updated.set(data.id, { ...existing, ...data } as Execution);
+            
+            if (existing && existing.status !== data.status) {
+              if (data.status === 'succeeded') {
+                toast.success(`${data.execution_type === 'agent_test' ? 'Agent 运行' : 'Workflow'} 执行成功`);
+              } else if (data.status === 'failed') {
+                toast.error(`${data.execution_type === 'agent_test' ? 'Agent 运行' : 'Workflow'} 执行失败`);
+              }
+            }
+            return updated;
+          });
         }
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error);
@@ -104,72 +90,17 @@ export const ExecutionProvider: React.FC<ExecutionProviderProps> = ({ children }
     wsRef.current = ws;
   };
 
-  const disconnect = () => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-    if (heartbeatRef.current) {
-      clearInterval(heartbeatRef.current);
-      heartbeatRef.current = null;
-    }
-  };
-
-  const handleExecutionUpdate = (data: Partial<Execution>) => {
-    setExecutions(prev => {
-      const updated = new Map(prev);
-      const existing = prev.get(data.id!);
-
-      // 合并更新
-      updated.set(data.id!, {
-        ...existing,
-        ...data,
-      } as Execution);
-
-      // 状态变化通知
-      if (existing && existing.status !== data.status) {
-        if (data.status === 'succeeded') {
-          toast.success(
-            `${data.execution_type === 'agent_test' ? 'Agent 测试' : 'Workflow'} 执行成功`,
-            {
-              description: `执行 #${data.id} 已完成`,
-            }
-          );
-        } else if (data.status === 'failed') {
-          toast.error(
-            `${data.execution_type === 'agent_test' ? 'Agent 测试' : 'Workflow'} 执行失败`,
-            {
-              description: data.error || '未知错误',
-            }
-          );
-        }
-      }
-
-      return updated;
-    });
-  };
-
-  // 自动连接
   useEffect(() => {
     connect();
-    return () => disconnect();
+    return () => wsRef.current?.close();
   }, []);
 
-  // 计算运行中的执行
   const runningExecutions = Array.from(executions.values())
     .filter(e => e.status === 'running')
-    .slice(0, 10); // 最多显示 10 个
+    .slice(0, 10);
 
   return (
-    <ExecutionContext.Provider
-      value={{
-        executions,
-        runningExecutions,
-        isConnected,
-        connect,
-        disconnect,
-      }}
-    >
+    <ExecutionContext.Provider value={{ executions, runningExecutions, isConnected }}>
       {children}
     </ExecutionContext.Provider>
   );
