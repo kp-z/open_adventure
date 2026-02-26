@@ -856,3 +856,53 @@ async def cleanup_duplicate_agents(
         "deleted": deleted_count,
         "deleted_records": deleted_records
     }
+
+
+# Agent 测试端点
+import asyncio
+from app.schemas.agent_test import AgentTestRequest, AgentTestResponse
+from app.services.agent_test_service import AgentTestService
+from app.services.websocket_manager import get_connection_manager
+
+@router.post(
+    "/{agent_id}/test",
+    response_model=AgentTestResponse,
+    summary="测试 Agent"
+)
+async def test_agent(
+    agent_id: int,
+    request: AgentTestRequest,
+    service: AgentService = Depends(get_agent_service),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    测试 Agent（异步执行）
+
+    1. 创建执行记录
+    2. 启动后台任务
+    3. 立即返回执行 ID
+    4. 通过 WebSocket 推送状态更新
+    """
+    # 验证 Agent 存在
+    agent = await service.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # 创建执行记录
+    test_service = AgentTestService(db)
+    execution = await test_service.create_agent_test_execution(
+        agent_id=agent_id,
+        test_input=request.test_input
+    )
+
+    # 启动后台任务
+    manager = get_connection_manager()
+    asyncio.create_task(
+        test_service.execute_agent_test(execution.id, manager)
+    )
+
+    return AgentTestResponse(
+        execution_id=execution.id,
+        status="pending",
+        message="Agent 测试已启动，请通过 WebSocket 或右下角监控查看进度"
+    )
