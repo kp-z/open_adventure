@@ -9,6 +9,7 @@ Agent API Router - Claude Code Subagent 管理
 """
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
@@ -529,6 +530,137 @@ Please respond according to your role and capabilities."""
             "duration": duration,
             "model": agent.model or "inherit"
         }
+
+
+@router.post(
+    "/{agent_id}/test-stream",
+    summary="测试子代理（流式输出）"
+)
+async def test_agent_stream(
+    agent_id: int,
+    prompt: str = Query(..., description="测试提示"),
+    service: AgentService = Depends(get_agent_service)
+):
+    """
+    运行子代理进行测试，实时流式输出日志
+
+    返回 SSE (Server-Sent Events) 格式的流
+    """
+    import subprocess
+    import os
+    import time
+    import asyncio
+    import json
+
+    agent = await service.get_agent(agent_id)
+    cli_path = settings.claude_cli_path
+
+    async def generate_stream():
+        start_time = time.time()
+
+        try:
+            # 发送开始日志
+            yield f"data: {json.dumps({'type': 'log', 'message': f'开始执行 Agent: {agent.name}'})}\n\n"
+
+            # 构建带有子代理配置的提示
+            system_context = ""
+            if agent.system_prompt:
+                system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
+
+            full_prompt = f"""You are acting as the subagent "{agent.name}".
+Description: {agent.description}
+{system_context}
+User Request: {prompt}
+
+Please respond according to your role and capabilities."""
+
+            cmd = [
+                cli_path,
+                "-p", full_prompt,
+                "--output-format", "text",
+                "--disable-slash-commands",
+                "--setting-sources", "user"
+            ]
+
+            # 如果指定了模型，添加模型参数
+            if agent.model and agent.model != "inherit":
+                cmd.extend(["--model", agent.model])
+
+            model_name = agent.model or "inherit"
+            yield f"data: {json.dumps({'type': 'log', 'message': f'使用模型: {model_name}'})}\n\n"
+            yield f"data: {json.dumps({'type': 'log', 'message': '执行命令...'})}\n\n"
+
+            # 创建环境变量副本
+            env = os.environ.copy()
+            env.pop("CLAUDECODE", None)
+
+            # 使用 Popen 实现实时输出
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                bufsize=1
+            )
+
+            output_lines = []
+            error_lines = []
+
+            # 实时读取输出
+            while True:
+                # 读取 stdout
+                if process.stdout:
+                    line = process.stdout.readline()
+                    if line:
+                        output_lines.append(line)
+                        yield f"data: {json.dumps({'type': 'log', 'message': line.rstrip()})}\n\n"
+
+                # 检查进程是否结束
+                if process.poll() is not None:
+                    # 读取剩余输出
+                    if process.stdout:
+                        remaining = process.stdout.read()
+                        if remaining:
+                            output_lines.append(remaining)
+                            for line in remaining.split('\n'):
+                                if line.strip():
+                                    yield f"data: {json.dumps({'type': 'log', 'message': line})}\n\n"
+
+                    if process.stderr:
+                        error_output = process.stderr.read()
+                        if error_output:
+                            error_lines.append(error_output)
+                    break
+
+                await asyncio.sleep(0.1)
+
+            duration = time.time() - start_time
+            full_output = ''.join(output_lines).strip()
+            full_error = ''.join(error_lines).strip()
+
+            if process.returncode != 0:
+                error_msg = f'Agent 执行失败: {full_error}'
+                model_name = agent.model or 'inherit'
+                yield f"data: {json.dumps({'type': 'complete', 'data': {'success': False, 'output': error_msg, 'duration': duration, 'model': model_name}})}\n\n"
+            else:
+                model_name = agent.model or 'inherit'
+                yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': full_output, 'duration': duration, 'model': model_name}})}\n\n"
+
+        except FileNotFoundError:
+            yield f"data: {json.dumps({'type': 'error', 'message': '未找到 Claude CLI，请确保已安装'})}\n\n"
+        except Exception as e:
+            duration = time.time() - start_time
+            yield f"data: {json.dumps({'type': 'error', 'message': f'执行错误: {str(e)}'})}\n\n"
+
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @router.post(
