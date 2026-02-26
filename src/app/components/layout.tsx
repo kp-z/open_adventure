@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useNavigate } from "react-router";
 import {
   LayoutDashboard,
   Wrench,
@@ -19,6 +19,10 @@ import {
   Menu,
   X,
   Sparkles,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -114,9 +118,35 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
 export const Layout = () => {
   const { mode, toggleMode, lang } = useMode();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+  const [canGoBack, setCanGoBack] = React.useState(false);
+  const [canGoForward, setCanGoForward] = React.useState(false);
+
+  // 监听浏览器历史变化
+  React.useEffect(() => {
+    const updateNavigationState = () => {
+      setCanGoBack(window.history.length > 1);
+      // 注意：浏览器不提供直接检测 forward 的 API，这里简化处理
+      setCanGoForward(false);
+    };
+
+    updateNavigationState();
+    window.addEventListener('popstate', updateNavigationState);
+    return () => window.removeEventListener('popstate', updateNavigationState);
+  }, []);
+
+  const handleGoBack = () => {
+    if (canGoBack) {
+      navigate(-1);
+    }
+  };
+
+  const handleGoForward = () => {
+    navigate(1);
+  };
 
   // 点击外部关闭搜索框
   React.useEffect(() => {
@@ -152,7 +182,7 @@ export const Layout = () => {
         <button
           onClick={toggleMode}
           className={`
-            h-24 flex items-center px-6 gap-4 group transition-all duration-500 hover:bg-white/5
+            h-20 flex items-center px-6 gap-4 group transition-all duration-500 hover:bg-white/5
             ${mode === "adventure" ? "border-b border-yellow-500/20" : "border-b border-blue-500/20"}
           `}
         >
@@ -262,8 +292,8 @@ export const Layout = () => {
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`
                 hidden md:flex p-2.5 rounded-xl transition-all duration-200
-                ${isSidebarOpen 
-                  ? 'hover:bg-white/5 text-gray-400 hover:text-white' 
+                ${isSidebarOpen
+                  ? 'hover:bg-white/5 text-gray-400 hover:text-white'
                   : mode === "adventure"
                     ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                     : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
@@ -272,17 +302,9 @@ export const Layout = () => {
               title={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
             >
               {isSidebarOpen ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M9 3v18" />
-                  <path d="m14 9-3 3 3 3" />
-                </svg>
+                <PanelLeftClose size={20} />
               ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M9 3v18" />
-                  <path d="m16 15-3-3 3-3" />
-                </svg>
+                <PanelLeftOpen size={20} />
               )}
             </button>
 
@@ -311,6 +333,31 @@ export const Layout = () => {
                 {mode === "adventure" ? "RPG" : "PRO"}
               </span>
             </button>
+
+            {/* 前进/后退按钮 */}
+            <div className="hidden sm:flex items-center gap-1">
+              <button
+                onClick={handleGoBack}
+                disabled={!canGoBack}
+                className={`
+                  p-2 rounded-lg transition-all duration-200
+                  ${canGoBack
+                    ? 'hover:bg-white/5 text-gray-400 hover:text-white'
+                    : 'text-gray-600 cursor-not-allowed opacity-40'
+                  }
+                `}
+                title="后退"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={handleGoForward}
+                className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all duration-200"
+                title="前进"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
 
             {/* 搜索框 - 可收起展开 */}
             <div className="relative hidden sm:flex items-center">

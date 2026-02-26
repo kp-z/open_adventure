@@ -55,6 +55,28 @@ import { GlassCard } from './ui-shared';
 import { agentsApi, skillsApi } from '@/lib/api';
 import type { Agent, AgentUpdate, AgentPermissionMode, AgentModel, AgentScope, Skill } from '@/lib/api';
 
+// 从路径中提取项目名称
+const extractProjectName = (path: string): string => {
+  const pathParts = path.split('/');
+
+  // 优先从 .claude 前面的目录获取（这是最准确的项目名称）
+  const claudeIndex = pathParts.findIndex(p => p === '.claude');
+  if (claudeIndex > 0) {
+    return pathParts[claudeIndex - 1];
+  }
+
+  // 如果没有 .claude，查找常见的项目目录标识
+  const projectDirNames = ['项目', 'Proj', 'projects', 'Projects', 'workspace', 'Workspace'];
+  const projectIndex = pathParts.findIndex(p => projectDirNames.includes(p));
+
+  if (projectIndex >= 0 && projectIndex < pathParts.length - 1) {
+    return pathParts[projectIndex + 1];
+  }
+
+  // 默认返回倒数第三个目录（通常是项目根目录）
+  return pathParts.length >= 3 ? pathParts[pathParts.length - 3] : 'project';
+};
+
 // 可用工具列表
 const AVAILABLE_TOOLS = [
   'Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob',
@@ -198,6 +220,10 @@ export const AgentEditor: React.FC<AgentEditorProps> = ({
   // 可用技能列表
   const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
 
+  // Scope 修改确认
+  const [showScopeChangeConfirm, setShowScopeChangeConfirm] = useState(false);
+  const [pendingScope, setPendingScope] = useState<AgentScope | null>(null);
+
   // AI 生成
   const [aiPrompt, setAiPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -305,6 +331,39 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
     } catch (err) {
       console.error('Failed to load skills:', err);
     }
+  };
+
+  // 处理 Scope 修改
+  const handleScopeChange = (newScope: AgentScope) => {
+    // 创建模式直接修改
+    if (isCreateMode) {
+      setScope(newScope);
+      return;
+    }
+
+    // 编辑模式：如果是当前 scope，不做任何操作
+    if (agent && agent.scope === newScope) {
+      return;
+    }
+
+    // 编辑模式：显示确认弹窗
+    setPendingScope(newScope);
+    setShowScopeChangeConfirm(true);
+  };
+
+  // 确认 Scope 修改
+  const confirmScopeChange = () => {
+    if (pendingScope) {
+      setScope(pendingScope);
+    }
+    setShowScopeChangeConfirm(false);
+    setPendingScope(null);
+  };
+
+  // 取消 Scope 修改
+  const cancelScopeChange = () => {
+    setShowScopeChangeConfirm(false);
+    setPendingScope(null);
   };
 
   // 切换到源码模式时生成/加载内容
@@ -489,7 +548,6 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
     if (tool && !tools.includes(tool)) {
       setTools([...tools, tool]);
     }
-    setNewTool('');
   };
 
   const handleRemoveTool = (tool: string) => {
@@ -500,7 +558,6 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
     if (tool && !disallowedTools.includes(tool)) {
       setDisallowedTools([...disallowedTools, tool]);
     }
-    setNewDisallowedTool('');
   };
 
   const handleRemoveDisallowedTool = (tool: string) => {
@@ -535,12 +592,6 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
     <div className="max-w-6xl mx-auto pb-20">
       {/* 头部 */}
       <div className="flex items-center gap-4 mb-8">
-        <button
-          onClick={onBack}
-          className="p-3 hover:bg-white/10 rounded-xl transition-colors"
-        >
-          <ArrowLeft size={24} />
-        </button>
         <div className="flex items-center gap-4 flex-1">
           <div
             className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-${color}-500/20 border border-${color}-500/30`}
@@ -792,35 +843,159 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
               </AnimatePresence>
             </GlassCard>
 
-            {/* 作用域 - 仅创建模式 */}
-            {isCreateMode && (
-              <GlassCard className="p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <FolderOpen size={18} className="text-green-400" />
-                  <h3 className="font-bold">保存位置</h3>
-                </div>
-                <div className="space-y-3">
-                  {SCOPE_OPTIONS.map(option => (
-                    <button
-                      key={option.value}
-                      onClick={() => setScope(option.value)}
-                      className={`w-full p-4 rounded-xl text-left transition-all border flex justify-between items-center ${scope === option.value
-                        ? 'bg-green-500/20 border-green-500/50'
-                        : 'bg-white/5 border-white/10 hover:border-white/20'
-                        }`}
+            {/* 目录配置卡片 */}
+            <GlassCard className="p-6 border-blue-500/20">
+              <div className="flex items-center gap-2 mb-6">
+                <FolderOpen size={18} className="text-blue-400" />
+                <h3 className="font-bold">目录配置</h3>
+              </div>
+
+              <div className="space-y-3">
+                {/* Scope 选择下拉框 */}
+                {(isCreateMode || (agent && !agent.is_builtin)) ? (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                      保存位置
+                    </label>
+                    <select
+                      value={scope}
+                      onChange={(e) => handleScopeChange(e.target.value as AgentScope)}
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 text-white"
                     >
-                      <div>
-                        <p className={`font-bold ${scope === option.value ? 'text-green-400' : ''}`}>
-                          {option.label}
-                        </p>
-                        <p className="text-xs text-gray-500 font-mono">{option.desc}</p>
+                      {SCOPE_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} - {option.desc}
+                        </option>
+                      ))}
+                    </select>
+                    {/* 显示完整路径 */}
+                    <p className="text-xs text-gray-300 mt-2 font-mono break-all">
+                      {(() => {
+                        // 编辑模式：显示实际路径
+                        if (!isCreateMode && agent?.meta?.path) {
+                          const path = agent.meta.path;
+                          if (path.includes('/.claude/agents/')) {
+                            return path.substring(0, path.lastIndexOf('/.claude/agents/') + 16);
+                          } else if (path.includes('/.claude/plugins/')) {
+                            const agentsIndex = path.lastIndexOf('/agents/');
+                            if (agentsIndex !== -1) {
+                              return path.substring(0, agentsIndex + 8);
+                            }
+                            return path.substring(0, path.lastIndexOf('/.claude/plugins/') + 17);
+                          }
+                          return path;
+                        }
+                        // 创建模式：显示通用路径
+                        if (scope === 'user') return '~/.claude/agents/';
+                        if (scope === 'project') return '.claude/agents/ (当前项目)';
+                        return '';
+                      })()}
+                    </p>
+                  </div>
+                ) : (
+                  /* 内置 Agent 提示 */
+                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle size={16} className="text-yellow-400" />
+                      <p className="text-sm font-bold text-yellow-400">内置 Agent</p>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      内置 Agent 由系统提供，无法修改保存位置
+                    </p>
+                  </div>
+                )}
+
+                {/* 项目名称 - 仅 project scope 显示 */}
+                {!isCreateMode && agent && agent.scope === 'project' && agent.meta?.path && (
+                  <div className="p-3 bg-white/5 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Code size={12} className="text-purple-400" />
+                      <span className="text-xs text-gray-400 uppercase">项目名称</span>
+                    </div>
+                    <p className="text-sm font-bold text-purple-400">
+                      {extractProjectName(agent.meta.path)}
+                    </p>
+                  </div>
+                )}
+
+                {/* 优先级 - 仅编辑模式显示 */}
+                {!isCreateMode && agent && agent.priority !== undefined && (
+                  <div className="p-3 bg-white/5 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400 uppercase">优先级</span>
+                      <span className="text-sm font-bold text-blue-400">
+                        {agent.priority}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      数字越大优先级越高
+                    </p>
+                  </div>
+                )}
+              </div>
+            </GlassCard>
+
+            {/* Scope 修改确认弹窗 */}
+            <AnimatePresence>
+              {showScopeChangeConfirm && pendingScope && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+                  onClick={cancelScopeChange}
+                >
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.9, opacity: 0 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-[#1a1b26] border border-yellow-500/30 rounded-2xl p-6 max-w-md mx-4 shadow-2xl"
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-yellow-500/20 rounded-xl">
+                        <AlertCircle size={24} className="text-yellow-400" />
                       </div>
-                      {scope === option.value && <CheckCircle2 size={18} className="text-green-400" />}
-                    </button>
-                  ))}
-                </div>
-              </GlassCard>
-            )}
+                      <h3 className="text-xl font-bold">确认修改保存位置</h3>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                      <p className="text-gray-300">
+                        您即将修改 Agent 的保存位置：
+                      </p>
+                      <div className="p-3 bg-white/5 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-400">当前位置</span>
+                          <span className="text-sm font-bold text-red-400">{agent?.scope}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400">新位置</span>
+                          <span className="text-sm font-bold text-green-400">{pendingScope}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-yellow-400">
+                        ⚠️ 此操作将移动 Agent 配置文件到新位置
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={cancelScopeChange}
+                        className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-bold transition-all"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={confirmScopeChange}
+                        className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 rounded-xl font-bold transition-all"
+                      >
+                        确认修改
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* 工具配置 */}
             <GlassCard className="p-6">
@@ -829,72 +1004,89 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
                 <h3 className="font-bold">工具配置</h3>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* 允许的工具 */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-400 mb-2">
+                  <label className="block text-sm font-bold text-gray-400 mb-3">
                     允许的工具（为空则继承全部）
                   </label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {tools.map(tool => (
-                      <span key={tool} className="inline-flex items-center gap-1 px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm border border-green-500/30">
-                        {tool}
-                        <button onClick={() => handleRemoveTool(tool)} className="hover:text-white"><X size={14} /></button>
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={newTool}
-                      onChange={(e) => setNewTool(e.target.value)}
-                      className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
-                    >
-                      <option value="">选择工具...</option>
-                      {AVAILABLE_TOOLS.filter(t => !tools.includes(t)).map(tool => (
-                        <option key={tool} value={tool}>{tool}</option>
+
+                  {/* 已选择的工具标签 */}
+                  {tools.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3 p-3 bg-white/5 rounded-xl">
+                      {tools.map(tool => (
+                        <span key={tool} className="inline-flex items-center gap-1 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-sm border border-green-500/30">
+                          {tool}
+                          <button onClick={() => handleRemoveTool(tool)} className="hover:text-white">
+                            <X size={14} />
+                          </button>
+                        </span>
                       ))}
-                    </select>
-                    <button
-                      onClick={() => handleAddTool(newTool)}
-                      disabled={!newTool}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-600 rounded-xl text-sm font-bold transition-all"
-                    >
-                      <Plus size={16} />
-                    </button>
+                    </div>
+                  )}
+
+                  {/* 可选择的工具标签 */}
+                  <div className="p-3 bg-black/40 rounded-xl border border-white/10">
+                    <p className="text-xs text-gray-500 mb-2">点击添加工具</p>
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                      {AVAILABLE_TOOLS.filter(t => !tools.includes(t)).map(tool => (
+                        <button
+                          key={tool}
+                          onClick={() => handleAddTool(tool)}
+                          className="px-3 py-1.5 bg-white/5 hover:bg-green-500/20 border border-white/10 hover:border-green-500/30 text-gray-400 hover:text-green-400 rounded-lg text-sm transition-all"
+                        >
+                          {tool}
+                        </button>
+                      ))}
+                      {AVAILABLE_TOOLS.filter(t => !tools.includes(t)).length === 0 && (
+                        <span className="text-gray-500 text-sm">所有工具已添加</span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
+                {/* 禁止的工具 */}
                 <div>
-                  <label className="block text-sm font-bold text-gray-400 mb-2">
+                  <label className="block text-sm font-bold text-gray-400 mb-3">
                     禁止的工具
                   </label>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {disallowedTools.map(tool => (
-                      <span key={tool} className="inline-flex items-center gap-1 px-3 py-1 bg-red-500/20 text-red-400 rounded-lg text-sm border border-red-500/30">
-                        <Ban size={12} />
-                        {tool}
-                        <button onClick={() => handleRemoveDisallowedTool(tool)} className="hover:text-white"><X size={14} /></button>
-                      </span>
-                    ))}
-                    {disallowedTools.length === 0 && <span className="text-gray-500 text-sm">无</span>}
-                  </div>
-                  <div className="flex gap-2">
-                    <select
-                      value={newDisallowedTool}
-                      onChange={(e) => setNewDisallowedTool(e.target.value)}
-                      className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
-                    >
-                      <option value="">选择要禁止的工具...</option>
-                      {AVAILABLE_TOOLS.filter(t => !disallowedTools.includes(t)).map(tool => (
-                        <option key={tool} value={tool}>{tool}</option>
+
+                  {/* 已禁止的工具标签 */}
+                  {disallowedTools.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mb-3 p-3 bg-white/5 rounded-xl">
+                      {disallowedTools.map(tool => (
+                        <span key={tool} className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-sm border border-red-500/30">
+                          <Ban size={12} />
+                          {tool}
+                          <button onClick={() => handleRemoveDisallowedTool(tool)} className="hover:text-white">
+                            <X size={14} />
+                          </button>
+                        </span>
                       ))}
-                    </select>
-                    <button
-                      onClick={() => handleAddDisallowedTool(newDisallowedTool)}
-                      disabled={!newDisallowedTool}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-gray-600 rounded-xl text-sm font-bold transition-all"
-                    >
-                      <Plus size={16} />
-                    </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-white/5 rounded-xl mb-3">
+                      <span className="text-gray-500 text-sm">无禁止工具</span>
+                    </div>
+                  )}
+
+                  {/* 可选择的工具标签 */}
+                  <div className="p-3 bg-black/40 rounded-xl border border-white/10">
+                    <p className="text-xs text-gray-500 mb-2">点击禁止工具</p>
+                    <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+                      {AVAILABLE_TOOLS.filter(t => !disallowedTools.includes(t)).map(tool => (
+                        <button
+                          key={tool}
+                          onClick={() => handleAddDisallowedTool(tool)}
+                          className="px-3 py-1.5 bg-white/5 hover:bg-red-500/20 border border-white/10 hover:border-red-500/30 text-gray-400 hover:text-red-400 rounded-lg text-sm transition-all"
+                        >
+                          {tool}
+                        </button>
+                      ))}
+                      {AVAILABLE_TOOLS.filter(t => !disallowedTools.includes(t)).length === 0 && (
+                        <span className="text-gray-500 text-sm">所有工具已禁止</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

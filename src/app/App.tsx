@@ -160,7 +160,6 @@ export default function App() {
               <TeamsProvider>
                 <ExecutionProvider>
                   <RouterProvider router={router} />
-                  <ExecutionMonitor />
                 </ExecutionProvider>
               </TeamsProvider>
             </AgentsProvider>

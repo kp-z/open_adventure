@@ -320,12 +320,6 @@ export const TeamCreator: React.FC<TeamCreatorProps> = ({ teamId, onBack }) => {
       <div className="max-w-7xl mx-auto pb-20">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={onBack}
-            className="p-3 hover:bg-white/10 rounded-xl transition-colors"
-          >
-            <ArrowLeft size={24} />
-          </button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold tracking-tight">
               {teamId ? 'Configure Team' : 'Create Agent Team'}

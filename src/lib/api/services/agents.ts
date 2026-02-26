@@ -132,6 +132,101 @@ export const agentsApi = {
     }>(`/agents/${id}/test`, null, { params: { prompt } }),
 
   /**
+   * 测试子代理（流式输出）
+   *
+   * 实时接收 shell 日志输出
+   * @param id Agent ID
+   * @param prompt 测试提示
+   * @param onLog 日志回调
+   * @param onComplete 完成回调
+   * @param onError 错误回调
+   */
+  testStream: (
+    id: number,
+    prompt: string,
+    onLog: (message: string) => void,
+    onComplete: (data: { success: boolean; output: string; duration: number; model: string }) => void,
+    onError: (error: string) => void
+  ) => {
+    const baseURL = apiClient.getBaseURL();
+    const url = `${baseURL}/agents/${id}/test-stream?prompt=${encodeURIComponent(prompt)}`;
+
+    // 使用 fetch 实现 SSE
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }).then(async (response) => {
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Response body is null');
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const jsonStr = line.substring(6).trim();
+              if (!jsonStr) continue;
+
+              const event = JSON.parse(jsonStr);
+
+              if (event.type === 'log') {
+                onLog(event.message);
+              } else if (event.type === 'complete') {
+                onComplete(event.data);
+              } else if (event.type === 'error') {
+                onError(event.message);
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e, 'Line:', line);
+            }
+          }
+        }
+      }
+
+      // 处理缓冲区中剩余的数据
+      if (buffer.trim() && buffer.startsWith('data: ')) {
+        try {
+          const jsonStr = buffer.substring(6).trim();
+          if (jsonStr) {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'log') {
+              onLog(event.message);
+            } else if (event.type === 'complete') {
+              onComplete(event.data);
+            } else if (event.type === 'error') {
+              onError(event.message);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to parse final SSE event:', e);
+        }
+      }
+    }).catch((error) => {
+      console.error('Stream error:', error);
+      onError(error.message || '连接失败');
+    });
+  },
+
+  /**
    * 使用 Claude 生成子代理配置
    *
    * 类似 /agents 命令的 "Generate with Claude" 功能

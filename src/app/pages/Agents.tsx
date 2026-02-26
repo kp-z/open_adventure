@@ -24,7 +24,9 @@ import {
   Edit,
   Copy,
   Users,
-  Activity
+  Activity,
+  Pin,
+  PinOff
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';

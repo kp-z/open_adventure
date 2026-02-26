@@ -291,29 +291,88 @@ const Dashboard = () => {
           {/* Available Models */}
           <div className="mb-4">
             <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-3">Available Models</p>
-            <div className="grid grid-cols-3 gap-2">
-              {claudeHealth?.model_info?.available_models.map((model) => (
-                <div
-                  key={model.alias}
-                  className={`p-3 rounded-lg border transition-colors ${
-                    claudeHealth?.model_info?.current_model === model.alias
-                      ? 'bg-blue-500/20 border-blue-500/50'
-                      : model.available
-                      ? 'bg-green-500/10 border-green-500/30'
-                      : 'bg-gray-500/10 border-gray-500/30'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-bold text-white capitalize">{model.alias}</p>
-                    <div className={`w-2 h-2 rounded-full ${
-                      model.available ? 'bg-green-500' : 'bg-gray-500'
-                    }`} />
-                  </div>
-                  <p className="text-[9px] text-gray-500">{model.description}</p>
-                </div>
-              ))}
+            <div className="relative h-24 flex items-center justify-center">
+              {(() => {
+                // 8个常用模型及其气泡配置 - 大小差异更大
+                const bubbleConfigs = [
+                  { name: 'Haiku', size: 28, top: '15%', left: '8%' },
+                  { name: 'Sonnet', size: 48, top: '50%', left: '12%' },
+                  { name: 'Opus', size: 52, top: '10%', left: '28%' },
+                  { name: 'Haiku 3.5', size: 32, top: '65%', left: '35%' },
+                  { name: 'Sonnet 3.5', size: 45, top: '18%', left: '50%' },
+                  { name: 'Sonnet 4', size: 38, top: '58%', left: '60%' },
+                  { name: 'Opus 4', size: 55, top: '8%', left: '75%' },
+                  { name: 'Opus 4.5', size: 35, top: '55%', left: '85%' }
+                ];
+
+                return bubbleConfigs.map((config, index) => {
+                  // 检查模型是否可用 - 改进匹配逻辑
+                  const matchedModel = claudeHealth?.model_info?.available_models.find(m => {
+                    const modelAlias = m.alias.toLowerCase();
+                    const configName = config.name.toLowerCase();
+                    // 精确匹配或包含匹配
+                    return modelAlias === configName ||
+                           modelAlias.includes(configName.replace(/\s+/g, '-')) ||
+                           modelAlias.includes(configName.replace(/\s+/g, ''));
+                  });
+
+                  const isAvailable = matchedModel?.available ?? false;
+
+                  return (
+                    <div
+                      key={config.name}
+                      className="absolute group cursor-pointer"
+                      style={{
+                        top: config.top,
+                        left: config.left,
+                        width: `${config.size}px`,
+                        height: `${config.size}px`,
+                        animation: `float ${3 + index * 0.5}s ease-in-out infinite`,
+                        animationDelay: `${index * 0.3}s`
+                      }}
+                      title={config.name}
+                    >
+                      {/* 气泡主体 */}
+                      <div
+                        className={`
+                          w-full h-full rounded-full relative
+                          transition-all duration-300
+                          bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                          backdrop-blur-[2px]
+                          border border-white/15
+                          shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]
+                          hover:scale-110
+                          ${isAvailable ? 'shadow-[0_0_12px_rgba(34,197,94,0.15),0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]' : ''}
+                        `}
+                      >
+                        {/* 顶部高光 */}
+                        <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
+
+                        {/* 次级高光 */}
+                        <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
+
+                        {/* 模型名称 - 更小更低调 */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-[8px] font-medium text-center leading-tight px-1 text-gray-400">
+                            {config.name}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
+
+          <style>{`
+            @keyframes float {
+              0%, 100% { transform: translateY(0px) translateX(0px); }
+              25% { transform: translateY(-8px) translateX(3px); }
+              50% { transform: translateY(-4px) translateX(-3px); }
+              75% { transform: translateY(-10px) translateX(2px); }
+            }
+          `}</style>
 
           <div className="grid grid-cols-2 gap-4 mt-auto">
             <div className="bg-white/5 rounded-xl p-3">

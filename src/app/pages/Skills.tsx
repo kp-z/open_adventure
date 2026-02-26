@@ -24,7 +24,9 @@ import {
   Power,
   PowerOff,
   Rocket,
-  Copy
+  Copy,
+  Pin,
+  PinOff
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -58,6 +60,31 @@ const Skills = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+
+  // ========== 置顶状态 ==========
+  const [pinnedSkills, setPinnedSkills] = useState<Set<number>>(() => {
+    const saved = localStorage.getItem('pinnedSkills');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+
+  // 保存置顶状态到 localStorage
+  useEffect(() => {
+    localStorage.setItem('pinnedSkills', JSON.stringify(Array.from(pinnedSkills)));
+  }, [pinnedSkills]);
+
+  // 切换置顶状态
+  const togglePin = (skillId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinnedSkills(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(skillId)) {
+        newSet.delete(skillId);
+      } else {
+        newSet.add(skillId);
+      }
+      return newSet;
+    });
+  };
 
   // ========== 分类数据 ==========
   const [categories, setCategories] = useState<{
@@ -265,35 +292,44 @@ const Skills = () => {
     };
   }, [openMenuId]);
 
-  // ========== 过滤逻辑 ==========
-  const filteredSkills = skills.filter(s => {
-    const name = s.name[lang] || s.name.en;
-    const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
+  // ========== 过滤和排序逻辑 ==========
+  const filteredSkills = skills
+    .filter(s => {
+      const name = s.name[lang] || s.name.en;
+      const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
 
-    // Category filter
-    let matchesCategory = true;
-    if (selectedCategory !== 'all') {
-      // Map source to category
-      let source = s.source.toLowerCase();
-      if (source === 'global') source = 'builtin';
+      // Category filter
+      let matchesCategory = true;
+      if (selectedCategory !== 'all') {
+        // Map source to category
+        let source = s.source.toLowerCase();
+        if (source === 'global') source = 'builtin';
 
-      matchesCategory = source === selectedCategory;
+        matchesCategory = source === selectedCategory;
 
-      // Sub-category filter (multi-select)
-      if (matchesCategory && selectedSubCategories.length > 0) {
-        if (selectedCategory === 'plugin') {
-          const pluginName = (s as any).pluginNamespace || (s as any).meta?.plugin_name;
-          matchesCategory = selectedSubCategories.includes(pluginName);
-        } else if (selectedCategory === 'project') {
-          const path = (s as any).meta?.path || '';
-          const projectName = path.split('/.claude/')[0].split('/').pop();
-          matchesCategory = selectedSubCategories.includes(projectName);
+        // Sub-category filter (multi-select)
+        if (matchesCategory && selectedSubCategories.length > 0) {
+          if (selectedCategory === 'plugin') {
+            const pluginName = (s as any).pluginNamespace || (s as any).meta?.plugin_name;
+            matchesCategory = selectedSubCategories.includes(pluginName);
+          } else if (selectedCategory === 'project') {
+            const path = (s as any).meta?.path || '';
+            const projectName = path.split('/.claude/')[0].split('/').pop();
+            matchesCategory = selectedSubCategories.includes(projectName);
+          }
         }
       }
-    }
 
-    return matchesSearch && matchesCategory;
-  });
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      // 置顶的排在前面
+      const aPinned = pinnedSkills.has(a.id);
+      const bPinned = pinnedSkills.has(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
 
   // ========== Loading 状态 ==========
   if (loading && skills.length === 0) {
@@ -691,6 +727,22 @@ const Skills = () => {
                             data-skill-menu="true"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            {/* 置顶/取消置顶 */}
+                            <button
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                                pinnedSkills.has(skill.id)
+                                  ? 'text-gray-300 hover:bg-gray-500/20 hover:text-gray-400'
+                                  : 'text-gray-300 hover:bg-yellow-500/20 hover:text-yellow-400'
+                              }`}
+                              onClick={(e) => {
+                                togglePin(skill.id, e);
+                                setOpenMenuId(null);
+                              }}
+                            >
+                              {pinnedSkills.has(skill.id) ? <PinOff size={14} /> : <Pin size={14} />}
+                              {pinnedSkills.has(skill.id) ? '取消置顶' : '置顶'}
+                            </button>
+
                             {/* 编辑 */}
                             <button
                               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors"

@@ -155,18 +155,12 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
         mode === 'adventure' ? "bg-[#121225] border-yellow-500/20" : "bg-white/[0.02] border-white/5 backdrop-blur-md"
       )}>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={creationMode ? () => setCreationMode(null) : onBack}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-gray-400 hover:text-white"
-          >
-            <ArrowLeft size={20} />
-          </button>
           <div>
             <h2 className={cn(
               "font-bold",
               mode === 'adventure' ? "text-yellow-500 uppercase tracking-widest text-sm" : "text-lg"
             )}>
-              {creationMode === 'ai' 
+              {creationMode === 'ai'
                 ? (mode === 'adventure' ? 'Oracle Ritual' : 'AI Architect')
                 : mode === 'adventure' ? 'Summon New Hero' : 'Create AI Agent'}
             </h2>

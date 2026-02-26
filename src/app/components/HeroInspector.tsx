@@ -97,12 +97,6 @@ export const HeroInspector = ({ agent, onBack, onSave }: HeroInspectorProps) => 
       {/* Header - Inspired by Figma currencies */}
       <header className="h-20 px-8 flex items-center justify-between bg-[#121225] border-b border-white/5 relative z-10">
         <div className="flex items-center gap-6">
-          <button 
-            onClick={onBack}
-            className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all hover:bg-white/10"
-          >
-            <ArrowLeft size={24} />
-          </button>
           <div className="flex flex-col">
             <h2 className="text-2xl font-black italic tracking-tighter text-yellow-500 uppercase">{t('appName' as any)}</h2>
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">

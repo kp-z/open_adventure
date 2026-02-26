@@ -35,13 +35,16 @@ import {
   Settings,
   FileText,
   Code,
+  Save,
+  X as XIcon,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import type { Agent } from '@/lib/api';
-import { agentsApi } from '@/lib/api';
+import type { Agent, Skill } from '@/lib/api';
+import { agentsApi, skillsApi } from '@/lib/api';
 import { GlassCard } from './ui-shared';
+import { useNotifications } from '../contexts/NotificationContext';
 import 'highlight.js/styles/github-dark.css';
 import '../../styles/markdown.css';
 
@@ -140,6 +143,7 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
 }) => {
   // 是否可以编辑（非内置 agent 可以编辑）
   const canEdit = !agent.is_builtin;
+  const { addNotification, updateNotification } = useNotifications();
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [currentOutput, setCurrentOutput] = useState<string | null>(null);
@@ -149,6 +153,32 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showMarkdownView, setShowMarkdownView] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
+  const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
+
+  // Skill 配置相关状态
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(agent.skills || []);
+  const [isSkillsModified, setIsSkillsModified] = useState(false);
+  const [isSavingSkills, setIsSavingSkills] = useState(false);
+  const [showSkillSelector, setShowSkillSelector] = useState(false);
+  const skillSelectorRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭 Skill 选择器
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (skillSelectorRef.current && !skillSelectorRef.current.contains(event.target as Node)) {
+        setShowSkillSelector(false);
+      }
+    };
+
+    if (showSkillSelector) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSkillSelector]);
 
   // 加载持久化的测试历史
   useEffect(() => {
@@ -160,6 +190,28 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
       setCurrentSuccess(history[0].success);
     }
   }, [agent.id]);
+
+  // 加载可用的 Skills
+  useEffect(() => {
+    const loadSkills = async () => {
+      try {
+        const response = await skillsApi.list({ limit: 1000 });
+        setAvailableSkills(response.items);
+      } catch (error) {
+        console.error('Failed to load skills:', error);
+      }
+    };
+    loadSkills();
+  }, []);
+
+  // 检测 Skills 是否被修改
+  useEffect(() => {
+    const originalSkills = agent.skills || [];
+    const isModified =
+      selectedSkills.length !== originalSkills.length ||
+      selectedSkills.some(s => !originalSkills.includes(s));
+    setIsSkillsModified(isModified);
+  }, [selectedSkills, agent.skills]);
 
   // 计算性能统计
   const performanceStats = useMemo(() => {
@@ -197,40 +249,98 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     }
   }, [currentOutput]);
 
-  // 测试 Agent - 调用真实后端 API
+  // 测试 Agent - 使用流式 API
   const handleTest = async () => {
     if (!input.trim() || isRunning) return;
 
     setIsRunning(true);
     setCurrentOutput(null);
     setCurrentSuccess(null);
+    setConsoleLogs([]); // 清空控制台日志
+
+    // 添加运行中通知
+    const notificationId = addNotification({
+      type: 'loading',
+      title: `Agent ${agent.name} 运行中`,
+      message: `正在执行测试: ${input.substring(0, 50)}${input.length > 50 ? '...' : ''}`,
+    });
+
+    const startTime = Date.now();
 
     try {
-      // 调用后端 API 测试 agent
-      const response = await agentsApi.test(agent.id, input);
-
-      const testResult: TestResult = {
-        id: `test-${Date.now()}`,
+      // 使用流式 API
+      agentsApi.testStream(
+        agent.id,
         input,
-        output: response.output,
-        success: response.success,
-        duration: response.duration,
-        timestamp: new Date().toISOString(),
-        model: response.model,
-        agentId: agent.id,
-      };
+        // onLog - 实时日志回调
+        (message: string) => {
+          setConsoleLogs(prev => [...prev, message]);
+        },
+        // onComplete - 完成回调
+        (data) => {
+          const duration = (Date.now() - startTime) / 1000;
 
-      setCurrentOutput(response.output);
-      setCurrentSuccess(response.success);
-      const newHistory = [testResult, ...testHistory];
-      setTestHistory(newHistory);
-      saveTestHistory(newHistory);
-      setInput('');
+          const testResult: TestResult = {
+            id: `test-${Date.now()}`,
+            input,
+            output: data.output,
+            success: data.success,
+            duration: data.duration,
+            timestamp: new Date().toISOString(),
+            model: data.model,
+            agentId: agent.id,
+          };
+
+          setCurrentOutput(data.output);
+          setCurrentSuccess(data.success);
+          const newHistory = [testResult, ...testHistory];
+          setTestHistory(newHistory);
+          saveTestHistory(newHistory);
+          setInput('');
+          setIsRunning(false);
+
+          // 更新通知为成功状态
+          updateNotification(notificationId, {
+            type: data.success ? 'success' : 'error',
+            title: `Agent ${agent.name} ${data.success ? '执行成功' : '执行失败'}`,
+            message: `耗时 ${data.duration.toFixed(2)}s · 模型: ${data.model}`,
+          });
+        },
+        // onError - 错误回调
+        (error: string) => {
+          const duration = (Date.now() - startTime) / 1000;
+          setCurrentOutput(error);
+          setCurrentSuccess(false);
+
+          const testResult: TestResult = {
+            id: `test-${Date.now()}`,
+            input,
+            output: error,
+            success: false,
+            duration,
+            timestamp: new Date().toISOString(),
+            model: agent.model || 'inherit',
+            agentId: agent.id,
+          };
+          const newHistory = [testResult, ...testHistory];
+          setTestHistory(newHistory);
+          saveTestHistory(newHistory);
+          setIsRunning(false);
+
+          // 更新通知为失败状态
+          updateNotification(notificationId, {
+            type: 'error',
+            title: `Agent ${agent.name} 执行失败`,
+            message: error.substring(0, 100),
+          });
+        }
+      );
     } catch (error) {
       console.error('Test failed:', error);
       const errorMessage = error instanceof Error ? error.message : '测试执行失败，请检查后端服务';
       setCurrentOutput(errorMessage);
       setCurrentSuccess(false);
+      setIsRunning(false);
 
       const testResult: TestResult = {
         id: `test-${Date.now()}`,
@@ -245,8 +355,13 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
       const newHistory = [testResult, ...testHistory];
       setTestHistory(newHistory);
       saveTestHistory(newHistory);
-    } finally {
-      setIsRunning(false);
+
+      // 更新通知为失败状态
+      updateNotification(notificationId, {
+        type: 'error',
+        title: `Agent ${agent.name} 执行失败`,
+        message: errorMessage.substring(0, 100),
+      });
     }
   };
 
@@ -274,6 +389,48 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     if (id) {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
+
+  // 切换 Skill 选择
+  const toggleSkill = (skillName: string) => {
+    setSelectedSkills(prev =>
+      prev.includes(skillName)
+        ? prev.filter(s => s !== skillName)
+        : [...prev, skillName]
+    );
+  };
+
+  // 移除 Skill
+  const removeSkill = (skillName: string) => {
+    setSelectedSkills(prev => prev.filter(s => s !== skillName));
+  };
+
+  // 添加 Skill
+  const addSkill = (skillName: string) => {
+    if (!selectedSkills.includes(skillName)) {
+      setSelectedSkills(prev => [...prev, skillName]);
+    }
+    setShowSkillSelector(false);
+  };
+
+  // 保存 Skills 配置到 Agent
+  const handleSaveSkills = async () => {
+    if (!canEdit || !isSkillsModified) return;
+
+    setIsSavingSkills(true);
+    try {
+      await agentsApi.update(agent.id, { skills: selectedSkills });
+      // 更新本地 agent 对象
+      agent.skills = selectedSkills;
+      setIsSkillsModified(false);
+      // 可以添加成功提示
+      console.log('Skills saved successfully');
+    } catch (error) {
+      console.error('Failed to save skills:', error);
+      // 可以添加错误提示
+    } finally {
+      setIsSavingSkills(false);
     }
   };
 
@@ -359,13 +516,6 @@ Agent 描述: ${agent.description}
     <div className="max-w-7xl mx-auto pb-20">
       {/* 头部 - 融入 Agent 信息 */}
       <div className="flex items-start gap-4 mb-8">
-        <button
-          onClick={onBack}
-          className="p-3 hover:bg-white/10 rounded-xl transition-colors mt-1"
-        >
-          <ArrowLeft size={24} />
-        </button>
-
         {/* Agent 图标 */}
         <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 flex-shrink-0"
@@ -644,6 +794,29 @@ Agent 描述: ${agent.description}
                 )}
               </AnimatePresence>
             </div>
+
+            {/* 控制台日志区域 */}
+            {consoleLogs.length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Terminal size={14} className="text-gray-400" />
+                  <label className="text-xs font-bold text-gray-400 uppercase">
+                    控制台日志
+                  </label>
+                  <span className="text-xs text-gray-500">({consoleLogs.length} 条)</span>
+                </div>
+                <div className="p-3 bg-black/60 rounded-xl border border-white/10 max-h-60 overflow-y-auto">
+                  <div className="space-y-1 font-mono text-xs">
+                    {consoleLogs.map((log, index) => (
+                      <div key={index} className="text-gray-400">
+                        <span className="text-gray-600 mr-2">[{index + 1}]</span>
+                        {log}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </GlassCard>
 
           {/* 建议的测试 */}
@@ -754,26 +927,239 @@ Agent 描述: ${agent.description}
 
         {/* 右侧 - Agent 信息和使用说明 */}
         <div className="space-y-6">
-          {/* 技能卡片 - 放在第一位 */}
+          {/* Skill 配置卡片 */}
           <GlassCard className="p-6 border-cyan-500/20">
-            <h3 className="font-bold mb-4 text-sm text-cyan-400 uppercase tracking-wider flex items-center gap-2">
-              <Zap size={14} />
-              预加载技能
-            </h3>
-            {agent.skills && agent.skills.length > 0 ? (
-              <div className="space-y-2">
-                {agent.skills.map((skill) => (
-                  <div
-                    key={skill}
-                    className="p-3 bg-cyan-500/10 rounded-xl border border-cyan-500/20"
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-sm text-cyan-400 uppercase tracking-wider flex items-center gap-2">
+                <Zap size={14} />
+                Skill 配置
+              </h3>
+              <div className="flex items-center gap-2">
+                {/* 添加按钮 */}
+                <button
+                  onClick={() => setShowSkillSelector(!showSkillSelector)}
+                  disabled={isRunning}
+                  className="p-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 hover:border-cyan-500/50 rounded-lg transition-all disabled:opacity-50"
+                  title="添加 Skill"
+                >
+                  <Sparkles size={16} className="text-cyan-400" />
+                </button>
+
+                {/* 保存按钮 */}
+                {canEdit && isSkillsModified && (
+                  <button
+                    onClick={handleSaveSkills}
+                    disabled={isSavingSkills}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 disabled:opacity-50 text-cyan-400 rounded-lg transition-all text-xs"
                   >
-                    <p className="text-sm font-bold text-cyan-400">{skill}</p>
-                  </div>
-                ))}
+                    {isSavingSkills ? (
+                      <>
+                        <Loader size={12} className="animate-spin" />
+                        保存
+                      </>
+                    ) : (
+                      <>
+                        <Save size={12} />
+                        保存
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">无预加载技能</p>
+            </div>
+
+            {/* Skills 便签展示 */}
+            <div className="min-h-[80px]">
+              {selectedSkills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedSkills.map((skillName) => {
+                    const skill = availableSkills.find(s => s.full_name === skillName);
+                    return (
+                      <div
+                        key={skillName}
+                        className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 rounded-lg transition-all"
+                      >
+                        <span className="text-xs font-medium text-cyan-300">
+                          {skill?.name || skillName}
+                        </span>
+                        <button
+                          onClick={() => removeSkill(skillName)}
+                          disabled={isRunning}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-500/30 text-red-400 rounded transition-all disabled:opacity-50"
+                        >
+                          <XIcon size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-20 border-2 border-dashed border-cyan-500/20 rounded-xl">
+                  <p className="text-xs text-gray-500">点击 + 添加 Skill</p>
+                </div>
+              )}
+            </div>
+
+            {/* Skill 选择器下拉菜单 */}
+            <AnimatePresence>
+              {showSkillSelector && (
+                <motion.div
+                  ref={skillSelectorRef}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="mt-3 p-3 bg-black/60 border border-cyan-500/30 rounded-xl shadow-2xl max-h-64 overflow-y-auto"
+                >
+                  {availableSkills.length === 0 ? (
+                    <div className="text-xs text-gray-500 text-center py-4">
+                      <Loader size={16} className="animate-spin mx-auto mb-2" />
+                      加载 Skills...
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {availableSkills
+                        .filter(skill => !selectedSkills.includes(skill.full_name))
+                        .map((skill) => (
+                          <button
+                            key={skill.id}
+                            onClick={() => addSkill(skill.full_name)}
+                            className="w-full text-left p-2 hover:bg-cyan-500/10 rounded-lg transition-all"
+                          >
+                            <p className="text-sm font-bold text-white">{skill.name}</p>
+                            {skill.description && (
+                              <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                                {skill.description}
+                              </p>
+                            )}
+                          </button>
+                        ))}
+                      {availableSkills.filter(skill => !selectedSkills.includes(skill.full_name)).length === 0 && (
+                        <div className="text-xs text-gray-500 text-center py-4">
+                          所有 Skill 已添加
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 状态提示 */}
+            {isSkillsModified && (
+              <div className="mt-3 pt-3 border-t border-cyan-500/20">
+                <div className="text-xs text-cyan-400 flex items-center gap-1">
+                  <Activity size={12} />
+                  配置已修改，点击保存按钮持久化
+                </div>
+              </div>
             )}
+          </GlassCard>
+
+          {/* 目录配置卡片 */}
+          <GlassCard className="p-6 border-blue-500/20">
+            <h3 className="font-bold mb-4 text-sm text-blue-400 uppercase tracking-wider flex items-center gap-2">
+              <Settings size={14} />
+              目录配置
+            </h3>
+            <div className="space-y-3">
+              {/* Scope */}
+              <div className="p-3 bg-white/5 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-400 uppercase">Scope</span>
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-bold capitalize"
+                    style={{
+                      backgroundColor: `${agentColor}20`,
+                      color: agentColor
+                    }}
+                  >
+                    {agent.scope}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-300 font-mono break-all">
+                  {(() => {
+                    if (agent.scope === 'builtin') return '系统内置';
+
+                    const path = agent.meta?.path;
+                    if (!path) {
+                      // 没有路径时的后备显示
+                      if (agent.scope === 'user') return '~/.claude/agents/';
+                      if (agent.scope === 'plugin') return '~/.claude/plugins/*/agents/';
+                      if (agent.scope === 'project') return '.claude/agents/ (项目级)';
+                      return '';
+                    }
+
+                    // 显示完整路径到 agents 目录
+                    if (path.includes('/.claude/agents/')) {
+                      return path.substring(0, path.lastIndexOf('/.claude/agents/') + 16);
+                    } else if (path.includes('/.claude/plugins/')) {
+                      // plugin 路径：显示到 /agents/ 目录
+                      const agentsIndex = path.lastIndexOf('/agents/');
+                      if (agentsIndex !== -1) {
+                        return path.substring(0, agentsIndex + 8);
+                      }
+                      return path.substring(0, path.lastIndexOf('/.claude/plugins/') + 17);
+                    }
+
+                    return path;
+                  })()}
+                </p>
+              </div>
+
+              {/* 文件路径 */}
+              {agent.meta?.path && (
+                <div className="p-3 bg-white/5 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText size={12} className="text-gray-400" />
+                    <span className="text-xs text-gray-400 uppercase">完整路径</span>
+                  </div>
+                  <p className="text-xs text-gray-300 font-mono break-all">
+                    {agent.meta.path}
+                  </p>
+                </div>
+              )}
+
+              {/* Plugin 名称 */}
+              {agent.scope === 'plugin' && agent.meta?.plugin_name && (
+                <div className="p-3 bg-white/5 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wrench size={12} className="text-orange-400" />
+                    <span className="text-xs text-gray-400 uppercase">插件名称</span>
+                  </div>
+                  <p className="text-sm font-bold text-orange-400">
+                    {agent.meta.plugin_name}
+                  </p>
+                </div>
+              )}
+
+              {/* Project 名称 */}
+              {agent.scope === 'project' && agent.meta?.path && (
+                <div className="p-3 bg-white/5 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Code size={12} className="text-purple-400" />
+                    <span className="text-xs text-gray-400 uppercase">项目名称</span>
+                  </div>
+                  <p className="text-sm font-bold text-purple-400">
+                    {extractProjectName(agent.meta.path)}
+                  </p>
+                </div>
+              )}
+
+              {/* 优先级 */}
+              {agent.priority !== undefined && (
+                <div className="p-3 bg-white/5 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-400 uppercase">优先级</span>
+                    <span className="text-sm font-bold text-blue-400">
+                      {agent.priority}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    数字越大优先级越高
+                  </p>
+                </div>
+              )}
+            </div>
           </GlassCard>
 
           {/* 性能统计卡片 */}

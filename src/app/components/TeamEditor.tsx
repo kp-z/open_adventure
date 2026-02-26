@@ -253,12 +253,6 @@ export const TeamEditor: React.FC<TeamEditorProps> = ({
     <div className="max-w-6xl mx-auto pb-20">
       {/* 头部 */}
       <div className="flex items-center gap-4 mb-8">
-        <button
-          onClick={onBack}
-          className="p-3 hover:bg-white/10 rounded-xl transition-colors"
-        >
-          <ArrowLeft size={24} />
-        </button>
         <div className="flex items-center gap-4 flex-1">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-purple-500/20 border border-purple-500/30">
             <UsersRound size={28} className="text-purple-400" />
