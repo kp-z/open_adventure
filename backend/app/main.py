@@ -45,8 +45,8 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # 开发环境允许所有来源
+    allow_credentials=False,  # 使用通配符时必须设为 False
     allow_methods=["*"],
     allow_headers=["*"],
 )
