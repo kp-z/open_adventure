@@ -27,6 +27,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
 import { GlassCard, GameCard, ActionButton } from './ui-shared';
+import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { HeroInspector } from './HeroInspector';
 import { cn } from '../lib/utils';
 import { getRandomAvatar, getAvatarById } from '../lib/avatars';
@@ -311,15 +312,24 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         "absolute inset-0 rounded-2xl blur-xl opacity-20 transition-opacity group-focus-within:opacity-40",
                         mode === 'adventure' ? "bg-yellow-500" : "bg-blue-600"
                       )} />
-                      <textarea 
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        placeholder={mode === 'adventure' ? "e.g., A powerful mage who knows everything about the ancient databases..." : "e.g., A marketing specialist agent that can browse the web and write catchy copy..."}
-                        className={cn(
-                          "w-full h-40 bg-black/40 border border-white/10 rounded-2xl px-6 py-5 text-white focus:outline-none transition-all relative z-10 text-lg resize-none",
-                          mode === 'adventure' ? "focus:border-yellow-500/50" : "focus:border-blue-600/50"
-                        )}
-                      />
+                      <div className="relative z-10">
+                        <div className="flex justify-end mb-2">
+                          <PromptOptimizeButton
+                            value={aiPrompt}
+                            onChange={setAiPrompt}
+                            context="AI Agent Generation"
+                          />
+                        </div>
+                        <textarea
+                          value={aiPrompt}
+                          onChange={(e) => setAiPrompt(e.target.value)}
+                          placeholder={mode === 'adventure' ? "e.g., A powerful mage who knows everything about the ancient databases..." : "e.g., A marketing specialist agent that can browse the web and write catchy copy..."}
+                          className={cn(
+                            "w-full h-40 bg-black/40 border border-white/10 rounded-2xl px-6 py-5 text-white focus:outline-none transition-all text-lg resize-none",
+                            mode === 'adventure' ? "focus:border-yellow-500/50" : "focus:border-blue-600/50"
+                          )}
+                        />
+                      </div>
                     </div>
 
                     <ActionButton 

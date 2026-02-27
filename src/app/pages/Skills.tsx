@@ -689,9 +689,22 @@ const Skills = () => {
                     <skill.icon size={20} />
                   </div>
                   <div className="flex gap-2">
+                    {/* 置顶按钮 */}
+                    <button
+                      className={`p-1.5 rounded-lg transition-all ${
+                        pinnedSkills.has(skill.id)
+                          ? 'text-yellow-400'
+                          : 'text-gray-500 hover:text-yellow-400'
+                      }`}
+                      onClick={(e) => togglePin(skill.id, e)}
+                      title={pinnedSkills.has(skill.id) ? '取消置顶' : '置顶'}
+                    >
+                      <Pin size={14} className={pinnedSkills.has(skill.id) ? 'fill-current' : ''} />
+                    </button>
+
                     {/* 重复标记 */}
                     {skill.isDuplicate && (
-                      <div 
+                      <div
                         className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-orange-500/20 text-orange-400 border border-orange-500/30"
                         title={`重复 ${skill.duplicateCount} 处: ${skill.duplicateLocations.join(', ')}`}
                       >
@@ -708,13 +721,13 @@ const Skills = () => {
                     </div>
                     {/* 三点菜单 */}
                     <div className="relative">
-                      <button 
+                      <button
                         className="text-gray-500 hover:text-white transition-colors p-1 rounded hover:bg-white/10"
                         onClick={(e) => handleMenuToggle(e, skill.id)}
                       >
                         <MoreVertical size={16} />
                       </button>
-                      
+
                       {/* 下拉菜单 */}
                       <AnimatePresence>
                         {openMenuId === skill.id && (
@@ -727,22 +740,6 @@ const Skills = () => {
                             data-skill-menu="true"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {/* 置顶/取消置顶 */}
-                            <button
-                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                                pinnedSkills.has(skill.id)
-                                  ? 'text-gray-300 hover:bg-gray-500/20 hover:text-gray-400'
-                                  : 'text-gray-300 hover:bg-yellow-500/20 hover:text-yellow-400'
-                              }`}
-                              onClick={(e) => {
-                                togglePin(skill.id, e);
-                                setOpenMenuId(null);
-                              }}
-                            >
-                              {pinnedSkills.has(skill.id) ? <PinOff size={14} /> : <Pin size={14} />}
-                              {pinnedSkills.has(skill.id) ? '取消置顶' : '置顶'}
-                            </button>
-
                             {/* 编辑 */}
                             <button
                               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
@@ -754,12 +751,12 @@ const Skills = () => {
                               <Edit3 size={14} />
                               编辑
                             </button>
-                            
+
                             {/* 启用/禁用 */}
                             <button
                               className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                                skill.status === 'enabled' 
-                                  ? 'text-gray-300 hover:bg-orange-500/20 hover:text-orange-400' 
+                                skill.status === 'enabled'
+                                  ? 'text-gray-300 hover:bg-orange-500/20 hover:text-orange-400'
                                   : 'text-gray-300 hover:bg-green-500/20 hover:text-green-400'
                               }`}
                               onClick={(e) => {
@@ -771,7 +768,7 @@ const Skills = () => {
                               {skill.status === 'enabled' ? <PowerOff size={14} /> : <Power size={14} />}
                               {skill.status === 'enabled' ? '禁用' : '启用'}
                             </button>
-                            
+
                             {/* 部署/同步 */}
                             <button
                               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-purple-500/20 hover:text-purple-400 transition-colors"
@@ -784,10 +781,10 @@ const Skills = () => {
                               <Rocket size={14} />
                               同步部署
                             </button>
-                            
+
                             {/* 分割线 */}
                             <div className="border-t border-white/10 my-1" />
-                            
+
                             {/* 删除 */}
                             <button
                               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/20 transition-colors"

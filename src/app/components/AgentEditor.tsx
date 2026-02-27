@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './ui-shared';
+import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { agentsApi, skillsApi } from '@/lib/api';
 import type { Agent, AgentUpdate, AgentPermissionMode, AgentModel, AgentScope, Skill } from '@/lib/api';
 
@@ -692,15 +693,25 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
           )}
         </div>
         <div className="flex gap-3">
-          <input
-            type="text"
-            placeholder="例如：'一个专门审查代码安全性的后端专家'"
-            value={aiPrompt}
-            onChange={(e) => setAiPrompt(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && aiPrompt.trim() && handleAIGenerate()}
-            className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
-            disabled={generating}
-          />
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              placeholder="例如：'一个专门审查代码安全性的后端专家'"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && aiPrompt.trim() && handleAIGenerate()}
+              className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
+              disabled={generating}
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2">
+              <PromptOptimizeButton
+                value={aiPrompt}
+                onChange={setAiPrompt}
+                context="AI Agent Generation"
+                iconOnly
+              />
+            </div>
+          </div>
           <button
             onClick={handleAIGenerate}
             disabled={generating || !aiPrompt.trim()}
@@ -1149,13 +1160,23 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
                 <MessageSquare size={18} className="text-purple-400" />
                 <h3 className="font-bold">系统提示</h3>
               </div>
-              <textarea
-                value={systemPrompt}
-                onChange={(e) => setSystemPrompt(e.target.value)}
-                placeholder="You are a specialized agent..."
-                rows={8}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500/50 resize-none font-mono text-sm transition-all"
-              />
+              <div className="relative">
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  placeholder="You are a specialized agent..."
+                  rows={8}
+                  className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500/50 resize-none font-mono text-sm transition-all"
+                />
+                <div className="absolute right-2 top-2">
+                  <PromptOptimizeButton
+                    value={systemPrompt}
+                    onChange={setSystemPrompt}
+                    context={`Agent: ${name}, Description: ${description}`}
+                    iconOnly
+                  />
+                </div>
+              </div>
             </GlassCard>
 
             {/* 高级配置（可折叠） */}

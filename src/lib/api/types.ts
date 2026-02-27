@@ -112,6 +112,19 @@ export interface ClaudeSettingsUpdate {
   effortLevel?: string;
 }
 
+// Prompt 优化相关类型
+export interface PromptOptimizeRequest {
+  prompt: string;
+  context?: string;
+}
+
+export interface PromptOptimizeResponse {
+  original_prompt: string;
+  optimized_prompt: string;
+  success: boolean;
+  error?: string;
+}
+
 // ============ Agent 相关类型 - Claude Code Subagent 规范 ============
 // 作用域枚举
 export type AgentScope = 'builtin' | 'user' | 'project' | 'plugin';

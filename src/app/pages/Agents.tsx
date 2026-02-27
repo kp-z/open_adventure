@@ -110,6 +110,31 @@ const Agents = () => {
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<AgentSyncResponse | null>(null);
 
+  // 置顶状态
+  const [pinnedAgents, setPinnedAgents] = useState<Set<number>>(() => {
+    const saved = localStorage.getItem('pinnedAgents');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+
+  // 保存置顶状态到 localStorage
+  useEffect(() => {
+    localStorage.setItem('pinnedAgents', JSON.stringify(Array.from(pinnedAgents)));
+  }, [pinnedAgents]);
+
+  // 切换置顶状态
+  const togglePin = (agentId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinnedAgents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(agentId)) {
+        newSet.delete(agentId);
+      } else {
+        newSet.add(agentId);
+      }
+      return newSet;
+    });
+  };
+
   // 分类数据
   const [categories, setCategories] = useState<{
     counts: { builtin: number; user: number; project: number; plugin: number };
@@ -280,46 +305,60 @@ const Agents = () => {
     }
   }, [searchParams, setSearchParams]);
 
-  // 过滤 agents
-  const filteredAgents = agents.filter(agent => {
-    // Category filter
-    if (selectedCategory !== 'all') {
-      const scope = agent.scope.toLowerCase();
-      if (scope !== selectedCategory) {
-        return false;
-      }
+  // 过滤和排序 agents
+  const filteredAgents = agents
+    .filter(agent => {
+      // Category filter
+      if (selectedCategory !== 'all') {
+        const scope = agent.scope.toLowerCase();
+        if (scope !== selectedCategory) {
+          return false;
+        }
 
-      // Sub-category filter (multi-select)
-      if (selectedSubCategories.length > 0) {
-        if (selectedCategory === 'plugin') {
-          const pluginName = agent.meta?.plugin_name;
-          if (!pluginName || !selectedSubCategories.includes(pluginName)) {
-            return false;
-          }
-        } else if (selectedCategory === 'project') {
-          const path = agent.meta?.path || '';
-          const parts = path.split('/');
-          const claudeIndex = parts.indexOf('.claude');
-          const projectName = claudeIndex > 0 ? parts[claudeIndex - 1] : '';
-          if (!projectName || !selectedSubCategories.includes(projectName)) {
-            return false;
+        // Sub-category filter (multi-select)
+        if (selectedSubCategories.length > 0) {
+          if (selectedCategory === 'plugin') {
+            const pluginName = agent.meta?.plugin_name;
+            if (!pluginName || !selectedSubCategories.includes(pluginName)) {
+              return false;
+            }
+          } else if (selectedCategory === 'project') {
+            const path = agent.meta?.path || '';
+            const parts = path.split('/');
+            const claudeIndex = parts.indexOf('.claude');
+            const projectName = claudeIndex > 0 ? parts[claudeIndex - 1] : '';
+            if (!projectName || !selectedSubCategories.includes(projectName)) {
+              return false;
+            }
           }
         }
       }
-    }
 
-    // 搜索过滤
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        agent.name.toLowerCase().includes(query) ||
-        agent.description?.toLowerCase().includes(query) ||
-        agent.agent_type?.toLowerCase().includes(query)
-      );
-    }
+      // 搜索过滤
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          agent.name.toLowerCase().includes(query) ||
+          agent.description?.toLowerCase().includes(query) ||
+          agent.agent_type?.toLowerCase().includes(query)
+        );
+      }
 
-    return true;
-  });
+      return true;
+    })
+    .sort((a, b) => {
+      // 1. 置顶的排在最前面
+      const aPinned = pinnedAgents.has(a.id);
+      const bPinned = pinnedAgents.has(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+
+      // 2. Built-in 的排在最后
+      if (!a.is_builtin && b.is_builtin) return -1;
+      if (a.is_builtin && !b.is_builtin) return 1;
+
+      return 0;
+    });
 
   // 测试模式
   if (testingAgent) {
@@ -516,59 +555,75 @@ const Agents = () => {
                     />
                   </div>
 
-                  {/* 操作下拉菜单 */}
-                  <div className="relative">
+                  <div className="flex gap-2">
+                    {/* 置顶按钮 */}
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowDropdown(showDropdown === agent.id ? null : agent.id);
-                      }}
-                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                      onClick={(e) => togglePin(agent.id, e)}
+                      className={`p-2 rounded-lg transition-all ${
+                        pinnedAgents.has(agent.id)
+                          ? 'text-yellow-400'
+                          : 'text-gray-500 hover:text-yellow-400'
+                      }`}
+                      title={pinnedAgents.has(agent.id) ? '取消置顶' : '置顶'}
                     >
-                      <MoreVertical size={20} className="text-gray-400" />
+                      <Pin size={16} className={pinnedAgents.has(agent.id) ? 'fill-current' : ''} />
                     </button>
 
-                    <AnimatePresence>
-                      {showDropdown === agent.id && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          className="absolute right-0 top-full mt-2 w-48 bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20"
-                        >
-                          {[
-                            { icon: Settings2, label: 'Configure', action: 'configure', color: 'blue', disabled: agent.is_builtin },
-                            { icon: Play, label: 'Run', action: 'test', color: 'green', disabled: false },
-                            { icon: Edit, label: 'Edit', action: 'edit', color: 'gray', disabled: agent.is_builtin },
-                            { icon: Copy, label: 'Duplicate', action: 'duplicate', color: 'gray', disabled: true },
-                            { icon: Trash2, label: 'Delete', action: 'delete', color: 'red', disabled: agent.is_builtin },
-                          ].map((item) => (
-                            <button
-                              key={item.action}
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (!item.disabled) {
-                                  handleAction(item.action, agent);
-                                }
-                              }}
-                              disabled={item.disabled}
-                              className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
-                                item.disabled 
-                                  ? 'opacity-40 cursor-not-allowed' 
-                                  : 'hover:bg-white/5'
-                              }`}
-                            >
-                              <item.icon size={16} className={`text-${item.color}-400`} />
-                              <span className="text-sm font-bold">{item.label}</span>
-                            </button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    {/* 操作下拉菜单 */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setShowDropdown(showDropdown === agent.id ? null : agent.id);
+                        }}
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                      >
+                        <MoreVertical size={20} className="text-gray-400" />
+                      </button>
+
+                      <AnimatePresence>
+                        {showDropdown === agent.id && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="absolute right-0 top-full mt-2 w-48 bg-[#1a1d2e] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20"
+                          >
+                            {[
+                              { icon: Settings2, label: 'Configure', action: 'configure', color: 'blue', disabled: agent.is_builtin },
+                              { icon: Play, label: 'Run', action: 'test', color: 'green', disabled: false },
+                              { icon: Edit, label: 'Edit', action: 'edit', color: 'gray', disabled: agent.is_builtin },
+                              { icon: Copy, label: 'Duplicate', action: 'duplicate', color: 'gray', disabled: true },
+                              { icon: Trash2, label: 'Delete', action: 'delete', color: 'red', disabled: agent.is_builtin },
+                            ].map((item) => (
+                              <button
+                                key={item.action}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (!item.disabled) {
+                                    handleAction(item.action, agent);
+                                  }
+                                }}
+                                disabled={item.disabled}
+                                className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
+                                  item.disabled
+                                    ? 'opacity-40 cursor-not-allowed'
+                                    : 'hover:bg-white/5'
+                                }`}
+                              >
+                                <item.icon size={16} className={`text-${item.color}-400`} />
+                                <span className="text-sm font-bold">{item.label}</span>
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
                 </div>
 

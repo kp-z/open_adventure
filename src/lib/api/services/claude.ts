@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from '../client';
-import type { SyncResult, ClaudeHealthResponse, ClaudeSettings, ClaudeSettingsUpdate } from '../types';
+import type { SyncResult, ClaudeHealthResponse, ClaudeSettings, ClaudeSettingsUpdate, PromptOptimizeRequest, PromptOptimizeResponse } from '../types';
 
 // 同步结果类型
 export interface SyncSkillsResult {
@@ -50,4 +50,10 @@ export const claudeApi = {
    */
   updateSettings: (settings: ClaudeSettingsUpdate) =>
     apiClient.put<ClaudeSettings>('/claude/settings', settings),
+
+  /**
+   * 优化 prompt
+   */
+  optimizePrompt: (request: PromptOptimizeRequest) =>
+    apiClient.post<PromptOptimizeResponse>('/claude/optimize-prompt', request),
 };

@@ -44,6 +44,7 @@ import rehypeHighlight from 'rehype-highlight';
 import type { Agent, Skill } from '@/lib/api';
 import { agentsApi, skillsApi } from '@/lib/api';
 import { GlassCard } from './ui-shared';
+import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { useNotifications } from '../contexts/NotificationContext';
 import 'highlight.js/styles/github-dark.css';
 import '../../styles/markdown.css';
@@ -599,19 +600,29 @@ Agent 描述: ${agent.description}
               <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">
                 输入
               </label>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && e.ctrlKey) {
-                    handleTest();
-                  }
-                }}
-                placeholder="输入测试提示... (Ctrl+Enter 运行)"
-                rows={4}
-                disabled={isRunning}
-                className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all resize-none font-mono text-sm"
-              />
+              <div className="relative">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      handleTest();
+                    }
+                  }}
+                  placeholder="输入测试提示... (Ctrl+Enter 运行)"
+                  rows={4}
+                  disabled={isRunning}
+                  className="w-full px-4 py-3 pr-12 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all resize-none font-mono text-sm"
+                />
+                <div className="absolute right-2 top-2">
+                  <PromptOptimizeButton
+                    value={input}
+                    onChange={setInput}
+                    context={`Testing Agent: ${agent.name}`}
+                    iconOnly
+                  />
+                </div>
+              </div>
               <div className="flex items-center justify-between mt-2">
                 <div className="text-xs text-gray-500">
                   {input.length} 字符 · 按 Ctrl+Enter 运行
