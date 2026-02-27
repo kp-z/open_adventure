@@ -1,36 +1,62 @@
 #!/bin/bash
 
-# Claude Manager Startup Script
+# 获取脚本所在目录
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
 
 echo "🚀 Starting Claude Manager..."
 echo ""
 
-# Check if virtual environment exists
+# 检查 backend 目录
+if [ ! -d "backend" ]; then
+    echo "❌ backend directory not found"
+    exit 1
+fi
+
+# 进入 backend 目录
+cd backend
+
+# 检查虚拟环境
 if [ ! -d "venv" ]; then
     echo "❌ Virtual environment not found. Creating one..."
     python3 -m venv venv
     echo "✅ Virtual environment created"
 fi
 
-# Activate virtual environment
+# 激活虚拟环境
 source venv/bin/activate
 
-# Check if dependencies are installed
+# 检查依赖
 if ! python -c "import fastapi" 2>/dev/null; then
     echo "📦 Installing dependencies..."
-    pip install -r requirements.txt
+    # 优先使用根目录的 requirements.txt
+    if [ -f "../requirements.txt" ]; then
+        pip install -r ../requirements.txt
+    else
+        echo "❌ requirements.txt not found"
+        exit 1
+    fi
     echo "✅ Dependencies installed"
 fi
 
-# Check if .env file exists
+# 检查并创建 .env 文件
 if [ ! -f ".env" ]; then
-    echo "⚠️  .env file not found. Please create one from .env.example"
-    echo "   cp .env.example .env"
-    echo "   Then edit .env with your API keys"
-    exit 1
+    if [ -f ".env.example" ]; then
+        echo "📝 Creating .env from .env.example..."
+        cp .env.example .env
+        echo "✅ .env file created"
+        echo "⚠️  Please edit backend/.env and configure your settings"
+        echo ""
+    else
+        echo "❌ .env.example not found"
+        exit 1
+    fi
 fi
 
-# Start the server
+# 设置生产环境变量
+export ENV=production
+
+# 启动服务器
 echo ""
 echo "✅ Starting FastAPI server on http://localhost:8000"
 echo "📚 API Documentation: http://localhost:8000/docs"
