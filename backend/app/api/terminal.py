@@ -34,6 +34,13 @@ class TerminalSession:
             home_dir = os.path.expanduser('~')
             os.environ['HOME'] = home_dir
 
+            # Change to user's home directory
+            os.chdir(home_dir)
+
+            # 取消 CLAUDECODE 环境变量，允许在 terminal 中使用 claude 命令
+            if 'CLAUDECODE' in os.environ:
+                del os.environ['CLAUDECODE']
+
             # Use zsh with login shell to load ~/.zshrc
             # Try zsh first, fall back to bash if not available
             shell = '/bin/zsh'

@@ -5,6 +5,7 @@ Claude CLI Client
 """
 import asyncio
 import json
+import os
 from typing import Dict, Any, Optional, List, Callable, AsyncIterator
 from pathlib import Path
 from datetime import datetime
@@ -220,10 +221,14 @@ class ClaudeCliClient:
             Dict: 包含 success, output, error, stderr
         """
         try:
+            # 设置工作目录为用户 home 目录
+            home_dir = os.path.expanduser('~')
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                cwd=home_dir
             )
 
             try:
@@ -290,11 +295,15 @@ class ClaudeCliClient:
             if log_callback:
                 log_callback("info", f"[{start_time.strftime('%H:%M:%S')}] 开始执行命令: {' '.join(cmd)}")
 
+            # 设置工作目录为用户 home 目录
+            home_dir = os.path.expanduser('~')
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env=env
+                env=env,
+                cwd=home_dir
             )
 
             async def read_stream(stream, stream_type: str, lines_buffer: List[str]):
