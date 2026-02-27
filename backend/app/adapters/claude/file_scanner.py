@@ -21,16 +21,19 @@ class ClaudeFileScanner:
         self.skills_dir = settings.claude_skills_dir
         self.plugins_dir = settings.claude_plugins_dir
 
-    async def scan_skills(self) -> List[Dict[str, Any]]:
+    async def scan_skills(self, project_paths: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """
         扫描所有技能
 
         扫描路径：
         1. ~/.claude/skills/ (用户技能 - 在 /Users 或 /home 下)
-        2. 项目目录 .claude/skills/ (项目技能)
+        2. 配置的项目路径 .claude/skills/ (项目技能)
         3. plugins/*/skills/ (插件技能)
 
         注意：不再去重，同名 skill 全部保留并标记为重复
+
+        Args:
+            project_paths: 配置的项目路径列表，每项包含 path, recursive_scan 等字段
 
         Returns:
             List[Dict]: 技能列表（含重复标记）
@@ -60,9 +63,22 @@ class ClaudeFileScanner:
             skills.extend(plugin_skills)
             logger.info(f"Found {len(plugin_skills)} plugin skills")
 
-        # TODO: 扫描项目技能（需要知道当前项目路径）
+        # 步骤 3: 扫描配置的项目路径
+        if project_paths:
+            for project_config in project_paths:
+                project_path = Path(project_config["path"])
+                recursive = project_config.get("recursive_scan", True)
+                project_alias = project_config.get("alias", project_path.name)
 
-        # 步骤 3: 标记重复的技能
+                project_skills = await self._scan_project_skills(
+                    project_path,
+                    recursive=recursive,
+                    alias=project_alias
+                )
+                skills.extend(project_skills)
+                logger.info(f"Found {len(project_skills)} skills in project '{project_alias}'")
+
+        # 步骤 4: 标记重复的技能
         skills = self._mark_duplicate_skills(skills)
 
         logger.info(f"Total skills: {len(skills)}")
@@ -262,6 +278,71 @@ class ClaudeFileScanner:
             logger.error(f"Error parsing skill {skill_dir}: {e}")
             return None
 
+    async def _scan_project_skills(
+        self,
+        project_path: Path,
+        recursive: bool = True,
+        alias: str = ""
+    ) -> List[Dict[str, Any]]:
+        """
+        扫描项目路径中的技能
+
+        Args:
+            project_path: 项目根路径
+            recursive: 是否递归扫描子目录
+            alias: 项目别名
+
+        Returns:
+            List[Dict]: 技能列表
+        """
+        skills = []
+
+        try:
+            if recursive:
+                # 递归查找所有 .claude/skills 目录
+                for skills_dir in project_path.rglob(".claude/skills"):
+                    if not skills_dir.is_dir():
+                        continue
+
+                    # 跳过空目录
+                    if not any(skills_dir.iterdir()):
+                        continue
+
+                    # 计算相对路径作为 source 标识
+                    rel_path = skills_dir.relative_to(project_path)
+                    source = f"project:{alias}/{rel_path.parent.parent}"
+
+                    project_skills = await self._scan_skills_in_dir(
+                        skills_dir,
+                        source="project"
+                    )
+
+                    # 在 meta 中记录项目信息
+                    for skill in project_skills:
+                        skill["meta"]["project_alias"] = alias
+                        skill["meta"]["project_path"] = str(project_path)
+                        skill["meta"]["relative_path"] = str(rel_path)
+                        skills.append(skill)
+            else:
+                # 只扫描根目录的 .claude/skills
+                skills_dir = project_path / ".claude" / "skills"
+                if skills_dir.exists() and skills_dir.is_dir():
+                    project_skills = await self._scan_skills_in_dir(
+                        skills_dir,
+                        source="project"
+                    )
+
+                    # 在 meta 中记录项目信息
+                    for skill in project_skills:
+                        skill["meta"]["project_alias"] = alias
+                        skill["meta"]["project_path"] = str(project_path)
+                        skills.append(skill)
+
+        except Exception as e:
+            logger.error(f"Error scanning project skills in {project_path}: {e}")
+
+        return skills
+
     async def _scan_plugin_skills(self, include_cache: bool = False) -> List[Dict[str, Any]]:
         """
         扫描所有插件中的技能
@@ -362,7 +443,7 @@ class ClaudeFileScanner:
         
         return info
 
-    async def scan_agents(self, project_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def scan_agents(self, project_paths: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """
         扫描所有 Claude Code 子代理（Subagents）
 
@@ -374,7 +455,7 @@ class ClaudeFileScanner:
         注意：CLI 级别（--agents 参数）只在运行时存在，不扫描
 
         Args:
-            project_path: 项目路径，用于扫描项目级 agents
+            project_paths: 配置的项目路径列表，每项包含 path, recursive_scan 等字段
 
         Returns:
             List[Dict]: 子代理列表，包含所有作用域
@@ -392,17 +473,20 @@ class ClaudeFileScanner:
             agents.extend(user_agents)
             logger.info(f"Found {len(user_agents)} user-level agents")
 
-        # 步骤 2: 扫描项目级 agents (.claude/agents/)
-        if project_path:
-            project_agents_dir = Path(project_path) / ".claude" / "agents"
-            if project_agents_dir.exists():
-                project_agents = await self._scan_agents_in_dir(
-                    project_agents_dir,
-                    scope="project",
-                    priority=2
+        # 步骤 2: 扫描配置的项目路径
+        if project_paths:
+            for project_config in project_paths:
+                project_path = Path(project_config["path"])
+                recursive = project_config.get("recursive_scan", True)
+                project_alias = project_config.get("alias", project_path.name)
+
+                project_agents = await self._scan_project_agents(
+                    project_path,
+                    recursive=recursive,
+                    alias=project_alias
                 )
                 agents.extend(project_agents)
-                logger.info(f"Found {len(project_agents)} project-level agents")
+                logger.info(f"Found {len(project_agents)} agents in project '{project_alias}'")
 
         # 步骤 3: 扫描插件级 agents
         if self.plugins_dir.exists():
@@ -680,6 +764,68 @@ class ClaudeFileScanner:
         except Exception as e:
             logger.error(f"Error parsing agent json {agent_file}: {e}")
             return None
+
+    async def _scan_project_agents(
+        self,
+        project_path: Path,
+        recursive: bool = True,
+        alias: str = ""
+    ) -> List[Dict[str, Any]]:
+        """
+        扫描项目路径中的 agents
+
+        Args:
+            project_path: 项目根路径
+            recursive: 是否递归扫描子目录
+            alias: 项目别名
+
+        Returns:
+            List[Dict]: agents 列表
+        """
+        agents = []
+
+        try:
+            if recursive:
+                # 递归查找所有 .claude/agents 目录
+                for agents_dir in project_path.rglob(".claude/agents"):
+                    if not agents_dir.is_dir():
+                        continue
+
+                    # 跳过空目录
+                    if not any(agents_dir.iterdir()):
+                        continue
+
+                    project_agents = await self._scan_agents_in_dir(
+                        agents_dir,
+                        scope="project",
+                        priority=2
+                    )
+
+                    # 在 meta 中记录项目信息
+                    for agent in project_agents:
+                        agent["meta"]["project_alias"] = alias
+                        agent["meta"]["project_path"] = str(project_path)
+                        agents.append(agent)
+            else:
+                # 只扫描根目录的 .claude/agents
+                agents_dir = project_path / ".claude" / "agents"
+                if agents_dir.exists() and agents_dir.is_dir():
+                    project_agents = await self._scan_agents_in_dir(
+                        agents_dir,
+                        scope="project",
+                        priority=2
+                    )
+
+                    # 在 meta 中记录项目信息
+                    for agent in project_agents:
+                        agent["meta"]["project_alias"] = alias
+                        agent["meta"]["project_path"] = str(project_path)
+                        agents.append(agent)
+
+        except Exception as e:
+            logger.error(f"Error scanning project agents in {project_path}: {e}")
+
+        return agents
 
     def _get_enabled_plugins(self) -> Dict[str, str]:
         """

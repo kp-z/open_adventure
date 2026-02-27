@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -13,7 +13,7 @@ from app.core.database import init_db, close_db
 from app.core.logging import setup_logging, get_logger
 
 # 导入所有模型以确保它们被注册到 Base.metadata（必须在 init_db 之前）
-from app.models import Skill, Agent, AgentTeam, Workflow, Task, User, TeamMessage, TeamTask, TeamState
+from app.models import Skill, Agent, AgentTeam, Workflow, Task, User, TeamMessage, TeamTask, TeamState, ProjectPath
 
 # Setup logging
 setup_logging()
@@ -27,9 +27,18 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Claude Manager Backend...")
     await init_db()
     logger.info("Database initialized")
+
+    # 启动终端清理任务
+    terminal.start_cleanup_task()
+
     yield
+
     # Shutdown
     logger.info("Shutting down Claude Manager Backend...")
+
+    # 停止终端清理任务
+    terminal.stop_cleanup_task()
+
     await close_db()
     logger.info("Database connections closed")
 
@@ -67,6 +76,7 @@ app.include_router(stats.router, prefix=f"{settings.api_prefix}")
 app.include_router(team_messages.router, prefix=f"{settings.api_prefix}")
 app.include_router(team_tasks.router, prefix=f"{settings.api_prefix}")
 app.include_router(team_state.router, prefix=f"{settings.api_prefix}")
+app.include_router(project_paths.router, prefix=f"{settings.api_prefix}")
 app.include_router(settings_router.router, prefix=f"{settings.api_prefix}")
 app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])

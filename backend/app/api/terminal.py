@@ -9,11 +9,15 @@ import struct
 import fcntl
 import termios
 from typing import Dict
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
+
+# 超时配置：15 分钟（900 秒）
+TERMINAL_TIMEOUT_SECONDS = int(os.getenv("TERMINAL_TIMEOUT_SECONDS", "900"))
 
 
 class TerminalSession:
@@ -23,6 +27,8 @@ class TerminalSession:
         self.master_fd = None
         self.pid = None
         self.running = False
+        self.last_activity = datetime.now()
+        self.created_at = datetime.now()
 
     def start(self):
         """Start a new PTY session"""
@@ -70,6 +76,7 @@ class TerminalSession:
         """Write data to the terminal"""
         if self.master_fd and self.running:
             os.write(self.master_fd, data.encode())
+            self.last_activity = datetime.now()  # 更新活动时间
 
     def read(self, timeout: float = 0.1) -> bytes:
         """Read data from the terminal"""
@@ -101,9 +108,59 @@ class TerminalSession:
             except (OSError, ChildProcessError):
                 pass
 
+    def is_timeout(self) -> bool:
+        """Check if session has timed out"""
+        elapsed = (datetime.now() - self.last_activity).total_seconds()
+        return elapsed > TERMINAL_TIMEOUT_SECONDS
+
 
 # Store active sessions
 sessions: Dict[str, TerminalSession] = {}
+
+# 后台清理任务
+cleanup_task = None
+
+
+async def cleanup_inactive_sessions():
+    """后台任务：定期清理超时的终端会话"""
+    while True:
+        try:
+            await asyncio.sleep(60)  # 每分钟检查一次
+
+            # 检查所有会话
+            timeout_sessions = []
+            for session_id, session in sessions.items():
+                if session.is_timeout():
+                    timeout_sessions.append(session_id)
+                    print(f"Session {session_id} timed out after {TERMINAL_TIMEOUT_SECONDS}s of inactivity")
+
+            # 关闭超时的会话
+            for session_id in timeout_sessions:
+                session = sessions.get(session_id)
+                if session:
+                    session.close()
+                    del sessions[session_id]
+                    print(f"Cleaned up session: {session_id}")
+
+        except Exception as e:
+            print(f"Error in cleanup task: {e}")
+
+
+def start_cleanup_task():
+    """启动后台清理任务"""
+    global cleanup_task
+    if cleanup_task is None:
+        cleanup_task = asyncio.create_task(cleanup_inactive_sessions())
+        print(f"Terminal cleanup task started (timeout: {TERMINAL_TIMEOUT_SECONDS}s)")
+
+
+def stop_cleanup_task():
+    """停止后台清理任务"""
+    global cleanup_task
+    if cleanup_task:
+        cleanup_task.cancel()
+        cleanup_task = None
+        print("Terminal cleanup task stopped")
 
 
 @router.websocket("/ws")

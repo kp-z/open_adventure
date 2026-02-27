@@ -168,7 +168,7 @@ class ClaudeHealthChecker:
         models = [
             {
                 "alias": "opus",
-                "full_name": "claude-opus-4-6[1m]",
+                "full_name": "claude-opus-4-6",
                 "description": "Most capable model"
             },
             {
