@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router";
 import {
   LayoutDashboard,
   Wrench,
@@ -125,11 +125,15 @@ export const Layout = () => {
   const { mode, toggleMode, lang } = useMode();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [canGoBack, setCanGoBack] = React.useState(false);
   const [canGoForward, setCanGoForward] = React.useState(false);
+
+  // 检查是否是 Terminal 页面
+  const isTerminalPage = location.pathname === '/terminal';
 
   // 监听浏览器历史变化
   React.useEffect(() => {
@@ -442,7 +446,7 @@ export const Layout = () => {
         </header>
 
         {/* Scrollable Page Content */}
-        <div className="flex-1 overflow-y-auto p-8 relative">
+        <div className={`flex-1 overflow-y-auto relative ${isTerminalPage ? '' : 'p-8'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={mode}
@@ -450,6 +454,7 @@ export const Layout = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
+              className={isTerminalPage ? 'h-full' : ''}
             >
               <Outlet />
             </motion.div>
