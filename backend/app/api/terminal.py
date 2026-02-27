@@ -8,11 +8,16 @@ import select
 import struct
 import fcntl
 import termios
-from typing import Dict
+from typing import Dict, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.repositories.project_path_repository import ProjectPathRepository
+from app.services.project_path_service import ProjectPathService
 
 router = APIRouter()
 
@@ -23,12 +28,14 @@ TERMINAL_TIMEOUT_SECONDS = int(os.getenv("TERMINAL_TIMEOUT_SECONDS", "900"))
 class TerminalSession:
     """Manages a PTY terminal session"""
 
-    def __init__(self):
+    def __init__(self, initial_dir: Optional[str] = None, auto_start_claude: bool = False):
         self.master_fd = None
         self.pid = None
         self.running = False
         self.last_activity = datetime.now()
         self.created_at = datetime.now()
+        self.initial_dir = initial_dir
+        self.auto_start_claude = auto_start_claude
 
     def start(self):
         """Start a new PTY session"""
@@ -40,8 +47,9 @@ class TerminalSession:
             home_dir = os.path.expanduser('~')
             os.environ['HOME'] = home_dir
 
-            # Change to user's home directory
-            os.chdir(home_dir)
+            # Change to initial directory if specified, otherwise home
+            target_dir = self.initial_dir if self.initial_dir and os.path.isdir(self.initial_dir) else home_dir
+            os.chdir(target_dir)
 
             # 取消 CLAUDECODE 环境变量，允许在 terminal 中使用 claude 命令
             if 'CLAUDECODE' in os.environ:
@@ -53,8 +61,8 @@ class TerminalSession:
             if not os.path.exists(shell):
                 shell = '/bin/bash'
 
-            # -l: login shell (loads profile)
-            # -i: interactive shell
+            # Always start normal interactive shell
+            # We'll send the cd and claude commands after shell starts
             os.execvp(shell, [shell, '-l', '-i'])
 
         # Parent process
@@ -164,18 +172,66 @@ def stop_cleanup_task():
 
 
 @router.websocket("/ws")
-async def terminal_websocket(websocket: WebSocket):
+async def terminal_websocket(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
     """WebSocket endpoint for terminal interaction"""
     await websocket.accept()
+    print(f"[Terminal] WebSocket connection accepted")
+
+    # Get first enabled project path
+    initial_dir = None
+    auto_start_claude = False
+
+    try:
+        repository = ProjectPathRepository(db)
+        service = ProjectPathService(repository)
+        enabled_paths = await service.get_enabled_paths()
+        print(f"[Terminal] Found {len(enabled_paths)} enabled project paths")
+
+        if enabled_paths:
+            # Use the first enabled project path
+            first_path = enabled_paths[0]
+            initial_dir = first_path.path
+            auto_start_claude = True
+            print(f"[Terminal] Will start in project directory: {initial_dir}")
+            print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
+    except Exception as e:
+        print(f"[Terminal] Failed to get project paths: {e}")
+        # Continue with default behavior (home directory)
 
     # Create a new terminal session
-    session = TerminalSession()
+    session = TerminalSession(initial_dir=initial_dir, auto_start_claude=auto_start_claude)
     session_id = str(id(websocket))
     sessions[session_id] = session
 
     try:
         # Start the PTY
         session.start()
+
+        # If auto_start_claude is enabled, send commands after a short delay
+        if auto_start_claude and initial_dir:
+            print(f"[Terminal] Setting up auto-start commands for: {initial_dir}")
+            async def send_startup_commands():
+                """Send cd and claude commands after shell is ready"""
+                await asyncio.sleep(0.5)  # Wait for shell to be ready
+                try:
+                    print(f"[Terminal] Sending cd command to: {initial_dir}")
+                    # Send cd command
+                    cd_command = f'cd "{initial_dir}"\n'
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, session.write, cd_command
+                    )
+                    await asyncio.sleep(0.2)
+                    print(f"[Terminal] Sending claude command")
+                    # Send claude command
+                    await asyncio.get_event_loop().run_in_executor(
+                        None, session.write, 'claude\n'
+                    )
+                    print(f"[Terminal] Startup commands sent successfully")
+                except Exception as e:
+                    print(f"[Terminal] Error sending startup commands: {e}")
+
+            # Start the startup commands task
+            asyncio.create_task(send_startup_commands())
 
         # Create tasks for reading from PTY and WebSocket
         async def read_from_pty():
