@@ -152,7 +152,6 @@ const Terminal = () => {
         <div className="flex gap-2">
           <ActionButton variant="secondary" onClick={() => createTerminal()} title="New Tab">
             <Plus size={16} />
-            <span className="hidden md:inline ml-1">New</span>
           </ActionButton>
           {!isMobile && (
             <>
@@ -186,7 +185,6 @@ const Terminal = () => {
           )}
           <ActionButton variant="secondary" onClick={handleClearActive} disabled={!activeTabId} title="Clear Terminal">
             <X size={16} />
-            <span className="hidden md:inline ml-1">Clear</span>
           </ActionButton>
           <ActionButton
             variant="secondary"
