@@ -1,6 +1,6 @@
 [project]
 name = "claude-manager-backend"
-version = "0.2.0"
+version = "0.1.2"
 description = "AI Configuration and Management Tool for Claude - Backend"
 requires-python = ">=3.11"
 dependencies = [
