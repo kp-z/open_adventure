@@ -1,13 +1,14 @@
 import React from 'react';
-import { 
-  GitBranch, 
-  Map as MapIcon, 
-  Play, 
-  Plus, 
-  MoreVertical, 
-  Layers, 
-  CheckCircle2, 
-  Clock, 
+import {
+  GitBranch,
+  Map as MapIcon,
+  Play,
+  Plus,
+  Package,
+  MoreVertical,
+  Layers,
+  CheckCircle2,
+  Clock,
   AlertCircle,
   Sword,
   Shield,
@@ -118,22 +119,29 @@ const Workflows = () => {
   }
 
   return (
-    <div className="space-y-8 relative">
+    <div className="space-y-4 md:space-y-8 relative">
       <AnimatePresence>
         {isEditorOpen && <WorkflowEditor workflow={selectedWorkflow} onClose={handleCloseEditor} />}
       </AnimatePresence>
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight uppercase">WORKFLOWS</h1>
-          <p className="text-gray-400">Design and manage complex multi-agent automation chains.</p>
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">WORKFLOWS</h1>
+          <p className="text-sm md:text-base text-gray-400">Design and manage complex multi-agent automation chains.</p>
         </div>
-        <div className="flex gap-3">
-          <ActionButton variant="secondary">Import Template</ActionButton>
-          <ActionButton onClick={() => setIsEditorOpen(true)}>New Workflow</ActionButton>
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
+          <ActionButton variant="secondary" className="md:px-4 px-2 py-2 text-sm min-w-0">
+            <Package size={16} />
+            <span className="hidden md:inline ml-2">Import</span>
+          </ActionButton>
+          <ActionButton onClick={() => setIsEditorOpen(true)} className="md:px-4 px-2 py-2 text-sm min-w-0">
+            <Plus size={16} />
+            <span className="hidden md:inline ml-2">New</span>
+          </ActionButton>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* Workflows Grid - 响应式网格 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {mockWorkflows.map((wf) => (
           <GlassCard key={wf.id} className="flex flex-col">
             <div className="flex justify-between items-start mb-6">

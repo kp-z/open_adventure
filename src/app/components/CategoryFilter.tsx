@@ -114,9 +114,9 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   const showSubCategories = currentCategory?.hasSubCategories && currentCategory.subCategories && currentCategory.subCategories.length > 0;
 
   return (
-    <div className="space-y-4">
-      {/* Main Categories */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="space-y-3 md:space-y-4">
+      {/* Main Categories - 移动端极简图标模式，桌面端完整卡片 */}
+      <div className="grid grid-cols-5 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
         {categories.map((category) => {
           const Icon = category.icon;
           const isSelected = selectedCategory === category.type;
@@ -125,31 +125,52 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             <GlassCard
               key={category.type}
               onClick={() => handleCategoryClick(category.type, category.hasSubCategories)}
-              className={`transition-all cursor-pointer ${
+              className={`transition-all cursor-pointer p-2 md:p-4 ${
                 isSelected ? `ring-2 ring-${category.color}-500/50` : ''
               }`}
             >
-              <div className="flex items-center justify-between mb-3">
+              {/* 移动端：仅图标和数字 */}
+              <div className="md:hidden flex flex-col items-center gap-1">
                 <div
-                  className={`w-12 h-12 rounded-2xl bg-${category.color}-500/20 border border-${category.color}-500/30 flex items-center justify-center`}
+                  className={`w-8 h-8 rounded-lg bg-${category.color}-500/20 border border-${category.color}-500/30 flex items-center justify-center`}
                 >
-                  <Icon className={`text-${category.color}-400`} size={24} />
+                  <Icon className={`text-${category.color}-400`} size={14} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-3xl font-black">{category.count}</span>
-                  {category.hasSubCategories && category.count > 0 && (
-                    <ChevronDown
-                      size={16}
-                      className={`text-gray-400 transition-transform ${
-                        isSelected && showSubCategories ? 'rotate-180' : ''
-                      }`}
-                    />
-                  )}
-                </div>
+                <span className="text-sm font-black">{category.count}</span>
+                {category.hasSubCategories && category.count > 0 && (
+                  <ChevronDown
+                    size={10}
+                    className={`text-gray-400 transition-transform ${
+                      isSelected && showSubCategories ? 'rotate-180' : ''
+                    }`}
+                  />
+                )}
               </div>
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
-                {category.label}
-              </h3>
+
+              {/* 桌面端：完整卡片 */}
+              <div className="hidden md:block">
+                <div className="flex items-center justify-between mb-3">
+                  <div
+                    className={`w-12 h-12 rounded-2xl bg-${category.color}-500/20 border border-${category.color}-500/30 flex items-center justify-center`}
+                  >
+                    <Icon className={`text-${category.color}-400`} size={24} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl font-black">{category.count}</span>
+                    {category.hasSubCategories && category.count > 0 && (
+                      <ChevronDown
+                        size={16}
+                        className={`text-gray-400 transition-transform ${
+                          isSelected && showSubCategories ? 'rotate-180' : ''
+                        }`}
+                      />
+                    )}
+                  </div>
+                </div>
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider">
+                  {category.label}
+                </h3>
+              </div>
             </GlassCard>
           );
         })}
@@ -164,7 +185,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="flex flex-wrap gap-2 p-4 bg-white/5 rounded-xl border border-white/10">
+            <div className="flex flex-wrap gap-2 p-3 md:p-4 bg-white/5 rounded-xl border border-white/10">
               {currentCategory.subCategories!.map((sub) => {
                 const isSelected = selectedSubCategories.includes(sub.id);
                 return (
@@ -174,14 +195,14 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
                       e.stopPropagation();
                       handleSubCategoryClick(sub.id);
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg text-xs font-bold transition-colors ${
                       isSelected
                         ? `bg-${currentCategory.color}-500/30 border-2 border-${currentCategory.color}-500 text-${currentCategory.color}-300`
                         : 'bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400'
                     }`}
                   >
                     <span className="truncate">{sub.name}</span>
-                    <span className="text-[10px] font-bold ml-2">({sub.count})</span>
+                    <span className="text-[10px] font-bold ml-1 md:ml-2">({sub.count})</span>
                   </button>
                 );
               })}

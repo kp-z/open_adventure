@@ -228,27 +228,28 @@ const Teams = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight uppercase">AGENT TEAMS</h1>
-          <p className="text-gray-400">Manage collaborative groups of AI agents for complex tasks.</p>
+    <div className="space-y-4 md:space-y-8">
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">AGENT TEAMS</h1>
+          <p className="text-sm md:text-base text-gray-400">Manage collaborative groups of AI agents for complex tasks.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
             onClick={() => {
               setSelectedTeam(null);
               setView('create');
             }}
+            className="md:px-4 px-2 py-2 text-sm min-w-0"
           >
             <Plus size={20} />
-            Create Team
+            <span className="hidden md:inline ml-2">Create Team</span>
           </ActionButton>
         </div>
       </header>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Stats Overview - 响应式网格 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {[
           { label: 'Total Teams', value: teams.length, icon: UsersRound, color: 'blue' },
           { label: 'Active Teams', value: teams.filter(t => t.status === 'active').length, icon: Zap, color: 'green' },

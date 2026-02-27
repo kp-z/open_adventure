@@ -52,7 +52,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       fontSize: 13,
       fontFamily: "'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
-        background: '#000000',
+        background: '#0f111a',
         foreground: '#e5e7eb',
         cursor: '#22c55e',
         black: '#1f2937',
@@ -73,6 +73,10 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         brightWhite: '#f9fafb',
       },
       allowProposedApi: true,
+      // 移动端支持配置
+      screenReaderMode: false,
+      // 确保可以接收输入
+      convertEol: true,
     });
 
     // 创建 fit addon
@@ -85,7 +89,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     const ws = new WebSocket(`ws://${wsHost}:${wsPort}/api/terminal/ws`);
 
     ws.onopen = () => {
-      term.writeln('\x1b[32m✓ Connected to zsh terminal\x1b[0m');
+      // 连接成功后不显示提示，直接等待 shell 的提示符
     };
 
     ws.onmessage = (event) => {

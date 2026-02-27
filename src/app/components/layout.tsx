@@ -180,10 +180,10 @@ export const Layout = () => {
     <div
       className={`min-h-screen flex text-white overflow-hidden transition-colors duration-500 ${mode === "adventure" ? "bg-[#0a0a14]" : "bg-[#0f111a]"}`}
     >
-      {/* Sidebar */}
+      {/* 桌面端侧边栏 - 仅在 ≥md 显示，保持原样 */}
       <aside
         className={`
-        ${isSidebarOpen ? "w-72" : "w-20"} 
+        ${isSidebarOpen ? "w-72" : "w-20"}
         hidden md:flex flex-col border-r border-white/5 transition-all duration-300 relative z-50
         ${mode === "adventure" ? "bg-[#121225]" : "bg-[#0a0b14]/80 backdrop-blur-2xl"}
       `}
@@ -287,17 +287,130 @@ export const Layout = () => {
         <Navigation collapsed={!isSidebarOpen} />
       </aside>
 
+      {/* 移动端抽屉侧边栏 - 仅在 <md 显示 */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <>
+            {/* 遮罩层 */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="md:hidden fixed inset-0 bg-black/50 z-40"
+            />
+            {/* 抽屉侧边栏 */}
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className={`
+                md:hidden fixed inset-y-0 left-0 w-64 z-50 border-r border-white/5 flex flex-col
+                ${mode === "adventure" ? "bg-[#121225]" : "bg-[#0a0b14]"}
+              `}
+            >
+              {/* Logo / Mode Switcher */}
+              <button
+                onClick={toggleMode}
+                className={`
+                  h-14 flex items-center px-4 gap-3 group transition-all duration-500 hover:bg-white/5
+                  ${mode === "adventure" ? "border-b border-yellow-500/20" : "border-b border-blue-500/20"}
+                `}
+              >
+                <div
+                  className={`
+                    w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
+                    ${
+                      mode === "adventure"
+                        ? "bg-gradient-to-br from-yellow-400 to-orange-600 shadow-yellow-500/20"
+                        : "bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10"
+                    }
+                  `}
+                >
+                  {mode === "adventure" ? (
+                    <>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-40">
+                        <Sparkles className="w-8 h-8 scale-125 rotate-12" />
+                      </div>
+                      <div className="relative z-10 flex items-center justify-center">
+                        <Sword
+                          size={20}
+                          className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="relative">
+                      <Zap
+                        size={20}
+                        fill="currentColor"
+                        className="text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] animate-pulse"
+                      />
+                      <div className="absolute inset-0 bg-blue-400/20 blur-xl scale-150 rounded-full" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col items-start overflow-hidden">
+                  <span
+                    className={`
+                    text-base font-black tracking-tighter uppercase italic leading-[0.85]
+                    ${
+                      mode === "adventure"
+                        ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500"
+                        : "text-white"
+                    }
+                  `}
+                  >
+                    Claude
+                  </span>
+                  <span
+                    className={`
+                    text-xs font-black tracking-[0.2em] uppercase leading-tight
+                    ${
+                      mode === "adventure"
+                        ? "text-yellow-500/80 italic"
+                        : "text-blue-500/80"
+                    }
+                  `}
+                  >
+                    {mode === "adventure"
+                      ? lang === "zh"
+                        ? "大冒险"
+                        : "Adventure"
+                      : lang === "zh"
+                        ? "管理器"
+                        : "Manager"}
+                  </span>
+                </div>
+              </button>
+
+              <Navigation collapsed={false} />
+
+              {/* 关闭按钮 */}
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* TopBar */}
+        {/* TopBar - 仅桌面端显示 */}
         <header
           className={`
-          h-20 flex items-center justify-between px-8 border-b border-white/5
+          hidden md:flex h-20 items-center justify-between px-8 border-b border-white/5
           ${mode === "adventure" ? "bg-[#121225]" : "bg-white/[0.02] backdrop-blur-xl"}
         `}
         >
           <div className="flex items-center gap-4 flex-1">
-            {/* 侧边栏收起/展开按钮 */}
+            {/* 侧边栏收起/展开按钮 - 仅桌面端显示 */}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className={`
@@ -316,32 +429,6 @@ export const Layout = () => {
               ) : (
                 <PanelLeftOpen size={20} />
               )}
-            </button>
-
-            {/* 移动端菜单按钮 */}
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="md:hidden p-2 hover:bg-white/5 rounded-lg"
-            >
-              <Menu size={24} />
-            </button>
-
-            <button
-              onClick={toggleMode}
-              className="md:hidden flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10"
-            >
-              <div
-                className={`w-5 h-5 rounded flex items-center justify-center ${mode === "adventure" ? "bg-yellow-500" : "bg-blue-600"}`}
-              >
-                {mode === "adventure" ? (
-                  <Sword size={10} />
-                ) : (
-                  <Zap size={10} />
-                )}
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-tighter">
-                {mode === "adventure" ? "RPG" : "PRO"}
-              </span>
             </button>
 
             {/* 前进/后退按钮 */}
@@ -445,8 +532,8 @@ export const Layout = () => {
           </div>
         </header>
 
-        {/* Scrollable Page Content */}
-        <div className={`flex-1 overflow-y-auto relative ${isTerminalPage ? '' : 'p-8'}`}>
+        {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
+        <div className={`flex-1 overflow-y-auto relative ${isTerminalPage ? '' : 'p-4 md:p-8'} pb-24 md:pb-4`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={mode}
@@ -461,6 +548,93 @@ export const Layout = () => {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* 移动端底部导航栏 - iOS 液态玻璃风格浮动导航栏 */}
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 safe-area-bottom">
+        <div className={`
+          flex items-center justify-around h-16 rounded-3xl
+          backdrop-blur-2xl backdrop-saturate-150
+          border border-white/20 shadow-2xl
+          ${mode === "adventure"
+            ? "bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-yellow-500/10"
+            : "bg-white/10"
+          }
+        `}>
+          {/* 菜单按钮 */}
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="flex flex-col items-center justify-center gap-1 p-2 touch-target rounded-2xl transition-all duration-300 text-gray-400 hover:text-white"
+          >
+            <Menu size={20} />
+            <span className="text-[10px] font-medium">菜单</span>
+          </button>
+
+          {/* 导航项 */}
+          {[
+            {
+              name: t("dashboard"),
+              path: "/",
+              icon: mode === "adventure" ? Sword : LayoutDashboard,
+            },
+            {
+              name: t("skills"),
+              path: "/skills",
+              icon: mode === "adventure" ? BookOpen : Wrench,
+            },
+            {
+              name: t("agents"),
+              path: "/agents",
+              icon: mode === "adventure" ? Shield : Users,
+            },
+            {
+              name: t("workflows"),
+              path: "/workflows",
+              icon: mode === "adventure" ? Map : GitBranch,
+            },
+            {
+              name: "Terminal",
+              path: "/terminal",
+              icon: Terminal,
+            },
+          ].map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => `
+                relative flex flex-col items-center justify-center gap-1 p-2 touch-target rounded-2xl transition-all duration-300
+                ${
+                  isActive
+                    ? mode === "adventure"
+                      ? "text-yellow-400"
+                      : "text-blue-400"
+                    : "text-gray-400 hover:text-white"
+                }
+              `}
+            >
+              {({ isActive }) => (
+                <>
+                  {/* 选中背景效果 */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className={`
+                        absolute inset-0 rounded-2xl
+                        ${mode === "adventure"
+                          ? "bg-gradient-to-br from-yellow-400/20 to-orange-500/20 shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+                          : "bg-gradient-to-br from-blue-400/20 to-blue-600/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]"
+                        }
+                      `}
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  <item.icon size={20} className="relative z-10" />
+                  <span className="text-[10px] font-medium relative z-10">{item.name}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 };

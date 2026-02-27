@@ -13,7 +13,9 @@ import {
   Map as MapIcon,
   Trophy,
   Plus,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -152,16 +154,16 @@ const Dashboard = () => {
 
   if (mode === 'adventure') {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 md:space-y-8">
         <header className="flex flex-col gap-2">
-          <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-600 uppercase">
+          <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-600 uppercase">
             {t("baseTitle")}
           </h1>
-          <p className="text-gray-400 font-medium">{t("baseDesc")}</p>
+          <p className="text-sm md:text-base text-gray-400 font-medium">{t("baseDesc")}</p>
         </header>
 
-        {/* Level Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Level Stats - 响应式网格 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <GameCard rarity="legendary" className="flex items-center gap-6 py-6">
             <div className="w-16 h-16 rounded-full bg-yellow-500/20 border-2 border-yellow-500 flex items-center justify-center shadow-[0_0_20px_rgba(234,179,8,0.4)]">
               <span className="text-2xl font-black text-yellow-500">{stats?.total_workflows || 0}</span>
@@ -196,8 +198,8 @@ const Dashboard = () => {
           </GameCard>
         </div>
 
-        {/* Building Entrances */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Building Entrances - 响应式网格 */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {[
             { name: "Hero Hall", icon: Shield, color: "from-blue-600 to-blue-400", desc: "Manage your Agents" },
             { name: "Spell Forge", icon: BookOpen, color: "from-purple-600 to-purple-400", desc: "Craft new Skills" },
@@ -223,34 +225,39 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-      <header className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight uppercase">SYSTEM OVERVIEW</h1>
-          <p className="text-gray-400">{t("overviewDesc")}</p>
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SYSTEM OVERVIEW</h1>
+          <p className="text-sm md:text-base text-gray-400">{t("overviewDesc")}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
             variant="secondary"
             onClick={handleRefresh}
             disabled={refreshing}
+            className="md:px-4 px-2 py-2 text-sm min-w-0"
           >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
+            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            <span className="hidden md:inline ml-2">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
           </ActionButton>
           <ActionButton
             onClick={handleSync}
             disabled={syncing}
+            className="md:px-4 px-2 py-2 text-sm min-w-0"
           >
-            {syncing ? 'Syncing...' : 'Sync Environments'}
+            <Zap size={16} />
+            <span className="hidden md:inline ml-2">{syncing ? 'Syncing...' : 'Sync'}</span>
           </ActionButton>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Claude CLI Status Card - 占2列 */}
+      {/* 响应式网格：移动端 1 列，中等屏幕 2 列，桌面端 4 列 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        {/* Claude CLI Status Card - 响应式跨列：中等屏幕和桌面端占 2 列 */}
         {loadingHealth ? (
-          <SkeletonCard className="lg:col-span-2" />
+          <SkeletonCard className="md:col-span-2 lg:col-span-2" />
         ) : (
-          <GlassCard className="lg:col-span-2 flex flex-col justify-between">
+          <GlassCard className="md:col-span-2 lg:col-span-2 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl ${
@@ -261,7 +268,7 @@ const Dashboard = () => {
                 <Activity size={24} />
               </div>
               <div>
-                <h2 className="text-lg font-bold">Claude CLI Status</h2>
+                <h2 className="text-base md:text-lg font-bold">Claude CLI Status</h2>
                 <p className={`text-xs font-medium ${
                   claudeHealth?.cli_available
                     ? 'text-green-500'
@@ -293,7 +300,83 @@ const Dashboard = () => {
           {/* Available Models */}
           <div className="mb-4">
             <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-3">Available Models</p>
-            <div className="relative h-24 flex items-center justify-center">
+
+            {/* 移动端气泡展示 - 仅在 <md 显示，调整布局和大小 */}
+            <div className="block md:hidden">
+              <div className="relative h-32 flex items-center justify-center">
+                {(() => {
+                  // 移动端气泡配置 - 更紧凑的布局，更小的尺寸
+                  const mobileBubbleConfigs = [
+                    { name: 'Haiku', size: 24, top: '20%', left: '5%' },
+                    { name: 'Sonnet', size: 36, top: '55%', left: '8%' },
+                    { name: 'Opus', size: 40, top: '15%', left: '25%' },
+                    { name: 'Haiku 3.5', size: 26, top: '65%', left: '32%' },
+                    { name: 'Sonnet 3.5', size: 34, top: '22%', left: '50%' },
+                    { name: 'Sonnet 4', size: 30, top: '60%', left: '58%' },
+                    { name: 'Opus 4', size: 42, top: '12%', left: '75%' },
+                    { name: 'Opus 4.5', size: 28, top: '58%', left: '85%' }
+                  ];
+
+                  return mobileBubbleConfigs.map((config, index) => {
+                    const matchedModel = claudeHealth?.model_info?.available_models.find(m => {
+                      const modelAlias = m.alias.toLowerCase();
+                      const configName = config.name.toLowerCase();
+                      return modelAlias === configName ||
+                             modelAlias.includes(configName.replace(/\s+/g, '-')) ||
+                             modelAlias.includes(configName.replace(/\s+/g, ''));
+                    });
+                    const isAvailable = matchedModel?.available ?? false;
+
+                    return (
+                      <div
+                        key={config.name}
+                        className="absolute group cursor-pointer"
+                        style={{
+                          top: config.top,
+                          left: config.left,
+                          width: `${config.size}px`,
+                          height: `${config.size}px`,
+                          animation: `float ${3 + index * 0.5}s ease-in-out infinite`,
+                          animationDelay: `${index * 0.3}s`
+                        }}
+                        title={config.name}
+                      >
+                        {/* 气泡主体 */}
+                        <div
+                          className={`
+                            w-full h-full rounded-full relative
+                            transition-all duration-300
+                            backdrop-blur-[2px]
+                            border
+                            active:scale-110
+                            ${isAvailable
+                              ? 'bg-gradient-to-br from-green-500/30 via-green-500/15 to-green-500/5 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
+                              : 'bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15'
+                            }
+                          `}
+                        >
+                          {/* 顶部高光 */}
+                          <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
+
+                          {/* 模型名称 - 移动端更小字体 */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className={`text-[7px] font-medium text-center leading-tight px-0.5 ${
+                              isAvailable ? 'text-green-400 font-bold' : 'text-gray-400'
+                            }`}>
+                              {config.name}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* 桌面端气泡展示 - 仅在 ≥md 显示，保持原样 */}
+            <div className="hidden md:block">
+              <div className="relative h-24 flex items-center justify-center">
               {(() => {
                 // 8个常用模型及其气泡配置 - 大小差异更大
                 const bubbleConfigs = [
@@ -377,6 +460,7 @@ const Dashboard = () => {
                   );
                 });
               })()}
+            </div>
             </div>
           </div>
 
@@ -510,8 +594,9 @@ const Dashboard = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Tasks */}
+      {/* 响应式网格：移动端 1 列，桌面端 3 列 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        {/* Recent Tasks - 桌面端占 2 列 */}
         <GlassCard className="lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Execution History</h2>

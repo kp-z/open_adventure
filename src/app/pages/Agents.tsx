@@ -414,33 +414,34 @@ const Agents = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* 页面标题和操作 */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight uppercase">
+    <div className="space-y-4 md:space-y-6">
+      {/* 页面标题和操作 - 响应式布局 */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
             AGENTS MANAGEMENT
           </h1>
-          <p className="text-gray-400">
+          <p className="text-sm md:text-base text-gray-400">
             {mode === 'adventure'
               ? '召唤和管理你的 AI 英雄'
               : '管理 Claude Code 子代理（Subagents）'}
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
             variant="secondary"
             onClick={handleSync}
             disabled={syncing}
+            className="md:px-4 px-2 py-2 text-sm min-w-0"
           >
             <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-            {syncing ? '同步中...' : '同步'}
+            <span className="hidden md:inline ml-2">{syncing ? '同步中...' : '同步'}</span>
           </ActionButton>
 
-          <ActionButton onClick={() => setIsCreating(true)}>
+          <ActionButton onClick={() => setIsCreating(true)} className="md:px-4 px-2 py-2 text-sm min-w-0">
             <Plus size={16} />
-            新建
+            <span className="hidden md:inline ml-2">新建</span>
           </ActionButton>
         </div>
       </header>
@@ -499,23 +500,23 @@ const Agents = () => {
         />
       )}
 
-      {/* 搜索和过滤 */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* 搜索和过滤 - 响应式布局 */}
+      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={18} className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="搜索子代理..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
+            className="w-full pl-10 md:pl-12 pr-4 py-2.5 md:py-3 text-sm md:text-base bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
           />
         </div>
 
         <button
           onClick={() => setShowOverridden(!showOverridden)}
           className={`
-            flex items-center gap-2 px-4 py-3 rounded-xl border transition-all
+            flex items-center justify-center gap-2 px-4 py-2.5 md:py-3 rounded-xl border transition-all text-sm md:text-base whitespace-nowrap
             ${showOverridden
               ? 'bg-orange-500/20 border-orange-500/30 text-orange-400'
               : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
@@ -523,12 +524,12 @@ const Agents = () => {
           `}
         >
           {showOverridden ? <Eye size={18} /> : <EyeOff size={18} />}
-          {showOverridden ? '显示已覆盖' : '隐藏已覆盖'}
+          <span className="hidden sm:inline">{showOverridden ? '显示已覆盖' : '隐藏已覆盖'}</span>
         </button>
       </div>
 
-      {/* 子代理列表 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* 子代理列表 - 响应式网格 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         <AnimatePresence mode="popLayout">
           {filteredAgents.map((agent) => (
             <motion.div

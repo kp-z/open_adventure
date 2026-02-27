@@ -62,23 +62,29 @@ export const UniversalCard = (props: any) => {
   return mode === 'professional' ? <GlassCard {...props} /> : <GameCard {...props} />;
 };
 
-export const ActionButton = ({ children, className, onClick, variant = 'primary' }: { 
-  children: React.ReactNode; 
-  className?: string; 
+export const ActionButton = ({ children, className, onClick, variant = 'primary', disabled = false, title }: {
+  children: React.ReactNode;
+  className?: string;
   onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'danger' 
+  variant?: 'primary' | 'secondary' | 'danger';
+  disabled?: boolean;
+  title?: string;
 }) => {
   const { mode } = useMode();
-  
+
   if (mode === 'adventure') {
     return (
       <motion.button
-        whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(255,215,0,0.5)" }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: disabled ? 1 : 1.05, boxShadow: disabled ? undefined : "0 0 15px rgba(255,215,0,0.5)" }}
+        whileTap={{ scale: disabled ? 1 : 0.95 }}
         onClick={onClick}
+        disabled={disabled}
+        title={title}
         className={cn(
           "px-6 py-2 rounded-lg font-bold uppercase tracking-wider border-2 transition-all",
+          "flex items-center justify-center gap-2",
           variant === 'primary' ? "bg-yellow-600 border-yellow-400 text-white" : "bg-gray-700 border-gray-500 text-gray-200",
+          disabled && "opacity-50 cursor-not-allowed",
           className
         )}
       >
@@ -89,12 +95,16 @@ export const ActionButton = ({ children, className, onClick, variant = 'primary'
 
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
+      whileHover={{ scale: disabled ? 1 : 1.02 }}
+      whileTap={{ scale: disabled ? 1 : 0.98 }}
       onClick={onClick}
+      disabled={disabled}
+      title={title}
       className={cn(
         "px-6 py-2 rounded-xl font-medium transition-all shadow-lg",
+        "flex items-center justify-center gap-2",
         variant === 'primary' ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white" : "bg-white/10 text-white hover:bg-white/20",
+        disabled && "opacity-50 cursor-not-allowed",
         className
       )}
     >

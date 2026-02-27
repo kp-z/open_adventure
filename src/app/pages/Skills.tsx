@@ -605,33 +605,34 @@ const Skills = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight uppercase">SKILLS MANAGEMENT</h1>
-          <p className="text-gray-400">{t('skillsDesc' as any)}</p>
+    <div className="space-y-4 md:space-y-8">
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SKILLS MANAGEMENT</h1>
+          <p className="text-sm md:text-base text-gray-400">{t('skillsDesc' as any)}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
             variant="secondary"
             onClick={handleSync}
             disabled={syncing}
+            className="md:px-4 px-2 py-2 text-sm min-w-0"
           >
             {syncing ? (
-              <span className="flex items-center gap-2">
+              <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                同步中...
-              </span>
+                <span className="hidden md:inline ml-2">同步中...</span>
+              </>
             ) : (
-              <span className="flex items-center gap-2">
+              <>
                 <RefreshCw className="w-4 h-4" />
-                同步
-              </span>
+                <span className="hidden md:inline ml-2">同步</span>
+              </>
             )}
           </ActionButton>
-          <ActionButton onClick={() => { setIsCreating(true); setInitialEditorMode('ai'); }}>
+          <ActionButton onClick={() => { setIsCreating(true); setInitialEditorMode('ai'); }} className="md:px-4 px-2 py-2 text-sm min-w-0">
             <Plus className="w-4 h-4" />
-            新建
+            <span className="hidden md:inline ml-2">新建</span>
           </ActionButton>
         </div>
         {error && (
@@ -668,7 +669,8 @@ const Skills = () => {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* Skills Grid - 响应式网格 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
         <AnimatePresence>
           {filteredSkills.map((skill, idx) => (
             <motion.div
