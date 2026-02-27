@@ -91,6 +91,8 @@ const Dashboard = () => {
       setLoadingHealth(true);
       // 获取 Claude 健康状态
       const healthData = await claudeApi.health();
+      console.log('Claude Health Data:', healthData);
+      console.log('Available Models:', healthData.model_info?.available_models);
       setClaudeHealth(healthData);
     } catch (err) {
       console.error('Failed to fetch health:', err);
@@ -318,6 +320,16 @@ const Dashboard = () => {
 
                   const isAvailable = matchedModel?.available ?? false;
 
+                  // 调试信息
+                  if (config.name === 'Opus') {
+                    console.log('Opus bubble:', {
+                      configName: config.name,
+                      matchedModel,
+                      isAvailable,
+                      allModels: claudeHealth?.model_info?.available_models
+                    });
+                  }
+
                   return (
                     <div
                       key={config.name}
@@ -337,12 +349,13 @@ const Dashboard = () => {
                         className={`
                           w-full h-full rounded-full relative
                           transition-all duration-300
-                          bg-gradient-to-br from-white/8 via-white/4 to-transparent
                           backdrop-blur-[2px]
-                          border border-white/15
-                          shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]
+                          border
                           hover:scale-110
-                          ${isAvailable ? 'shadow-[0_0_12px_rgba(34,197,94,0.15),0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]' : ''}
+                          ${isAvailable
+                            ? 'bg-gradient-to-br from-green-500/30 via-green-500/15 to-green-500/5 border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.4),0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]'
+                            : 'bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]'
+                          }
                         `}
                       >
                         {/* 顶部高光 */}
@@ -353,7 +366,9 @@ const Dashboard = () => {
 
                         {/* 模型名称 - 更小更低调 */}
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-[8px] font-medium text-center leading-tight px-1 text-gray-400">
+                          <span className={`text-[8px] font-medium text-center leading-tight px-1 ${
+                            isAvailable ? 'text-green-400 font-bold' : 'text-gray-400'
+                          }`}>
                             {config.name}
                           </span>
                         </div>

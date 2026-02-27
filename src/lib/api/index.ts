@@ -15,6 +15,8 @@ export { executionsApi } from './services/executions';
 export { dashboardApi } from './services/dashboard';
 export { statsApi } from './services/stats';
 export { claudeApi } from './services/claude';
+export * as projectPathsApi from './services/project-paths';
+export type { ProjectPath, ProjectPathCreate, ProjectPathUpdate } from './services/project-paths';
 
 // 数据转换器
 export * from './transformers/skill-transformer';

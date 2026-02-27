@@ -43,7 +43,9 @@ export const ExecutionProvider: React.FC<ExecutionProviderProps> = ({ children }
 
   const connect = () => {
     const clientId = `client-${Date.now()}`;
-    const wsUrl = `ws://localhost:8000/ws/executions?client_id=${clientId}`;
+    const wsHost = window.location.hostname;
+    const wsPort = 8000;
+    const wsUrl = `ws://${wsHost}:${wsPort}/ws/executions?client_id=${clientId}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

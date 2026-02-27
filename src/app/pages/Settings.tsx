@@ -1,22 +1,24 @@
 import React from 'react';
-import { 
-  Settings as SettingsIcon, 
-  Monitor, 
-  Palette, 
-  Database, 
-  Zap, 
-  Globe, 
-  Bell, 
-  Lock, 
+import {
+  Settings as SettingsIcon,
+  Monitor,
+  Palette,
+  Database,
+  Zap,
+  Globe,
+  Bell,
+  Lock,
   ShieldCheck,
   Sword,
   LayoutDashboard,
   Check,
-  Languages
+  Languages,
+  FolderGit2
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, ActionButton } from '../components/ui-shared';
+import { ProjectPathManager } from '../components/ProjectPathManager';
 import { motion } from 'motion/react';
 
 const Settings = () => {
@@ -158,6 +160,20 @@ const Settings = () => {
                 </div>
               </div>
             </div>
+          </section>
+
+          {/* Project Paths Configuration */}
+          <section className="space-y-4">
+            <div>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <FolderGit2 size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                项目路径配置
+              </h2>
+              <p className="text-sm text-gray-400 mt-2">
+                配置需要扫描的项目路径，只有配置的路径才会被检索 project 级别的 skills 和 agents
+              </p>
+            </div>
+            <ProjectPathManager />
           </section>
 
           <div className="flex justify-end gap-4 pt-8">

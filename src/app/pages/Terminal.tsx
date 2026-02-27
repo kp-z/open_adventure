@@ -1,17 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Terminal as TerminalIcon, X, Maximize2, Minimize2, Plus, SplitSquareHorizontal, SplitSquareVertical } from 'lucide-react';
 import { ActionButton } from '../components/ui-shared';
-import { Terminal as XTerm } from 'xterm';
-import { FitAddon } from 'xterm-addon-fit';
+import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
 import 'xterm/css/xterm.css';
-
-interface TerminalInstance {
-  id: string;
-  term: XTerm;
-  ws: WebSocket;
-  fitAddon: FitAddon;
-  title: string;
-}
 
 type SplitDirection = 'horizontal' | 'vertical' | null;
 
@@ -59,129 +50,17 @@ const TerminalPane: React.FC<{
 };
 
 const Terminal = () => {
-  const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const { terminals, activeTabId, setActiveTabId, createTerminal, closeTerminal } = useTerminalContext();
   const [splitDirection, setSplitDirection] = useState<SplitDirection>(null);
   const [splitTerminalId, setSplitTerminalId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const terminalCounterRef = useRef(1);
 
-  const createTerminal = () => {
-    const id = `terminal-${Date.now()}`;
-    const title = `Terminal ${terminalCounterRef.current++}`;
-
-    // 创建 xterm 实例
-    const term = new XTerm({
-      cursorBlink: true,
-      fontSize: 13,
-      fontFamily: "'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
-      theme: {
-        background: '#000000',
-        foreground: '#e5e7eb',
-        cursor: '#22c55e',
-        black: '#1f2937',
-        red: '#ef4444',
-        green: '#22c55e',
-        yellow: '#eab308',
-        blue: '#3b82f6',
-        magenta: '#a855f7',
-        cyan: '#06b6d4',
-        white: '#e5e7eb',
-        brightBlack: '#4b5563',
-        brightRed: '#f87171',
-        brightGreen: '#4ade80',
-        brightYellow: '#facc15',
-        brightBlue: '#60a5fa',
-        brightMagenta: '#c084fc',
-        brightCyan: '#22d3ee',
-        brightWhite: '#f9fafb',
-      },
-      allowProposedApi: true,
-    });
-
-    // 创建 fit addon
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-
-    // 连接 WebSocket
-    const ws = new WebSocket('ws://localhost:8000/api/terminal/ws');
-
-    ws.onopen = () => {
-      term.writeln('\x1b[32m✓ Connected to zsh terminal\x1b[0m');
-    };
-
-    ws.onmessage = (event) => {
-      term.write(event.data);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      term.writeln('\x1b[31m✗ Connection error\x1b[0m');
-    };
-
-    ws.onclose = () => {
-      term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
-    };
-
-    // 监听终端输入
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'input',
-          data: data
-        }));
-      }
-    });
-
-    // 初始化时发送终端大小
-    setTimeout(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'resize',
-          rows: term.rows,
-          cols: term.cols
-        }));
-      }
-    }, 100);
-
-    const newTerminal: TerminalInstance = {
-      id,
-      term,
-      ws,
-      fitAddon,
-      title
-    };
-
-    setTerminals(prev => [...prev, newTerminal]);
-    setActiveTabId(id);
-
-    return newTerminal;
-  };
-
-  const closeTerminal = (id: string) => {
-    const terminal = terminals.find(t => t.id === id);
-    if (terminal) {
-      terminal.term.dispose();
-      terminal.ws.close();
+  // 初始化第一个终端
+  useEffect(() => {
+    if (terminals.length === 0) {
+      createTerminal();
     }
-
-    setTerminals(prev => {
-      const newTerminals = prev.filter(t => t.id !== id);
-
-      // 如果关闭的是当前活跃的终端，切换到第一个
-      if (activeTabId === id && newTerminals.length > 0) {
-        setActiveTabId(newTerminals[0].id);
-      }
-
-      // 如果关闭的是分屏终端，取消分屏
-      if (splitTerminalId === id) {
-        setSplitTerminalId(null);
-        setSplitDirection(null);
-      }
-
-      return newTerminals;
-    });
-  };
+  }, []);
 
   const handleSplit = (direction: 'horizontal' | 'vertical') => {
     if (!activeTabId) return;
@@ -205,19 +84,13 @@ const Terminal = () => {
     }
   };
 
-  // 初始化第一个终端
+  // 处理关闭终端时的分屏状态
   useEffect(() => {
-    if (terminals.length === 0) {
-      createTerminal();
+    if (splitTerminalId && !terminals.find(t => t.id === splitTerminalId)) {
+      setSplitTerminalId(null);
+      setSplitDirection(null);
     }
-
-    return () => {
-      terminals.forEach(terminal => {
-        terminal.term.dispose();
-        terminal.ws.close();
-      });
-    };
-  }, []);
+  }, [terminals, splitTerminalId]);
 
   // 获取当前显示的终端
   const activeTerminal = terminals.find(t => t.id === activeTabId);
