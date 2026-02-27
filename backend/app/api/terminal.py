@@ -39,7 +39,9 @@ class TerminalSession:
 
     def start(self):
         """Start a new PTY session"""
+        print(f"[Terminal] Starting new PTY session...")
         self.pid, self.master_fd = pty.fork()
+        print(f"[Terminal] PTY forked - PID: {self.pid}, FD: {self.master_fd}")
 
         if self.pid == 0:
             # Child process - execute shell
@@ -50,6 +52,7 @@ class TerminalSession:
             # Change to initial directory if specified, otherwise home
             target_dir = self.initial_dir if self.initial_dir and os.path.isdir(self.initial_dir) else home_dir
             os.chdir(target_dir)
+            print(f"[Terminal] Child process - Changed to directory: {target_dir}")
 
             # 取消 CLAUDECODE 环境变量，允许在 terminal 中使用 claude 命令
             if 'CLAUDECODE' in os.environ:
@@ -61,11 +64,13 @@ class TerminalSession:
             if not os.path.exists(shell):
                 shell = '/bin/bash'
 
+            print(f"[Terminal] Child process - Executing shell: {shell}")
             # Always start normal interactive shell
             # We'll send the cd and claude commands after shell starts
             os.execvp(shell, [shell, '-l', '-i'])
 
         # Parent process
+        print(f"[Terminal] Parent process - PTY session started with PID: {self.pid}")
         self.running = True
 
         # Set non-blocking mode
@@ -172,31 +177,42 @@ def stop_cleanup_task():
 
 
 @router.websocket("/ws")
-async def terminal_websocket(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
+async def terminal_websocket(
+    websocket: WebSocket,
+    db: AsyncSession = Depends(get_db),
+    project_path: str = None
+):
     """WebSocket endpoint for terminal interaction"""
     await websocket.accept()
-    print(f"[Terminal] WebSocket connection accepted")
+    print(f"[Terminal] WebSocket connection accepted, project_path param: {project_path}")
 
-    # Get first enabled project path
+    # Get project path from URL parameter or use first enabled path
     initial_dir = None
     auto_start_claude = False
 
-    try:
-        repository = ProjectPathRepository(db)
-        service = ProjectPathService(repository)
-        enabled_paths = await service.get_enabled_paths()
-        print(f"[Terminal] Found {len(enabled_paths)} enabled project paths")
+    if project_path:
+        # Use the specified project path
+        initial_dir = project_path
+        auto_start_claude = True
+        print(f"[Terminal] Using specified project path: {initial_dir}")
+    else:
+        # Get first enabled project path from database
+        try:
+            repository = ProjectPathRepository(db)
+            service = ProjectPathService(repository)
+            enabled_paths = await service.get_enabled_paths()
+            print(f"[Terminal] Found {len(enabled_paths)} enabled project paths")
 
-        if enabled_paths:
-            # Use the first enabled project path
-            first_path = enabled_paths[0]
-            initial_dir = first_path.path
-            auto_start_claude = True
-            print(f"[Terminal] Will start in project directory: {initial_dir}")
-            print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
-    except Exception as e:
-        print(f"[Terminal] Failed to get project paths: {e}")
-        # Continue with default behavior (home directory)
+            if enabled_paths:
+                # Use the first enabled project path
+                first_path = enabled_paths[0]
+                initial_dir = first_path.path
+                auto_start_claude = True
+                print(f"[Terminal] Will start in project directory: {initial_dir}")
+                print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
+        except Exception as e:
+            print(f"[Terminal] Failed to get project paths: {e}")
+            # Continue with default behavior (home directory)
 
     # Create a new terminal session
     session = TerminalSession(initial_dir=initial_dir, auto_start_claude=auto_start_claude)
