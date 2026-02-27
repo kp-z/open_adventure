@@ -14,7 +14,7 @@ interface TerminalContextType {
   terminals: TerminalInstance[];
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
-  createTerminal: () => TerminalInstance;
+  createTerminal: (projectPath?: string) => TerminalInstance;
   closeTerminal: (id: string) => void;
   cleanupAll: () => void;
 }
@@ -42,7 +42,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const terminalCounterRef = useRef(1);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const createTerminal = (): TerminalInstance => {
+  const createTerminal = (projectPath?: string): TerminalInstance => {
     const id = `terminal-${Date.now()}`;
     const title = `Terminal ${terminalCounterRef.current++}`;
 
@@ -86,7 +86,11 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     // 连接 WebSocket - 使用动态主机名支持局域网访问
     const wsHost = window.location.hostname;
     const wsPort = 8000;
-    const ws = new WebSocket(`ws://${wsHost}:${wsPort}/api/terminal/ws`);
+    // 如果指定了项目路径，添加到 URL 参数中
+    const wsUrl = projectPath
+      ? `ws://${wsHost}:${wsPort}/api/terminal/ws?project_path=${encodeURIComponent(projectPath)}`
+      : `ws://${wsHost}:${wsPort}/api/terminal/ws`;
+    const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
       // 连接成功后不显示提示，直接等待 shell 的提示符

@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Terminal as TerminalIcon, X, Maximize2, Minimize2, Plus, SplitSquareHorizontal, SplitSquareVertical, Keyboard } from 'lucide-react';
+import { Terminal as TerminalIcon, X, Maximize2, Minimize2, Plus, SplitSquareHorizontal, SplitSquareVertical, Keyboard, FolderOpen } from 'lucide-react';
 import { ActionButton } from '../components/ui-shared';
 import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
 import 'xterm/css/xterm.css';
 
 type SplitDirection = 'horizontal' | 'vertical' | null;
+
+interface ProjectPath {
+  id: number;
+  path: string;
+  alias: string;
+  enabled: boolean;
+}
 
 const TerminalPane: React.FC<{
   terminal: TerminalInstance;
@@ -80,6 +87,33 @@ const Terminal = () => {
   const [splitTerminalId, setSplitTerminalId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [projectPaths, setProjectPaths] = useState<ProjectPath[]>([]);
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string>('');
+
+  // 获取项目路径列表
+  useEffect(() => {
+    const fetchProjectPaths = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/project-paths?enabled=true');
+        const data = await response.json();
+        setProjectPaths(data.items || []);
+        // 默认选择第一个
+        if (data.items && data.items.length > 0) {
+          setSelectedProjectPath(data.items[0].path);
+        }
+      } catch (error) {
+        console.error('Failed to fetch project paths:', error);
+      }
+    };
+    fetchProjectPaths();
+  }, []);
+
+  // 当选择的项目路径改变时，创建新终端
+  const handleProjectPathChange = (newPath: string) => {
+    setSelectedProjectPath(newPath);
+    // 创建新终端并切换到新的项目目录
+    createTerminal(newPath);
+  };
 
   // 检测是否为移动设备
   useEffect(() => {
@@ -93,10 +127,10 @@ const Terminal = () => {
 
   // 初始化第一个终端
   useEffect(() => {
-    if (terminals.length === 0) {
-      createTerminal();
+    if (terminals.length === 0 && selectedProjectPath) {
+      createTerminal(selectedProjectPath);
     }
-  }, []);
+  }, [selectedProjectPath]);
 
   const handleSplit = (direction: 'horizontal' | 'vertical') => {
     if (!activeTabId) return;
@@ -145,12 +179,31 @@ const Terminal = () => {
       <header className={`flex justify-between items-start gap-3 ${isFullscreen ? 'mb-4' : ''}`}>
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SHELL</h1>
-          <p className="text-sm md:text-base text-gray-400">
-            <span className="text-green-500">{terminals.length} terminal{terminals.length > 1 ? 's' : ''}</span> active
-          </p>
+          <div className="flex items-center gap-3 mt-2">
+            <p className="text-sm md:text-base text-gray-400">
+              <span className="text-green-500">{terminals.length} terminal{terminals.length > 1 ? 's' : ''}</span> active
+            </p>
+            {/* 项目路径选择器 */}
+            {projectPaths.length > 0 && (
+              <div className="flex items-center gap-2">
+                <FolderOpen size={14} className="text-gray-400" />
+                <select
+                  value={selectedProjectPath}
+                  onChange={(e) => handleProjectPathChange(e.target.value)}
+                  className="bg-black/40 text-gray-300 text-xs px-2 py-1 rounded border border-white/10 focus:border-green-500/50 focus:outline-none"
+                >
+                  {projectPaths.map((path) => (
+                    <option key={path.id} value={path.path}>
+                      {path.alias}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
-          <ActionButton variant="secondary" onClick={() => createTerminal()} title="New Tab">
+          <ActionButton variant="secondary" onClick={() => createTerminal(selectedProjectPath)} title="New Tab">
             <Plus size={16} />
           </ActionButton>
           {!isMobile && (
