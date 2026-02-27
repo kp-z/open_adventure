@@ -23,6 +23,7 @@ import {
   PanelLeftOpen,
   ChevronLeft,
   ChevronRight,
+  Terminal,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -63,6 +64,11 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       name: t("tasks"),
       path: "/tasks",
       icon: mode === "adventure" ? Trophy : History,
+    },
+    {
+      name: "Terminal",
+      path: "/terminal",
+      icon: Terminal,
     },
   ];
 

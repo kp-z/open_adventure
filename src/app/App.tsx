@@ -136,6 +136,13 @@ const router = createBrowserRouter(
             return { Component: Settings.default };
           },
         },
+        {
+          path: 'terminal',
+          lazy: async () => {
+            const Terminal = await import('./pages/Terminal');
+            return { Component: Terminal.default };
+          },
+        },
       ],
     },
   ],
