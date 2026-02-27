@@ -177,9 +177,6 @@ async def terminal_websocket(websocket: WebSocket):
         # Start the PTY
         session.start()
 
-        # Send initial prompt
-        await websocket.send_text("$ ")
-
         # Create tasks for reading from PTY and WebSocket
         async def read_from_pty():
             """Read output from PTY and send to WebSocket"""
