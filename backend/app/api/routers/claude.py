@@ -12,7 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.services.sync_service import SyncService
+from app.services.prompt_optimizer_service import PromptOptimizerService, OptimizerMode
 from app.adapters.claude import ClaudeAdapter
+from app.adapters.claude.cli_client import ClaudeCliClient
 from app.config.settings import settings
 
 router = APIRouter(prefix="/claude", tags=["claude"])
@@ -26,6 +28,23 @@ class ClaudeSettingsUpdate(BaseModel):
     enabledPlugins: Dict[str, bool] | None = None
     language: str | None = None
     effortLevel: str | None = None
+
+
+class PromptOptimizeRequest(BaseModel):
+    """Prompt 优化请求模型"""
+    prompt: str
+    context: str | None = None
+    mode: str = "rule"  # "ai" 或 "rule"，默认使用规则模式
+
+
+class PromptOptimizeResponse(BaseModel):
+    """Prompt 优化响应模型"""
+    original_prompt: str
+    optimized_prompt: str
+    analysis: str
+    mode: str  # 使用的模式：ai 或 rule
+    success: bool
+    error: str | None = None
 
 
 @router.post("/sync")
@@ -146,3 +165,76 @@ async def update_claude_settings(update: ClaudeSettingsUpdate):
         return current_settings
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update settings.json: {str(e)}")
+
+
+@router.post("/optimize-prompt", response_model=PromptOptimizeResponse)
+async def optimize_prompt(request: PromptOptimizeRequest):
+    """
+    优化用户输入的 prompt
+
+    支持两种模式：
+    - rule: 基于规则的本地优化（默认，不需要 API Key）
+    - ai: 使用 Anthropic API 进行 AI 优化（需要配置 API Key）
+
+    Args:
+        request: 包含原始 prompt、可选上下文和优化模式的请求
+
+    Returns:
+        PromptOptimizeResponse: 包含原始和优化后的 prompt 及分析说明
+    """
+    try:
+        # 根据请求的模式选择优化器
+        mode = OptimizerMode.AI if request.mode == "ai" else OptimizerMode.RULE
+
+        # 创建优化器
+        optimizer = PromptOptimizerService(mode=mode)
+
+        # 执行优化
+        result = await optimizer.optimize_prompt(
+            prompt=request.prompt,
+            context=request.context
+        )
+
+        return PromptOptimizeResponse(
+            original_prompt=request.prompt,
+            optimized_prompt=result["optimized_prompt"],
+            analysis=result["analysis"],
+            mode=result["mode"],
+            success=result["success"],
+            error=result["error"]
+        )
+    except Exception as e:
+        # 如果 AI 模式失败，自动降级到规则模式
+        if request.mode == "ai":
+            try:
+                optimizer = PromptOptimizerService(mode=OptimizerMode.RULE)
+                result = await optimizer.optimize_prompt(
+                    prompt=request.prompt,
+                    context=request.context
+                )
+                return PromptOptimizeResponse(
+                    original_prompt=request.prompt,
+                    optimized_prompt=result["optimized_prompt"],
+                    analysis=f"AI 模式失败，已降级到规则模式\n\n{result['analysis']}",
+                    mode="rule",
+                    success=True,
+                    error=None
+                )
+            except Exception as fallback_error:
+                return PromptOptimizeResponse(
+                    original_prompt=request.prompt,
+                    optimized_prompt=request.prompt,
+                    analysis="",
+                    mode="rule",
+                    success=False,
+                    error=str(fallback_error)
+                )
+
+        return PromptOptimizeResponse(
+            original_prompt=request.prompt,
+            optimized_prompt=request.prompt,
+            analysis="",
+            mode=request.mode,
+            success=False,
+            error=str(e)
+        )

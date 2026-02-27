@@ -430,107 +430,6 @@ async def delete_agent(
     await service.delete_agent(agent_id)
 
 
-@router.post(
-    "/{agent_id}/test",
-    summary="测试子代理"
-)
-async def test_agent(
-    agent_id: int,
-    prompt: str = Query(..., description="测试提示"),
-    service: AgentService = Depends(get_agent_service)
-):
-    """
-    运行子代理进行测试
-
-    调用 Claude CLI 使用指定的子代理处理提示
-    """
-    import subprocess
-    import os
-    import time
-
-    agent = await service.get_agent(agent_id)
-    cli_path = settings.claude_cli_path
-
-    start_time = time.time()
-
-    try:
-        # 构建带有子代理配置的提示
-        system_context = ""
-        if agent.system_prompt:
-            system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
-
-        full_prompt = f"""You are acting as the subagent "{agent.name}".
-Description: {agent.description}
-{system_context}
-User Request: {prompt}
-
-Please respond according to your role and capabilities."""
-
-        cmd = [
-            cli_path,
-            "-p", full_prompt,
-            "--output-format", "text",
-            "--disable-slash-commands",
-            "--setting-sources", "user"
-        ]
-
-        # 如果指定了模型，添加模型参数
-        if agent.model and agent.model != "inherit":
-            cmd.extend(["--model", agent.model])
-
-        # 创建环境变量副本，移除 CLAUDECODE 以避免嵌套会话检测
-        env = os.environ.copy()
-        env.pop("CLAUDECODE", None)
-
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            env=env
-        )
-
-        duration = time.time() - start_time
-
-        if result.returncode != 0:
-            return {
-                "success": False,
-                "output": f"Agent 执行失败: {result.stderr}",
-                "duration": duration,
-                "model": agent.model or "inherit"
-            }
-
-        return {
-            "success": True,
-            "output": result.stdout.strip(),
-            "duration": duration,
-            "model": agent.model or "inherit"
-        }
-
-    except subprocess.TimeoutExpired:
-        duration = time.time() - start_time
-        return {
-            "success": False,
-            "output": "执行超时（超过 3 分钟）",
-            "duration": duration,
-            "model": agent.model or "inherit"
-        }
-    except FileNotFoundError:
-        return {
-            "success": False,
-            "output": "未找到 Claude CLI，请确保已安装",
-            "duration": 0,
-            "model": agent.model or "inherit"
-        }
-    except Exception as e:
-        duration = time.time() - start_time
-        return {
-            "success": False,
-            "output": f"执行错误: {str(e)}",
-            "duration": duration,
-            "model": agent.model or "inherit"
-        }
-
 
 @router.post(
     "/{agent_id}/test-stream",
@@ -546,11 +445,11 @@ async def test_agent_stream(
 
     返回 SSE (Server-Sent Events) 格式的流
     """
-    import subprocess
     import os
     import time
-    import asyncio
     import json
+    import asyncio
+    from app.adapters.claude.cli_client import ClaudeCliClient
 
     agent = await service.get_agent(agent_id)
     cli_path = settings.claude_cli_path
@@ -590,62 +489,69 @@ Please respond according to your role and capabilities."""
             yield f"data: {json.dumps({'type': 'log', 'message': f'使用模型: {model_name}'})}\n\n"
             yield f"data: {json.dumps({'type': 'log', 'message': '执行命令...'})}\n\n"
 
-            # 创建环境变量副本
-            env = os.environ.copy()
-            env.pop("CLAUDECODE", None)
+            # 使用队列来传递日志
+            log_queue = asyncio.Queue()
+            execution_done = asyncio.Event()
 
-            # 使用 Popen 实现实时输出
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env,
-                bufsize=1
-            )
+            # 定义日志回调函数
+            def log_callback(stream_type: str, line: str):
+                # 将日志放入队列
+                asyncio.create_task(log_queue.put((stream_type, line)))
 
-            output_lines = []
-            error_lines = []
+            # 在后台执行命令
+            async def run_command():
+                try:
+                    # 创建环境变量副本，移除 CLAUDECODE
+                    import os
+                    env = os.environ.copy()
+                    env.pop("CLAUDECODE", None)
 
-            # 实时读取输出
-            while True:
-                # 读取 stdout
-                if process.stdout:
-                    line = process.stdout.readline()
-                    if line:
-                        output_lines.append(line)
-                        yield f"data: {json.dumps({'type': 'log', 'message': line.rstrip()})}\n\n"
+                    client = ClaudeCliClient()
+                    result = await client.run_command_with_streaming(
+                        cmd=cmd,
+                        log_callback=log_callback,
+                        timeout=180,
+                        env=env
+                    )
+                    # 将结果放入队列
+                    await log_queue.put(('result', result))
+                except Exception as e:
+                    await log_queue.put(('error', str(e)))
+                finally:
+                    execution_done.set()
 
-                # 检查进程是否结束
-                if process.poll() is not None:
-                    # 读取剩余输出
-                    if process.stdout:
-                        remaining = process.stdout.read()
-                        if remaining:
-                            output_lines.append(remaining)
-                            for line in remaining.split('\n'):
-                                if line.strip():
-                                    yield f"data: {json.dumps({'type': 'log', 'message': line})}\n\n"
+            # 启动后台任务
+            asyncio.create_task(run_command())
 
-                    if process.stderr:
-                        error_output = process.stderr.read()
-                        if error_output:
-                            error_lines.append(error_output)
-                    break
+            # 持续从队列中读取日志并推送
+            result_data = None
+            while not execution_done.is_set() or not log_queue.empty():
+                try:
+                    # 等待日志消息，超时 0.1 秒
+                    item = await asyncio.wait_for(log_queue.get(), timeout=0.1)
 
-                await asyncio.sleep(0.1)
+                    if item[0] == 'result':
+                        result_data = item[1]
+                        break
+                    elif item[0] == 'error':
+                        yield f"data: {json.dumps({'type': 'error', 'message': f'执行错误: {item[1]}'})}\n\n"
+                        return
+                    else:
+                        # 推送日志
+                        stream_type, line = item
+                        yield f"data: {json.dumps({'type': 'log', 'message': line})}\n\n"
 
-            duration = time.time() - start_time
-            full_output = ''.join(output_lines).strip()
-            full_error = ''.join(error_lines).strip()
+                except asyncio.TimeoutError:
+                    # 超时，继续等待
+                    continue
 
-            if process.returncode != 0:
-                error_msg = f'Agent 执行失败: {full_error}'
-                model_name = agent.model or 'inherit'
-                yield f"data: {json.dumps({'type': 'complete', 'data': {'success': False, 'output': error_msg, 'duration': duration, 'model': model_name}})}\n\n"
-            else:
-                model_name = agent.model or 'inherit'
-                yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': full_output, 'duration': duration, 'model': model_name}})}\n\n"
+            # 发送完成消息
+            if result_data:
+                if result_data["success"]:
+                    yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': result_data['output'], 'duration': result_data['duration'], 'model': model_name}})}\n\n"
+                else:
+                    error_msg = f"Agent 执行失败: {result_data['error']}"
+                    yield f"data: {json.dumps({'type': 'complete', 'data': {'success': False, 'output': error_msg, 'duration': result_data['duration'], 'model': model_name}})}\n\n"
 
         except FileNotFoundError:
             yield f"data: {json.dumps({'type': 'error', 'message': '未找到 Claude CLI，请确保已安装'})}\n\n"
@@ -989,52 +895,3 @@ async def cleanup_duplicate_agents(
         "deleted_records": deleted_records
     }
 
-
-# Agent 测试端点
-import asyncio
-from app.schemas.agent_test import AgentTestRequest, AgentTestResponse
-from app.services.agent_test_service import AgentTestService
-from app.services.websocket_manager import get_connection_manager
-
-@router.post(
-    "/{agent_id}/test",
-    response_model=AgentTestResponse,
-    summary="测试 Agent"
-)
-async def test_agent(
-    agent_id: int,
-    request: AgentTestRequest,
-    service: AgentService = Depends(get_agent_service),
-    db: AsyncSession = Depends(get_db)
-):
-    """
-    测试 Agent（异步执行）
-
-    1. 创建执行记录
-    2. 启动后台任务
-    3. 立即返回执行 ID
-    4. 通过 WebSocket 推送状态更新
-    """
-    # 验证 Agent 存在
-    agent = await service.get(agent_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail="Agent not found")
-
-    # 创建执行记录
-    test_service = AgentTestService(db)
-    execution = await test_service.create_agent_test_execution(
-        agent_id=agent_id,
-        test_input=request.test_input
-    )
-
-    # 启动后台任务
-    manager = get_connection_manager()
-    asyncio.create_task(
-        test_service.execute_agent_test(execution.id, manager)
-    )
-
-    return AgentTestResponse(
-        execution_id=execution.id,
-        status="pending",
-        message="Agent 测试已启动，请通过 WebSocket 或右下角监控查看进度"
-    )
