@@ -46,44 +46,36 @@ def get_agent_service(db: AsyncSession = Depends(get_db)) -> AgentService:
 )
 async def sync_agents(
     request: AgentSyncRequest = None,
-    service: AgentService = Depends(get_agent_service)
+    service: AgentService = Depends(get_agent_service),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     从本地文件系统同步所有子代理到数据库
 
     扫描范围：
     - 用户级: ~/.claude/agents/
-    - 项目级: .claude/agents/ (按优先级检测: 请求参数 > 环境变量 > 自动检测)
+    - 项目级: 配置的项目路径下的 .claude/agents/
     - 插件级: ~/.claude/plugins/*/agents/
     - 内置: Explore, Plan, General-purpose 等
     """
-    import os
+    from pathlib import Path
+    from app.repositories.project_path_repository import ProjectPathRepository
+
     scanner = ClaudeFileScanner()
+    project_path_repo = ProjectPathRepository(db)
 
-    # 按优先级确定项目路径：
-    # 1. 请求参数中指定的 project_path
-    # 2. 配置/环境变量中的 PROJECT_PATH
-    # 3. 自动检测当前工作目录及其父目录
-    project_path = None
+    # 获取启用的项目路径配置
+    enabled_paths = await project_path_repo.get_enabled_paths()
+    project_paths = [
+        {
+            "path": p.path,
+            "alias": p.alias or Path(p.path).name,
+            "recursive_scan": p.recursive_scan
+        }
+        for p in enabled_paths
+    ]
 
-    # 优先级 1: 请求参数
-    if request and request.project_path:
-        project_path = request.project_path
-
-    # 优先级 2: 配置/环境变量
-    if not project_path and settings.project_path:
-        project_path = settings.project_path
-
-    # 优先级 3: 自动检测
-    if not project_path:
-        cwd = os.getcwd()
-        # 检查当前目录、父目录、祖父目录
-        for check_path in [cwd, os.path.dirname(cwd), os.path.dirname(os.path.dirname(cwd))]:
-            if os.path.exists(os.path.join(check_path, ".claude", "agents")):
-                project_path = check_path
-                break
-
-    scanned_agents = await scanner.scan_agents(project_path=project_path)
+    scanned_agents = await scanner.scan_agents(project_paths=project_paths)
 
     # 如果不包含内置 agents，过滤掉
     if request and not request.include_builtin:

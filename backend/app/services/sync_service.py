@@ -4,6 +4,7 @@ Sync Service
 负责将 Claude Adapter 扫描到的数据同步到数据库
 """
 from typing import Dict, Any, List
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +12,7 @@ from app.adapters.claude import ClaudeAdapter
 from app.repositories.skill_repository import SkillRepository
 from app.repositories.agent_repository import AgentRepository
 from app.repositories.agent_team_repository import AgentTeamRepository
+from app.repositories.project_path_repository import ProjectPathRepository
 from app.schemas.skill import SkillCreate
 from app.schemas.agent import AgentCreate
 from app.schemas.agent_team import AgentTeamCreate
@@ -28,6 +30,7 @@ class SyncService:
         self.skill_repo = SkillRepository(session)
         self.agent_repo = AgentRepository(session)
         self.agent_team_repo = AgentTeamRepository(session)
+        self.project_path_repo = ProjectPathRepository(session)
 
     async def sync_all(self) -> Dict[str, Any]:
         """
@@ -80,8 +83,19 @@ class SyncService:
         logger.info("Syncing skills...")
 
         try:
-            # 步骤 1: 扫描技能
-            scanned_skills = await self.adapter.scan_skills()
+            # 步骤 1: 获取启用的项目路径
+            enabled_paths = await self.project_path_repo.get_enabled_paths()
+            project_paths = [
+                {
+                    "path": p.path,
+                    "alias": p.alias or Path(p.path).name,
+                    "recursive_scan": p.recursive_scan
+                }
+                for p in enabled_paths
+            ]
+
+            # 步骤 2: 扫描技能
+            scanned_skills = await self.adapter.scan_skills(project_paths=project_paths)
             logger.info(f"Scanned {len(scanned_skills)} skills")
             
             # 记录扫描到的 skill 名称
@@ -178,8 +192,19 @@ class SyncService:
         logger.info("Syncing agents...")
 
         try:
-            # 步骤 1: 扫描智能体
-            scanned_agents = await self.adapter.scan_agents()
+            # 步骤 1: 获取启用的项目路径
+            enabled_paths = await self.project_path_repo.get_enabled_paths()
+            project_paths = [
+                {
+                    "path": p.path,
+                    "alias": p.alias or Path(p.path).name,
+                    "recursive_scan": p.recursive_scan
+                }
+                for p in enabled_paths
+            ]
+
+            # 步骤 2: 扫描智能体
+            scanned_agents = await self.adapter.scan_agents(project_paths=project_paths)
             logger.info(f"Scanned {len(scanned_agents)} agents")
 
             # 记录扫描到的 agent 路径

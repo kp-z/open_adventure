@@ -12,6 +12,7 @@ from app.models.user import User
 from app.models.team_message import TeamMessage
 from app.models.team_task import TeamTask
 from app.models.team_state import TeamState
+from app.models.project_path import ProjectPath
 
 __all__ = [
     "Skill",
@@ -26,5 +27,6 @@ __all__ = [
     "User",
     "TeamMessage",
     "TeamTask",
-    "TeamState"
+    "TeamState",
+    "ProjectPath"
 ]

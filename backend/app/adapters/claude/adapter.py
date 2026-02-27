@@ -24,9 +24,9 @@ class ClaudeAdapter(AdapterProvider):
         self.health_checker = ClaudeHealthChecker()
 
     # SkillProvider 实现
-    async def scan_skills(self) -> List[Dict[str, Any]]:
+    async def scan_skills(self, project_paths: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """扫描所有技能"""
-        return await self.file_scanner.scan_skills()
+        return await self.file_scanner.scan_skills(project_paths=project_paths)
 
     async def get_skill_detail(self, skill_name: str) -> Optional[Dict[str, Any]]:
         """获取技能详细信息"""
@@ -38,9 +38,9 @@ class ClaudeAdapter(AdapterProvider):
         return None
 
     # AgentProvider 实现
-    async def scan_agents(self) -> List[Dict[str, Any]]:
+    async def scan_agents(self, project_paths: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
         """扫描所有智能体"""
-        return await self.file_scanner.scan_agents()
+        return await self.file_scanner.scan_agents(project_paths=project_paths)
 
     async def get_agent_detail(self, agent_name: str) -> Optional[Dict[str, Any]]:
         """获取智能体详细信息"""
