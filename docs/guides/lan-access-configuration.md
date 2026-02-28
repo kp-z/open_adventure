@@ -1,12 +1,40 @@
 # 局域网访问配置指南
 
-## 问题描述
-当从局域网内其他设备访问 Claude Manager 时，前端可以加载，但无法连接到后端 API。
+## 自动配置（推荐）
 
-## 原因
-前端默认使用 `localhost:8000` 作为 API 地址，这在局域网访问时会指向访问设备自己的 localhost，而不是服务器的地址。
+使用 `start.sh` 脚本会**自动配置**局域网访问：
 
-## 解决方案
+```bash
+./start.sh
+```
+
+脚本会：
+1. 自动检测服务器的局域网 IP 地址
+2. 生成 `frontend/.env.local` 配置文件
+3. 显示本地和局域网访问地址
+
+启动后会看到类似输出：
+```
+============================================
+✅ Claude Manager is running!
+============================================
+
+🌐 Local Access:
+   Frontend: http://localhost:5173
+   Backend API: http://localhost:8000
+   API Docs: http://localhost:8000/docs
+
+🌍 LAN Access (from other devices):
+   Frontend: http://10.12.69.156:5173
+   Backend API: http://10.12.69.156:8000
+
+Press Ctrl+C to stop all servers
+============================================
+```
+
+## 手动配置
+
+如果需要手动配置或自动检测失败，可以按以下步骤操作：
 
 ### 1. 修改前端环境变量
 
