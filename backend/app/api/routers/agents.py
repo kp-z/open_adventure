@@ -8,7 +8,7 @@ Agent API Router - Claude Code Subagent 管理
 - 文件内容读写
 """
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Depends, Query, status, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
@@ -886,4 +886,94 @@ async def cleanup_duplicate_agents(
         "deleted": deleted_count,
         "deleted_records": deleted_records
     }
+
+
+@router.websocket("/{agent_id}/terminal")
+async def agent_terminal(
+    agent_id: int,
+    websocket: WebSocket,
+    service: AgentService = Depends(get_agent_service)
+):
+    """Agent 终端 WebSocket 端点"""
+    import json
+    from app.api.websocket.terminal import TerminalSession
+
+    await websocket.accept()
+    print(f"[AgentTerminal] WebSocket connection accepted for agent {agent_id}")
+
+    try:
+        # 获取 agent 信息
+        agent = await service.get_agent(agent_id)
+        if not agent:
+            await websocket.send_json({
+                'type': 'error',
+                'message': f'Agent {agent_id} not found'
+            })
+            await websocket.close()
+            return
+
+        # 构建 Claude CLI 命令
+        cli_path = settings.claude_cli_path
+
+        # 构建带有子代理配置的提示
+        system_context = ""
+        if agent.system_prompt:
+            system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
+
+        # 创建一个交互式会话命令
+        # 使用 claude 命令启动交互式会话
+        agent_command = f'{cli_path} --setting-sources user'
+
+        # 如果指定了模型，添加模型参数
+        if agent.model and agent.model != "inherit":
+            agent_command += f' --model {agent.model}'
+
+        print(f"[AgentTerminal] Starting agent session with command: {agent_command}")
+
+        session = TerminalSession(agent_id, agent.name, agent_command)
+
+        try:
+            await session.start(websocket)
+
+            while session.running:
+                try:
+                    data = await websocket.receive_text()
+                    message = json.loads(data)
+
+                    if message['type'] == 'input':
+                        await session.write_input(message['data'])
+                    elif message['type'] == 'resize':
+                        await session.resize(message['cols'], message['rows'])
+                    elif message['type'] == 'close':
+                        break
+                except WebSocketDisconnect:
+                    print(f"[AgentTerminal] WebSocket disconnected for agent {agent_id}")
+                    break
+                except Exception as e:
+                    print(f"[AgentTerminal] Error processing message: {e}")
+                    break
+
+        except Exception as e:
+            print(f"[AgentTerminal] Session error: {e}")
+            await websocket.send_json({
+                'type': 'error',
+                'message': str(e)
+            })
+        finally:
+            session.close()
+
+    except Exception as e:
+        print(f"[AgentTerminal] WebSocket error: {e}")
+        try:
+            await websocket.send_json({
+                'type': 'error',
+                'message': str(e)
+            })
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
 
