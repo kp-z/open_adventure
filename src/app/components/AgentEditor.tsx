@@ -48,13 +48,15 @@ import {
   Lightbulb,
   Target,
   Hammer,
-  RefreshCw
+  RefreshCw,
+  User,
+  Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './ui-shared';
 import { PromptOptimizeButton } from './PromptOptimizeButton';
-import { agentsApi, skillsApi } from '@/lib/api';
-import type { Agent, AgentUpdate, AgentPermissionMode, AgentModel, AgentScope, Skill } from '@/lib/api';
+import { agentsApi, skillsApi, pluginsApi, projectPathsApi } from '@/lib/api';
+import type { Agent, AgentUpdate, AgentPermissionMode, AgentModel, AgentScope, Skill, Plugin, ProjectPath } from '@/lib/api';
 
 // 从路径中提取项目名称
 const extractProjectName = (path: string): string => {
@@ -103,9 +105,10 @@ const MODEL_OPTIONS: { value: AgentModel; label: string; desc: string; color: st
 ];
 
 // 作用域选项
-const SCOPE_OPTIONS: { value: AgentScope; label: string; desc: string }[] = [
-  { value: 'user', label: '用户级', desc: '~/.claude/agents/ - 所有项目可用' },
-  { value: 'project', label: '项目级', desc: '.claude/agents/ - 仅当前项目' }
+const SCOPE_OPTIONS: { value: AgentScope; label: string; desc: string; icon: any }[] = [
+  { value: 'user', label: '用户级', desc: '所有项目可用', icon: User },
+  { value: 'plugin', label: '插件级', desc: '插件内可用', icon: Package },
+  { value: 'project', label: '项目级', desc: '仅当前项目', icon: FolderOpen }
 ];
 
 // 可用颜色
@@ -180,6 +183,15 @@ export const AgentEditor: React.FC<AgentEditorProps> = ({
   const [tools, setTools] = useState<string[]>(agent?.tools || []);
   const [skills, setSkills] = useState<string[]>(agent?.skills || []);
   const [scope, setScope] = useState<AgentScope>(agent?.scope as AgentScope || 'user');
+
+  // === Scope 相关状态 ===
+  const [selectedPlugin, setSelectedPlugin] = useState<string>(agent?.meta?.plugin_name || '');
+  const [selectedProject, setSelectedProject] = useState<string>(agent?.meta?.project_path || '');
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [projects, setProjects] = useState<ProjectPath[]>([]);
+  const [isCreatingPlugin, setIsCreatingPlugin] = useState(false);
+  const [newPluginName, setNewPluginName] = useState('');
+  const [newPluginDescription, setNewPluginDescription] = useState('');
 
   // === 外观设置 ===
   const [color, setColor] = useState(agent?.meta?.color || 'blue');
@@ -334,6 +346,61 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
     }
   };
 
+  // 加载 plugins 和 projects 列表
+  useEffect(() => {
+    // 加载 plugins
+    pluginsApi.list().then(setPlugins).catch(console.error);
+
+    // 加载 projects
+    projectPathsApi.listProjectPaths().then(data => setProjects(data.items)).catch(console.error);
+
+    // 如果是编辑模式且是 plugin scope，设置选中的 plugin
+    if (agent && agent.scope === 'plugin' && agent.meta?.plugin_name) {
+      setSelectedPlugin(agent.meta.plugin_name);
+    }
+
+    // 如果是编辑模式且是 project scope，设置选中的 project
+    if (agent && agent.scope === 'project' && agent.meta?.project_path) {
+      setSelectedProject(agent.meta.project_path);
+    }
+  }, [agent]);
+
+  // 创建新 Plugin
+  const handleCreatePlugin = async () => {
+    if (!newPluginName.trim()) {
+      setError('请输入 Plugin 名称');
+      return;
+    }
+
+    // 验证名称格式（小写字母、数字、连字符）
+    if (!/^[a-z][a-z0-9-]*$/.test(newPluginName)) {
+      setError('Plugin 名称格式错误：只能包含小写字母、数字和连字符，且必须以字母开头');
+      return;
+    }
+
+    try {
+      const newPlugin = await pluginsApi.create({
+        name: newPluginName,
+        description: newPluginDescription || undefined
+      });
+
+      // 刷新 plugin 列表
+      const updatedPlugins = await pluginsApi.list();
+      setPlugins(updatedPlugins);
+
+      // 选中新创建的 plugin
+      setSelectedPlugin(newPlugin.name);
+      setIsCreatingPlugin(false);
+      setNewPluginName('');
+      setNewPluginDescription('');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to create plugin:', err);
+      setError(err instanceof Error ? err.message : 'Plugin 创建失败');
+    }
+  };
+
   // 处理 Scope 修改
   const handleScopeChange = (newScope: AgentScope) => {
     // 创建模式直接修改
@@ -458,6 +525,16 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
       return;
     }
 
+    // 验证 scope 相关的选择
+    if (scope === 'plugin' && !selectedPlugin) {
+      setError('请选择或创建插件');
+      return;
+    }
+    if (scope === 'project' && !selectedProject) {
+      setError('请选择项目');
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
@@ -466,7 +543,13 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
         parseSourceContent(sourceContent);
       }
 
-      const meta = { color, icon };
+      // 构建 meta
+      const meta: any = { color, icon };
+      if (scope === 'plugin') {
+        meta.plugin_name = selectedPlugin;
+      } else if (scope === 'project') {
+        meta.project_path = selectedProject;
+      }
 
       if (isCreateMode) {
         await agentsApi.create({
@@ -500,6 +583,7 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
             description,
             system_prompt: systemPrompt,
             model,
+            scope,
             tools,
             disallowed_tools: disallowedTools,
             permission_mode: permissionMode,
@@ -854,95 +938,161 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
               </AnimatePresence>
             </GlassCard>
 
-            {/* 目录配置卡片 */}
-            <GlassCard className="p-6 border-blue-500/20">
-              <div className="flex items-center gap-2 mb-6">
-                <FolderOpen size={18} className="text-blue-400" />
-                <h3 className="font-bold">目录配置</h3>
+            {/* Scope 配置卡片 */}
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <FolderOpen size={20} />
+                保存位置配置
+              </h3>
+
+              {/* Scope 选择 */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                  配置层级
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {SCOPE_OPTIONS.map(option => {
+                    const IconComp = option.icon;
+                    const isSelected = scope === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          handleScopeChange(option.value);
+                          // 切换 scope 时重置选择
+                          if (option.value === 'plugin') setSelectedPlugin('');
+                          if (option.value === 'project') setSelectedProject('');
+                        }}
+                        className={`p-4 rounded-xl border transition-all ${
+                          isSelected
+                            ? 'bg-blue-500/20 border-blue-500/50'
+                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <IconComp size={20} className="mx-auto mb-2" />
+                        <p className="font-bold text-sm">{option.label}</p>
+                        <p className="text-xs text-gray-500">{option.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="space-y-3">
-                {/* Scope 选择下拉框 */}
-                {(isCreateMode || (agent && !agent.is_builtin)) ? (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
-                      保存位置
-                    </label>
-                    <select
-                      value={scope}
-                      onChange={(e) => handleScopeChange(e.target.value as AgentScope)}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 text-white"
-                    >
-                      {SCOPE_OPTIONS.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label} - {option.desc}
-                        </option>
-                      ))}
-                    </select>
-                    {/* 显示完整路径 */}
-                    <p className="text-xs text-gray-300 mt-2 font-mono break-all">
-                      {(() => {
-                        // 编辑模式：显示实际路径
-                        if (!isCreateMode && agent?.meta?.path) {
-                          const path = agent.meta.path;
-                          if (path.includes('/.claude/agents/')) {
-                            return path.substring(0, path.lastIndexOf('/.claude/agents/') + 16);
-                          } else if (path.includes('/.claude/plugins/')) {
-                            const agentsIndex = path.lastIndexOf('/agents/');
-                            if (agentsIndex !== -1) {
-                              return path.substring(0, agentsIndex + 8);
-                            }
-                            return path.substring(0, path.lastIndexOf('/.claude/plugins/') + 17);
-                          }
-                          return path;
-                        }
-                        // 创建模式：显示通用路径
-                        if (scope === 'user') return '~/.claude/agents/';
-                        if (scope === 'project') return '.claude/agents/ (当前项目)';
-                        return '';
-                      })()}
-                    </p>
-                  </div>
-                ) : (
-                  /* 内置 Agent 提示 */
-                  <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle size={16} className="text-yellow-400" />
-                      <p className="text-sm font-bold text-yellow-400">内置 Agent</p>
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      内置 Agent 由系统提供，无法修改保存位置
-                    </p>
-                  </div>
-                )}
+              {/* Plugin 选择器 */}
+              {scope === 'plugin' && (
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                    选择或创建插件
+                  </label>
 
-                {/* 项目名称 - 仅 project scope 显示 */}
-                {!isCreateMode && agent && agent.scope === 'project' && agent.meta?.path && (
-                  <div className="p-3 bg-white/5 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Code size={12} className="text-purple-400" />
-                      <span className="text-xs text-gray-400 uppercase">项目名称</span>
-                    </div>
-                    <p className="text-sm font-bold text-purple-400">
-                      {extractProjectName(agent.meta.path)}
-                    </p>
-                  </div>
-                )}
+                  {!isCreatingPlugin ? (
+                    <>
+                      <select
+                        value={selectedPlugin}
+                        onChange={(e) => setSelectedPlugin(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 mb-2"
+                      >
+                        <option value="">-- 请选择插件 --</option>
+                        {plugins.map(plugin => (
+                          <option key={plugin.name} value={plugin.name}>
+                            {plugin.name}
+                          </option>
+                        ))}
+                      </select>
 
-                {/* 优先级 - 仅编辑模式显示 */}
-                {!isCreateMode && agent && agent.priority !== undefined && (
-                  <div className="p-3 bg-white/5 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400 uppercase">优先级</span>
-                      <span className="text-sm font-bold text-blue-400">
-                        {agent.priority}
-                      </span>
+                      <button
+                        onClick={() => setIsCreatingPlugin(true)}
+                        className="w-full px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus size={16} />
+                        创建新 Plugin
+                      </button>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-400 mb-1">Plugin 名称 *</label>
+                        <input
+                          type="text"
+                          value={newPluginName}
+                          onChange={(e) => setNewPluginName(e.target.value.toLowerCase())}
+                          placeholder="my-plugin"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          只能包含小写字母、数字和连字符
+                        </p>
+                      </div>
+
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-400 mb-1">描述（可选）</label>
+                        <input
+                          type="text"
+                          value={newPluginDescription}
+                          onChange={(e) => setNewPluginDescription(e.target.value)}
+                          placeholder="Plugin 功能描述"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 text-sm"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setIsCreatingPlugin(false);
+                            setNewPluginName('');
+                            setNewPluginDescription('');
+                          }}
+                          className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-bold transition-all"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleCreatePlugin}
+                          className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-all"
+                        >
+                          创建
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      数字越大优先级越高
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
+
+              {/* Project 选择器 */}
+              {scope === 'project' && (
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                    选择项目
+                  </label>
+                  <select
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
+                  >
+                    <option value="">-- 请选择项目 --</option>
+                    {projects.map(project => (
+                      <option key={project.id} value={project.path}>
+                        {project.alias} ({project.path})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 保存路径预览 */}
+              <div className="p-3 bg-white/5 rounded-xl">
+                <p className="text-xs text-gray-400 mb-1">保存路径</p>
+                <p className="text-sm font-mono text-gray-300 break-all">
+                  {scope === 'user' && '~/.claude/agents/'}
+                  {scope === 'plugin' && selectedPlugin && `~/.claude/plugins/${selectedPlugin}/agents/`}
+                  {scope === 'plugin' && !selectedPlugin && (
+                    <span className="text-yellow-400">请先选择或创建插件</span>
+                  )}
+                  {scope === 'project' && selectedProject && `${selectedProject}/.claude/agents/`}
+                  {scope === 'project' && !selectedProject && (
+                    <span className="text-yellow-400">请先选择项目</span>
+                  )}
+                </p>
               </div>
             </GlassCard>
 

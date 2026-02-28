@@ -141,9 +141,14 @@ const Tasks = () => {
     return (
       <div className="space-y-8">
         <header>
-          <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-600 uppercase">
-            Battle Logs: Victory Hall
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-600 uppercase">
+              Battle Logs: Victory Hall
+            </h1>
+            <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+              敬请期待
+            </span>
+          </div>
           <p className="text-gray-400 font-medium">Behold the records of past conquests and learn from every encounter.</p>
         </header>
 
@@ -218,7 +223,12 @@ const Tasks = () => {
     <div className="space-y-4 md:space-y-8">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION TASKS</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION TASKS</h1>
+            <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+              敬请期待
+            </span>
+          </div>
           <p className="text-sm md:text-base text-gray-400">Track and monitor the history of all AI agent activities.</p>
         </div>
       </header>

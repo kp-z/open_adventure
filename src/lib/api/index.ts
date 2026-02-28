@@ -17,6 +17,8 @@ export { statsApi } from './services/stats';
 export { claudeApi } from './services/claude';
 export * as projectPathsApi from './services/project-paths';
 export type { ProjectPath, ProjectPathCreate, ProjectPathUpdate } from './services/project-paths';
+export * as pluginsApi from './services/plugins';
+export type { Plugin, PluginCreate } from './services/plugins';
 
 // 数据转换器
 export * from './transformers/skill-transformer';

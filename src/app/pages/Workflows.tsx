@@ -54,10 +54,15 @@ const Workflows = () => {
           {isEditorOpen && <WorkflowEditor workflow={selectedWorkflow} onClose={handleCloseEditor} />}
         </AnimatePresence>
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-600 uppercase leading-[0.8]">
-              Dungeon Hall: Missions
-            </h1>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-600 uppercase leading-[0.8]">
+                Dungeon Hall: Missions
+              </h1>
+              <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+                敬请期待
+              </span>
+            </div>
             <p className="text-gray-400 font-medium">Embark on legendary automation quests and reap the rewards.</p>
           </div>
           <ActionButton onClick={() => setIsEditorOpen(true)}>Create New Map</ActionButton>
@@ -125,7 +130,12 @@ const Workflows = () => {
       </AnimatePresence>
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">WORKFLOWS</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">WORKFLOWS</h1>
+            <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+              敬请期待
+            </span>
+          </div>
           <p className="text-sm md:text-base text-gray-400">Design and manage complex multi-agent automation chains.</p>
         </div>
         <div className="flex md:flex-row flex-col gap-2 shrink-0">

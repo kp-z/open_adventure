@@ -22,14 +22,16 @@ import {
   Bot,
   AlertCircle,
   Loader2,
-  Wand2
+  Wand2,
+  User,
+  Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, GameCard, ActionButton } from './ui-shared';
 import { cn } from '../lib/utils';
-import { skillsApi, type ClaudeGenerateResponse, type SkillFileItem, type SaveSkillRequest, type SkillContentResponse } from '@/lib/api';
+import { skillsApi, pluginsApi, projectPathsApi, type ClaudeGenerateResponse, type SkillFileItem, type SaveSkillRequest, type SkillContentResponse, type Plugin, type ProjectPath } from '@/lib/api';
 
 // 预设推荐
 const PRESET_RECOMMENDATIONS = [
@@ -111,6 +113,16 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   const [showRecommendations, setShowRecommendations] = useState(true);  // 显示推荐
   const [smartRecommendations, setSmartRecommendations] = useState<string[]>([]);  // 智能推荐
 
+  // Scope 相关状态
+  const [scope, setScope] = useState<'user' | 'project' | 'plugin'>('user');
+  const [selectedPlugin, setSelectedPlugin] = useState<string>('');
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [plugins, setPlugins] = useState<Plugin[]>([]);
+  const [projects, setProjects] = useState<ProjectPath[]>([]);
+  const [isCreatingPlugin, setIsCreatingPlugin] = useState(false);
+  const [newPluginName, setNewPluginName] = useState('');
+  const [newPluginDescription, setNewPluginDescription] = useState('');
+
   // 加载现有技能数据
   useEffect(() => {
     if (editingSkillId) {
@@ -168,6 +180,48 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
       setSmartRecommendations([]);
     }
   }, [prompt]);
+
+  // 加载 plugins 和 projects 列表
+  useEffect(() => {
+    pluginsApi.list().then(setPlugins).catch(console.error);
+    projectPathsApi.listProjectPaths().then(data => setProjects(data.items)).catch(console.error);
+  }, []);
+
+  // 创建新 Plugin
+  const handleCreatePlugin = async () => {
+    if (!newPluginName.trim()) {
+      setGenerateError('请输入 Plugin 名称');
+      return;
+    }
+
+    if (!/^[a-z][a-z0-9-]*$/.test(newPluginName)) {
+      setGenerateError('Plugin 名称格式错误：只能包含小写字母、数字和连字符，且必须以字母开头');
+      return;
+    }
+
+    try {
+      const newPlugin = await pluginsApi.create({
+        name: newPluginName,
+        description: newPluginDescription || undefined
+      });
+
+      const updatedPlugins = await pluginsApi.list();
+      setPlugins(updatedPlugins);
+      setSelectedPlugin(newPlugin.name);
+      setIsCreatingPlugin(false);
+      setNewPluginName('');
+      setNewPluginDescription('');
+
+      addNotification({
+        type: 'success',
+        title: 'Plugin 创建成功',
+        message: `已创建 plugin: ${newPlugin.name}`
+      });
+    } catch (err) {
+      console.error('Failed to create plugin:', err);
+      setGenerateError(err instanceof Error ? err.message : 'Plugin 创建失败');
+    }
+  };
 
   const steps = [
     "Analyzing intent...",
@@ -274,26 +328,36 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   const handleSave = async () => {
     console.log('[SkillEditor] handleSave called');
     console.log('[SkillEditor] Current skillData:', skillData);
-    
+
+    // 验证 scope 相关的选择
+    if (scope === 'plugin' && !selectedPlugin) {
+      setGenerateError('请选择或创建插件');
+      return;
+    }
+    if (scope === 'project' && !selectedProject) {
+      setGenerateError('请选择项目');
+      return;
+    }
+
     setIsSaving(true);
     setGenerateError(null);
-    
+
     try {
       // 从 SKILL.md 中提取技能名称
       const skillMdContent = skillData['SKILL.md'];
       console.log('[SkillEditor] SKILL.md content length:', skillMdContent?.length || 0);
       console.log('[SkillEditor] SKILL.md content preview:', skillMdContent?.substring(0, 200));
-      
+
       let skillName = generatedSkillName;
       console.log('[SkillEditor] Initial skill name from state:', skillName);
-      
+
       // 尝试从 frontmatter 中提取 name
       const nameMatch = skillMdContent.match(/^---[\s\S]*?name:\s*(.+?)[\s\n]/m);
       if (nameMatch) {
         skillName = nameMatch[1].trim();
         console.log('[SkillEditor] Extracted skill name from frontmatter:', skillName);
       }
-      
+
       // 如果没有名称，从标题提取
       if (!skillName) {
         const titleMatch = skillMdContent.match(/^#\s+(.+?)$/m);
@@ -302,7 +366,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
           console.log('[SkillEditor] Extracted skill name from title:', skillName);
         }
       }
-      
+
       if (!skillName) {
         skillName = 'new-skill';
         console.log('[SkillEditor] Using default skill name:', skillName);
@@ -314,7 +378,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
         console.error('[SkillEditor] SKILL.md content is empty or default template');
         throw new Error('请先生成或编辑 Skill 内容后再保存');
       }
-      
+
       // 构建保存请求
       const saveRequest: SaveSkillRequest = {
         name: skillName,
@@ -333,16 +397,19 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
           name: a.name,
           content: a.content,
           type: a.type
-        }))
+        })),
+        scope,
+        plugin_name: scope === 'plugin' ? selectedPlugin : undefined,
+        project_path: scope === 'project' ? selectedProject : undefined
       };
-      
+
       console.log('[SkillEditor] Calling saveToGlobal API with:', saveRequest);
-      
+
       // 调用保存 API
       const response = await skillsApi.saveToGlobal(saveRequest);
-      
+
       console.log('[SkillEditor] saveToGlobal response:', response);
-      
+
       if (response.success) {
         console.log('[SkillEditor] Skill saved successfully to:', response.saved_path);
         setSaveSuccess(true);
@@ -442,6 +509,167 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
           </button>
         </div>
       </div>
+
+      {/* Scope 配置卡片 */}
+      <GlassCard className="p-6 mb-8">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <FolderOpen size={20} />
+          保存位置配置
+        </h3>
+
+        {/* Scope 选择 */}
+        <div className="mb-4">
+          <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+            配置层级
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: 'user', label: '用户级', desc: '所有项目可用', icon: User },
+              { value: 'plugin', label: '插件级', desc: '插件内可用', icon: Package },
+              { value: 'project', label: '项目级', desc: '仅当前项目', icon: FolderOpen }
+            ].map(option => {
+              const IconComp = option.icon;
+              const isSelected = scope === option.value;
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setScope(option.value as 'user' | 'project' | 'plugin');
+                    if (option.value === 'plugin') setSelectedPlugin('');
+                    if (option.value === 'project') setSelectedProject('');
+                  }}
+                  className={`p-4 rounded-xl border transition-all ${
+                    isSelected
+                      ? 'bg-blue-500/20 border-blue-500/50'
+                      : 'bg-white/5 border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <IconComp size={20} className="mx-auto mb-2" />
+                  <p className="font-bold text-sm">{option.label}</p>
+                  <p className="text-xs text-gray-500">{option.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Plugin 选择器 */}
+        {scope === 'plugin' && (
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+              选择或创建插件
+            </label>
+
+            {!isCreatingPlugin ? (
+              <>
+                <select
+                  value={selectedPlugin}
+                  onChange={(e) => setSelectedPlugin(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 mb-2"
+                >
+                  <option value="">-- 请选择插件 --</option>
+                  {plugins.map(plugin => (
+                    <option key={plugin.name} value={plugin.name}>
+                      {plugin.name}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={() => setIsCreatingPlugin(true)}
+                  className="w-full px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} />
+                  创建新 Plugin
+                </button>
+              </>
+            ) : (
+              <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-400 mb-1">Plugin 名称 *</label>
+                  <input
+                    type="text"
+                    value={newPluginName}
+                    onChange={(e) => setNewPluginName(e.target.value.toLowerCase())}
+                    placeholder="my-plugin"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    只能包含小写字母、数字和连字符
+                  </p>
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-400 mb-1">描述（可选）</label>
+                  <input
+                    type="text"
+                    value={newPluginDescription}
+                    onChange={(e) => setNewPluginDescription(e.target.value)}
+                    placeholder="Plugin 功能描述"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 text-sm"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setIsCreatingPlugin(false);
+                      setNewPluginName('');
+                      setNewPluginDescription('');
+                    }}
+                    className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-bold transition-all"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleCreatePlugin}
+                    className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-all"
+                  >
+                    创建
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Project 选择器 */}
+        {scope === 'project' && (
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+              选择项目
+            </label>
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
+            >
+              <option value="">-- 请选择项目 --</option>
+              {projects.map(project => (
+                <option key={project.id} value={project.path}>
+                  {project.alias} ({project.path})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* 保存路径预览 */}
+        <div className="p-3 bg-white/5 rounded-xl">
+          <p className="text-xs text-gray-400 mb-1">保存路径</p>
+          <p className="text-sm font-mono text-gray-300 break-all">
+            {scope === 'user' && '~/.claude/skills/'}
+            {scope === 'plugin' && selectedPlugin && `~/.claude/plugins/${selectedPlugin}/skills/`}
+            {scope === 'plugin' && !selectedPlugin && (
+              <span className="text-yellow-400">请先选择或创建插件</span>
+            )}
+            {scope === 'project' && selectedProject && `${selectedProject}/.claude/skills/`}
+            {scope === 'project' && !selectedProject && (
+              <span className="text-yellow-400">请先选择项目</span>
+            )}
+          </p>
+        </div>
+      </GlassCard>
 
       {/* AI 助手卡片 - 在可视化模式显示 */}
       {editorMode === 'visual' && (

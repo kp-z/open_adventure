@@ -80,18 +80,19 @@ const modelColors: Record<string, string> = {
 // 从路径中提取项目名称
 const extractProjectName = (path: string): string => {
   const pathParts = path.split('/');
-  // 查找常见的项目目录标识
+
+  // 优先从 .claude 前面的目录获取（这是最准确的项目名称）
+  const claudeIndex = pathParts.findIndex(p => p === '.claude');
+  if (claudeIndex > 0) {
+    return pathParts[claudeIndex - 1];
+  }
+
+  // 如果没有 .claude，查找常见的项目目录标识
   const projectDirNames = ['项目', 'Proj', 'projects', 'Projects', 'workspace', 'Workspace'];
   const projectIndex = pathParts.findIndex(p => projectDirNames.includes(p));
 
   if (projectIndex >= 0 && projectIndex < pathParts.length - 1) {
     return pathParts[projectIndex + 1];
-  }
-
-  // 如果找不到，尝试从 .claude 前面的目录获取
-  const claudeIndex = pathParts.findIndex(p => p === '.claude');
-  if (claudeIndex > 0) {
-    return pathParts[claudeIndex - 1];
   }
 
   // 默认返回倒数第三个目录（通常是项目根目录）
@@ -964,18 +965,6 @@ Agent 描述: ${agent.description}
                 </p>
               </div>
 
-              {/* 文件路径 */}
-              {agent.meta?.path && (
-                <div className="p-3 bg-white/5 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <FileText size={12} className="text-gray-400" />
-                    <span className="text-xs text-gray-400 uppercase">完整路径</span>
-                  </div>
-                  <p className="text-xs text-gray-300 font-mono break-all">
-                    {agent.meta.path}
-                  </p>
-                </div>
-              )}
 
               {/* Plugin 名称 */}
               {agent.scope === 'plugin' && agent.meta?.plugin_name && (

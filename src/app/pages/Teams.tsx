@@ -106,10 +106,15 @@ const Teams = () => {
     return (
       <div className="space-y-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-600 uppercase">
-              Guild Hall: Alliances
-            </h1>
+          <div className="flex-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-600 uppercase">
+                Guild Hall: Alliances
+              </h1>
+              <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+                敬请期待
+              </span>
+            </div>
             <p className="text-gray-400 font-medium">Form elite squads of heroes to tackle impossible raids.</p>
           </div>
           <ActionButton
@@ -231,7 +236,12 @@ const Teams = () => {
     <div className="space-y-4 md:space-y-8">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">AGENT TEAMS</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">AGENT TEAMS</h1>
+            <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+              敬请期待
+            </span>
+          </div>
           <p className="text-sm md:text-base text-gray-400">Manage collaborative groups of AI agents for complex tasks.</p>
         </div>
         <div className="flex md:flex-row flex-col gap-2 shrink-0">

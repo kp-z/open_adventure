@@ -56,6 +56,9 @@ export interface SaveSkillRequest {
   scripts?: SkillFileItem[];
   references?: SkillFileItem[];
   assets?: SkillFileItem[];
+  scope?: 'user' | 'project' | 'plugin';
+  plugin_name?: string;
+  project_path?: string;
 }
 
 export interface SaveSkillResponse {

@@ -8,6 +8,7 @@ export interface TerminalInstance {
   ws: WebSocket;
   fitAddon: FitAddon;
   title: string;
+  sessionId?: string;  // 后端的 session ID
 }
 
 interface TerminalContextType {
@@ -33,18 +34,28 @@ interface TerminalProviderProps {
   children: ReactNode;
 }
 
-// 超时时间：15 分钟
-const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
-
 export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) => {
   const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const terminalCounterRef = useRef(1);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const createTerminal = (projectPath?: string): TerminalInstance => {
     const id = `terminal-${Date.now()}`;
-    const title = `Terminal ${terminalCounterRef.current++}`;
+
+    // 根据项目路径生成 title
+    let title = `Terminal ${terminalCounterRef.current++}`;
+    if (projectPath) {
+      // 从路径中提取项目名（最后一个目录名）
+      const pathParts = projectPath.split('/').filter(p => p);
+      const projectName = pathParts[pathParts.length - 1] || 'Terminal';
+      title = projectName;
+    }
+
+    console.log('[TerminalContext] createTerminal called');
+    console.log('[TerminalContext] Project path:', projectPath);
+    console.log('[TerminalContext] Terminal title:', title);
+    console.log('[TerminalContext] New terminal ID:', id);
+    console.log('[TerminalContext] Current terminals count:', terminals.length);
 
     // 创建 xterm 实例
     const term = new XTerm({
@@ -90,14 +101,31 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     const wsUrl = projectPath
       ? `ws://${wsHost}:${wsPort}/api/terminal/ws?project_path=${encodeURIComponent(projectPath)}`
       : `ws://${wsHost}:${wsPort}/api/terminal/ws`;
+    console.log('[TerminalContext] Creating WebSocket connection to:', wsUrl);
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      // 连接成功后不显示提示，直接等待 shell 的提示符
+      console.log('[TerminalContext] WebSocket connected for terminal:', id);
     };
 
     ws.onmessage = (event) => {
-      term.write(event.data);
+      const data = event.data;
+
+      // 检查是否是 session ID 消息（OSC 序列）
+      if (typeof data === 'string' && data.includes('SESSION_ID:')) {
+        const match = data.match(/SESSION_ID:([a-f0-9-]+)/);
+        if (match) {
+          const sessionId = match[1];
+          console.log('[TerminalContext] Received session ID:', sessionId);
+          // 保存 session ID 到 terminal 实例
+          newTerminal.sessionId = sessionId;
+          // 保存到 localStorage
+          localStorage.setItem(`terminal_session_${id}`, sessionId);
+          return; // 不显示这个消息
+        }
+      }
+
+      term.write(data);
     };
 
     ws.onerror = (error) => {
@@ -140,6 +168,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     setTerminals(prev => [...prev, newTerminal]);
     setActiveTabId(id);
+    console.log('[TerminalContext] Terminal added to state, new count:', terminals.length + 1);
+    console.log('[TerminalContext] Active tab set to:', id);
 
     return newTerminal;
   };
@@ -149,6 +179,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     if (terminal) {
       terminal.term.dispose();
       terminal.ws.close();
+      // 清理 localStorage 中的 session ID
+      localStorage.removeItem(`terminal_session_${id}`);
     }
 
     setTerminals(prev => {
@@ -169,40 +201,12 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     terminals.forEach(terminal => {
       terminal.term.dispose();
       terminal.ws.close();
+      // 清理 localStorage
+      localStorage.removeItem(`terminal_session_${terminal.id}`);
     });
     setTerminals([]);
     setActiveTabId(null);
   };
-
-  // 页面可见性监听
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // 页面隐藏，启动 15 分钟倒计时
-        console.log('Page hidden, starting inactivity timer (15 minutes)');
-        inactivityTimerRef.current = setTimeout(() => {
-          console.log('Terminal sessions timed out, cleaning up...');
-          cleanupAll();
-        }, INACTIVITY_TIMEOUT);
-      } else {
-        // 页面显示，取消倒计时
-        console.log('Page visible, clearing inactivity timer');
-        if (inactivityTimerRef.current) {
-          clearTimeout(inactivityTimerRef.current);
-          inactivityTimerRef.current = null;
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-    };
-  }, [terminals]);
 
   return (
     <TerminalContext.Provider

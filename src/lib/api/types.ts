@@ -255,6 +255,7 @@ export interface AgentUpdate {
   memory?: string | null;
   background?: boolean;
   isolation?: string | null;
+  scope?: AgentScope;
   meta?: Record<string, any> | null;
 }
 
