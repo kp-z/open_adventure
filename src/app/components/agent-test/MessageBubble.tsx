@@ -1,13 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { memo } from 'react';
 import { ChatMessage } from './types';
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ message }) {
   const isUser = message.role === 'user';
 
   return (
@@ -32,4 +32,4 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       </div>
     </div>
   );
-};
+});
