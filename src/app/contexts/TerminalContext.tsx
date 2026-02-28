@@ -84,10 +84,22 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         brightWhite: '#f9fafb',
       },
       allowProposedApi: true,
-      // 移动端支持配置
       screenReaderMode: false,
-      // 确保可以接收输入
       convertEol: true,
+
+      // 移动端优化配置
+      scrollback: 1000,  // 限制滚动缓冲区，提升性能
+      fastScrollModifier: 'alt',  // 快速滚动修饰键
+      fastScrollSensitivity: 5,   // 快速滚动灵敏度
+      scrollSensitivity: 3,       // 普通滚动灵敏度
+
+      // 移动端渲染优化
+      rendererType: 'canvas',     // 使用 canvas 渲染，性能更好
+      disableStdin: false,        // 确保可以输入
+
+      // 光标和选择优化
+      cursorStyle: 'block',       // 块状光标在移动端更明显
+      cursorWidth: 2,             // 光标宽度
     });
 
     // 创建 fit addon

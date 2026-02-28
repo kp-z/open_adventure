@@ -126,11 +126,28 @@ export const Layout = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  // 检测是否为移动端，移动端默认隐藏侧边栏
+  const [isMobile, setIsMobile] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [canGoBack, setCanGoBack] = React.useState(false);
   const [canGoForward, setCanGoForward] = React.useState(false);
+
+  // 检测移动端并设置侧边栏初始状态
+  React.useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768; // md breakpoint
+      setIsMobile(mobile);
+      // 仅在首次加载时根据设备类型设置侧边栏状态
+      if (mobile && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []); // 空依赖数组，仅在组件挂载时执行
 
   // 检查是否是 Terminal 页面
   const isTerminalPage = location.pathname === '/terminal';

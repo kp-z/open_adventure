@@ -33,7 +33,7 @@ const TerminalPane: React.FC<{
 
     // 点击或触摸时聚焦
     const handleInteraction = (e: Event) => {
-      e.preventDefault();
+      // 不阻止默认行为，允许正常的触摸滚动
       focusTerminal();
     };
 
@@ -69,12 +69,14 @@ const TerminalPane: React.FC<{
   return (
     <div
       ref={terminalRef}
-      className="flex-1 overflow-hidden"
+      className="flex-1 overflow-auto"
       style={{
         minHeight: 0,
-        touchAction: 'none', // 防止移动端滚动干扰
-        WebkitTouchCallout: 'none', // 禁用长按菜单
-        WebkitUserSelect: 'text', // 允许文本选择
+        touchAction: 'pan-y',  // 允许垂直滚动，禁止水平滚动和缩放
+        WebkitOverflowScrolling: 'touch',  // iOS 平滑滚动
+        WebkitTouchCallout: 'none',  // 禁用长按菜单
+        WebkitUserSelect: 'text',  // 允许文本选择
+        overscrollBehavior: 'contain',  // 防止滚动穿透
       }}
     />
   );
@@ -87,6 +89,8 @@ const Terminal = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [projectPaths, setProjectPaths] = useState<ProjectPath[]>([]);
   const [selectedProjectPath, setSelectedProjectPath] = useState<string>('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   // 获取项目路径列表
   useEffect(() => {
@@ -133,6 +137,66 @@ const Terminal = () => {
     }
   }, [selectedProjectPath]);
 
+  // 监听虚拟键盘事件
+  useEffect(() => {
+    if (!isMobile) return;
+
+    // 使用 Visual Viewport API 监听键盘
+    const handleViewportResize = () => {
+      if (!window.visualViewport) return;
+
+      const viewport = window.visualViewport;
+      const keyboardHeight = window.innerHeight - viewport.height;
+
+      setKeyboardHeight(keyboardHeight);
+      setIsKeyboardVisible(keyboardHeight > 100); // 键盘高度超过 100px 认为是弹出状态
+
+      console.log('[Terminal] Keyboard height:', keyboardHeight);
+      console.log('[Terminal] Viewport height:', viewport.height);
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
+
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleViewportResize);
+        window.visualViewport?.removeEventListener('scroll', handleViewportResize);
+      };
+    } else {
+      // 降级方案：监听 window resize
+      const handleWindowResize = () => {
+        const keyboardHeight = Math.max(0, window.screen.height - window.innerHeight - 100);
+        setKeyboardHeight(keyboardHeight);
+        setIsKeyboardVisible(keyboardHeight > 100);
+      };
+
+      window.addEventListener('resize', handleWindowResize);
+      return () => window.removeEventListener('resize', handleWindowResize);
+    }
+  }, [isMobile]);
+
+  // 键盘弹出时自动滚动到底部
+  const activeTerminal = terminals.find(t => t.id === activeTabId);
+  useEffect(() => {
+    if (isKeyboardVisible && activeTerminal) {
+      setTimeout(() => {
+        activeTerminal.term.scrollToBottom();
+      }, 100);
+    }
+  }, [isKeyboardVisible, activeTerminal]);
+
+  // 移动端：当终端变为活跃时自动聚焦
+  useEffect(() => {
+    if (isMobile && activeTerminal) {
+      // 延迟聚焦，确保 DOM 已更新
+      const timer = setTimeout(() => {
+        activeTerminal.term.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isMobile, activeTabId, activeTerminal]);
+
   const handleSplit = (direction: 'horizontal' | 'vertical') => {
     if (!activeTabId) return;
 
@@ -170,12 +234,20 @@ const Terminal = () => {
     }
   }, [terminals, splitTerminalId]);
 
-  // 获取当前显示的终端
-  const activeTerminal = terminals.find(t => t.id === activeTabId);
+  // 获取分屏终端
   const splitTerminal = terminals.find(t => t.id === splitTerminalId);
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-8 space-y-4 md:space-y-6">
+    <div
+      className="h-full flex flex-col p-4 md:p-8 space-y-4 md:space-y-6"
+      style={{
+        // 移动端键盘弹出时调整高度
+        height: isMobile && isKeyboardVisible
+          ? `calc(100vh - ${keyboardHeight}px)`
+          : '100%',
+        transition: 'height 0.2s ease-out',  // 平滑过渡
+      }}
+    >
       {/* Header */}
       <header className="flex justify-between items-start gap-3">
         <div className="flex-1 min-w-0">
@@ -186,12 +258,12 @@ const Terminal = () => {
             </p>
             {/* 项目路径选择器 */}
             {projectPaths.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative z-50">
                 <FolderOpen size={14} className="text-gray-400" />
                 <select
                   value={selectedProjectPath}
                   onChange={(e) => handleProjectPathChange(e.target.value)}
-                  className="bg-black/40 text-gray-300 text-xs px-2 py-1 rounded border border-white/10 focus:border-green-500/50 focus:outline-none"
+                  className="bg-black/40 text-gray-300 text-xs px-2 py-1 rounded border border-white/10 focus:border-green-500/50 focus:outline-none relative z-50"
                 >
                   {projectPaths.map((path) => (
                     <option key={path.id} value={path.path}>
@@ -242,6 +314,43 @@ const Terminal = () => {
           </ActionButton>
         </div>
       </header>
+
+      {/* 移动端虚拟键盘工具栏 */}
+      {isMobile && isKeyboardVisible && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-black/60 border-b border-white/10 overflow-x-auto">
+          {['Tab', 'Ctrl+C', 'Ctrl+D', 'Ctrl+Z', '↑', '↓', 'Esc'].map((key) => (
+            <button
+              key={key}
+              onClick={() => {
+                const terminal = terminals.find(t => t.id === activeTabId);
+                if (!terminal) return;
+
+                // 发送特殊按键
+                const keyMap: Record<string, string> = {
+                  'Tab': '\t',
+                  'Ctrl+C': '\x03',
+                  'Ctrl+D': '\x04',
+                  'Ctrl+Z': '\x1a',
+                  '↑': '\x1b[A',
+                  '↓': '\x1b[B',
+                  'Esc': '\x1b',
+                };
+
+                const keyCode = keyMap[key];
+                if (keyCode && terminal.ws.readyState === WebSocket.OPEN) {
+                  terminal.ws.send(JSON.stringify({
+                    type: 'input',
+                    data: keyCode
+                  }));
+                }
+              }}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs font-mono text-gray-300 whitespace-nowrap transition-colors"
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">

@@ -63,6 +63,7 @@ const Dashboard = () => {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfigEditor, setShowConfigEditor] = useState(false);
+  const [hoveredModel, setHoveredModel] = useState<string | null>(null);
 
   const fetchDashboardData = async () => {
     try {
@@ -353,6 +354,7 @@ const Dashboard = () => {
                           animationDelay: `${index * 0.3}s`
                         }}
                         title={config.name}
+                        onClick={() => setHoveredModel(hoveredModel === config.name ? null : config.name)}
                       >
                         {/* 可用模型：显示绿色高亮边框和水位线 */}
                         {isAvailable && tokenUsage ? (
@@ -384,13 +386,27 @@ const Dashboard = () => {
                               </span>
                             </div>
 
-                            {/* Hover/Active 显示 token 信息 */}
-                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
-                              <div className="bg-black/80 rounded-lg px-1.5 py-0.5 text-[6px] text-white whitespace-nowrap">
-                                <div className="font-bold">{tokenUsage.percentage.toFixed(1)}% Used</div>
-                                <div className="text-gray-300">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200000</div>
+                            {/* Active 显示 token 信息 - 在气泡上方 - 只在当前选中的模型显示 */}
+                            {hoveredModel === config.name && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                                <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
+                                  <div className="font-bold mb-1">{config.name}</div>
+                                  <div className="text-gray-300 mb-1.5 text-[7px]">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200,000</div>
+                                  {/* 横向柱状图 */}
+                                  <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300"
+                                      style={{ width: `${tokenUsage.percentage}%` }}
+                                    />
+                                  </div>
+                                  <div className="text-[6px] text-gray-400 mt-1">{tokenUsage.percentage.toFixed(1)}% Used</div>
+                                </div>
+                                {/* 小三角箭头 */}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                                  <div className="w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-black/90" />
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         ) : (
                           /* 不可用的模型显示原来的样式 */
@@ -479,6 +495,8 @@ const Dashboard = () => {
                         animationDelay: `${index * 0.3}s`
                       }}
                       title={config.name}
+                      onMouseEnter={() => setHoveredModel(config.name)}
+                      onMouseLeave={() => setHoveredModel(null)}
                     >
                       {/* 可用模型：显示绿色高亮边框和水位线 */}
                       {isAvailable && tokenUsage ? (
@@ -513,13 +531,27 @@ const Dashboard = () => {
                             </span>
                           </div>
 
-                          {/* Hover 显示 token 信息 */}
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
-                            <div className="bg-black/80 rounded-lg px-2 py-1 text-[7px] text-white whitespace-nowrap">
-                              <div className="font-bold">{tokenUsage.percentage.toFixed(1)}% Used</div>
-                              <div className="text-gray-300">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200000</div>
+                          {/* Hover 显示 token 信息 - 在气泡上方 - 只在当前 hover 的模型显示 */}
+                          {hoveredModel === config.name && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                              <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
+                                <div className="font-bold mb-1">{config.name}</div>
+                                <div className="text-gray-300 mb-2">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200,000 tokens</div>
+                                {/* 横向柱状图 */}
+                                <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300"
+                                    style={{ width: `${tokenUsage.percentage}%` }}
+                                  />
+                                </div>
+                                <div className="text-[8px] text-gray-400 mt-1">{tokenUsage.percentage.toFixed(1)}% Used</div>
+                              </div>
+                              {/* 小三角箭头 */}
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/90" />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       ) : (
                         /* 不可用的模型显示原来的样式 */
