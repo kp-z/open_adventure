@@ -66,12 +66,15 @@ class ClaudeGenerateResponse(BaseModel):
 
 
 class SaveSkillRequest(BaseModel):
-    """保存 Skill 到全局目录请求"""
+    """保存 Skill 到指定目录请求"""
     name: str = Field(..., description="技能名称（kebab-case）")
     skill_md: str = Field(..., description="SKILL.md 内容")
     scripts: List[SkillFileItem] = Field(default_factory=list, description="脚本文件列表")
     references: List[SkillFileItem] = Field(default_factory=list, description="参考文件列表")
     assets: List[SkillFileItem] = Field(default_factory=list, description="资源文件列表")
+    scope: Optional[str] = Field('user', description="保存位置：user, project, plugin")
+    plugin_name: Optional[str] = Field(None, description="Plugin 名称（scope=plugin 时必填）")
+    project_path: Optional[str] = Field(None, description="项目路径（scope=project 时必填）")
 
 
 class SaveSkillResponse(BaseModel):
@@ -563,15 +566,16 @@ description: {request.description[:100]}
     "/save-to-global",
     response_model=SaveSkillResponse,
     status_code=status.HTTP_200_OK,
-    summary="保存 Skill 到全局目录"
+    summary="保存 Skill 到指定目录"
 )
 async def save_skill_to_global(
     request: SaveSkillRequest,
     repository: SkillRepository = Depends(get_skill_repository)
 ):
     """
-    将编辑好的 Skill 内容保存到 ~/.claude/skills/ 目录。
-    
+    将编辑好的 Skill 内容保存到指定目录。
+
+    - 支持 user/plugin/project scope
     - 创建技能目录
     - 写入 SKILL.md 和可选的 scripts/references/assets
     - 自动同步到数据库（直接操作 repository，不触发文件系统同步）
@@ -581,19 +585,47 @@ async def save_skill_to_global(
         skill_name = request.name.strip().lower()
         skill_name = re.sub(r'[^a-z0-9\u4e00-\u9fff-]', '-', skill_name)
         skill_name = re.sub(r'-+', '-', skill_name).strip('-')
-        
+
         if not skill_name:
             skill_name = "new-skill"
-        
-        # 步骤2：创建技能目录并写入文件
-        skills_dir = settings.claude_skills_dir / skill_name
+
+        # 步骤2：确定保存路径
+        scope = getattr(request, 'scope', 'user')
+
+        if scope == 'plugin':
+            plugin_name = getattr(request, 'plugin_name', None)
+            if not plugin_name:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Plugin scope 需要指定 plugin_name"
+                )
+            skills_dir = Path.home() / ".claude" / "plugins" / plugin_name / "skills" / skill_name
+
+            # 验证 plugin 是否存在
+            if not skills_dir.parent.parent.exists():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Plugin '{plugin_name}' 不存在"
+                )
+        elif scope == 'project':
+            project_path = getattr(request, 'project_path', None)
+            if not project_path:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Project scope 需要指定 project_path"
+                )
+            skills_dir = Path(project_path) / ".claude" / "skills" / skill_name
+        else:  # user
+            skills_dir = settings.claude_skills_dir / skill_name
+
+        # 创建技能目录并写入文件
         skills_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 写入 SKILL.md
         skill_md_path = skills_dir / "SKILL.md"
         skill_md_path.write_text(request.skill_md, encoding="utf-8")
         logger.info(f"Written SKILL.md to {skill_md_path}")
-        
+
         # 写入 scripts
         if request.scripts:
             scripts_dir = skills_dir / "scripts"
@@ -602,7 +634,7 @@ async def save_skill_to_global(
                 script_path = scripts_dir / script.name
                 script_path.write_text(script.content, encoding="utf-8")
                 logger.info(f"Written script: {script_path}")
-        
+
         # 写入 references
         if request.references:
             refs_dir = skills_dir / "references"
@@ -611,7 +643,7 @@ async def save_skill_to_global(
                 ref_path = refs_dir / ref.name
                 ref_path.write_text(ref.content, encoding="utf-8")
                 logger.info(f"Written reference: {ref_path}")
-        
+
         # 写入 assets
         if request.assets:
             assets_dir = skills_dir / "assets"
@@ -620,38 +652,43 @@ async def save_skill_to_global(
                 asset_path = assets_dir / asset.name
                 asset_path.write_text(asset.content, encoding="utf-8")
                 logger.info(f"Written asset: {asset_path}")
-        
+
         saved_path = str(skills_dir)
         logger.info(f"Skill files saved to: {saved_path}")
-        
+
         # 步骤3：同步到数据库
         # 从 SKILL.md 提取描述
         description = skill_name
         desc_match = re.search(r'^description:\s*(.+?)$', request.skill_md, re.MULTILINE)
         if desc_match:
             description = desc_match.group(1).strip()
-        
+
         # 提取标签
         tags = []
         tags_match = re.search(r'^tags:\s*\[(.+?)\]', request.skill_md, re.MULTILINE)
         if tags_match:
             tags = [t.strip().strip('"\'') for t in tags_match.group(1).split(',')]
-        
+
         # 构建 meta 信息
         meta = {
             "path": str(skills_dir),
             "skill_md_path": str(skill_md_path),
         }
+        if scope == 'plugin':
+            meta["plugin_name"] = plugin_name
+        elif scope == 'project':
+            meta["project_path"] = project_path
+
         if request.scripts:
             meta["scripts"] = [s.name for s in request.scripts]
         if request.references:
             meta["references"] = [r.name for r in request.references]
         if request.assets:
             meta["assets"] = [a.name for a in request.assets]
-        
+
         # 检查是否已存在同名技能（直接查询数据库）
         existing_skill = await repository.get_by_name(skill_name)
-        
+
         if existing_skill:
             # 更新现有技能
             skill_update = SkillUpdate(

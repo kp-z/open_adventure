@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -78,6 +78,7 @@ app.include_router(team_tasks.router, prefix=f"{settings.api_prefix}")
 app.include_router(team_state.router, prefix=f"{settings.api_prefix}")
 app.include_router(project_paths.router, prefix=f"{settings.api_prefix}")
 app.include_router(token_usage.router, prefix=f"{settings.api_prefix}")
+app.include_router(plugins.router, prefix=f"{settings.api_prefix}")
 app.include_router(settings_router.router, prefix=f"{settings.api_prefix}")
 app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
