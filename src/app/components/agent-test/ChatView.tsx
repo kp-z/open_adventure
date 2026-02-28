@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { PromptOptimizeButton } from '../PromptOptimizeButton';
@@ -19,6 +19,7 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasAutoSent, setHasAutoSent] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentInputRef = useRef<string>('');
 
@@ -29,7 +30,7 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async (retryInput?: string) => {
+  const handleSend = useCallback(async (retryInput?: string) => {
     const messageContent = retryInput || input.trim();
     if (!messageContent || isRunning) return;
 
@@ -199,7 +200,20 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
         setRetryCount(0);
       }
     }
-  };
+  }, [agentId, input, isRunning, retryCount, onTestComplete]);
+
+  // 首次加载时自动发送启动消息
+  useEffect(() => {
+    if (!hasAutoSent && messages.length === 0 && !isRunning) {
+      const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力。`;
+      setHasAutoSent(true);
+      // 延迟 500ms 发送，确保组件完全加载
+      const timer = setTimeout(() => {
+        handleSend(welcomeMessage);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [hasAutoSent, messages.length, isRunning, agentName, handleSend]);
 
   return (
     <div className="flex flex-col h-[500px]">

@@ -90,7 +90,7 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
     if (!xtermRef.current || session.isConnected) return;
 
     const terminal = xtermRef.current;
-    const wsUrl = `ws://localhost:8000/agents/${agentId}/terminal`;
+    const wsUrl = `ws://localhost:8000/api/terminal/ws`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {

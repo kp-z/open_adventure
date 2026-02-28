@@ -22,6 +22,7 @@ import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { ClaudeConfigEditor } from '../components/ClaudeConfigEditor';
 import { LoadingSpinner, SkeletonCard, SkeletonListItem } from '../components/LoadingSpinner';
+import { WaterLevel } from '../components/WaterLevel';
 import { getAvatarById } from '../lib/avatars';
 import {
   BarChart,
@@ -54,6 +55,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [claudeHealth, setClaudeHealth] = useState<ClaudeHealthResponse | null>(null);
+  const [tokenUsage, setTokenUsage] = useState<{ percentage: number } | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingHealth, setLoadingHealth] = useState(true);
   const [loadingExecutions, setLoadingExecutions] = useState(true);
@@ -96,6 +98,15 @@ const Dashboard = () => {
       console.log('Claude Health Data:', healthData);
       console.log('Available Models:', healthData.model_info?.available_models);
       setClaudeHealth(healthData);
+
+      // 获取 token 使用情况
+      try {
+        const response = await fetch('http://localhost:8000/api/token-usage');
+        const tokenData = await response.json();
+        setTokenUsage({ percentage: tokenData.percentage });
+      } catch (err) {
+        console.error('Failed to fetch token usage:', err);
+      }
     } catch (err) {
       console.error('Failed to fetch health:', err);
     } finally {
@@ -321,9 +332,11 @@ const Dashboard = () => {
                     const matchedModel = claudeHealth?.model_info?.available_models.find(m => {
                       const modelAlias = m.alias.toLowerCase();
                       const configName = config.name.toLowerCase();
+                      const normalizedConfigName = configName.replace(/\s+/g, '-');
                       return modelAlias === configName ||
-                             modelAlias.includes(configName.replace(/\s+/g, '-')) ||
-                             modelAlias.includes(configName.replace(/\s+/g, ''));
+                             modelAlias === normalizedConfigName ||
+                             modelAlias.includes(normalizedConfigName) ||
+                             normalizedConfigName.includes(modelAlias);
                     });
                     const isAvailable = matchedModel?.available ?? false;
 
@@ -341,32 +354,67 @@ const Dashboard = () => {
                         }}
                         title={config.name}
                       >
-                        {/* 气泡主体 */}
-                        <div
-                          className={`
-                            w-full h-full rounded-full relative
-                            transition-all duration-300
-                            backdrop-blur-[2px]
-                            border
-                            active:scale-110
-                            ${isAvailable
-                              ? 'bg-gradient-to-br from-green-500/30 via-green-500/15 to-green-500/5 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.3)]'
-                              : 'bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15'
-                            }
-                          `}
-                        >
-                          {/* 顶部高光 */}
-                          <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
+                        {/* 可用模型：显示绿色高亮边框和水位线 */}
+                        {isAvailable && tokenUsage ? (
+                          <div
+                            className={`
+                              w-full h-full rounded-full relative
+                              transition-all duration-300
+                              backdrop-blur-[2px]
+                              border-2
+                              active:scale-110
+                              bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                              group
+                            `}
+                            style={{
+                              borderColor: 'rgba(34, 197, 94, 0.4)',
+                              boxShadow: '0 0 15px rgba(34, 197, 94, 0.4), 0 0 30px rgba(34, 197, 94, 0.2), inset 0 0 20px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
+                            }}
+                          >
+                            {/* 顶部高光 */}
+                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
 
-                          {/* 模型名称 - 移动端更小字体 */}
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className={`text-[7px] font-medium text-center leading-tight px-0.5 ${
-                              isAvailable ? 'text-green-400 font-bold' : 'text-gray-400'
-                            }`}>
-                              {config.name}
-                            </span>
+                            {/* 水位线 */}
+                            <WaterLevel percentage={tokenUsage.percentage} size={config.size} />
+
+                            {/* 模型名称 - 在水位线后面 */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                              <span className="text-[7px] font-bold text-white drop-shadow-lg text-center leading-tight px-0.5">
+                                {config.name}
+                              </span>
+                            </div>
+
+                            {/* Hover/Active 显示 token 信息 */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-active:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                              <div className="bg-black/80 rounded-lg px-1.5 py-0.5 text-[6px] text-white whitespace-nowrap">
+                                <div className="font-bold">{tokenUsage.percentage.toFixed(1)}% Used</div>
+                                <div className="text-gray-300">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200000</div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          /* 不可用的模型显示原来的样式 */
+                          <div
+                            className={`
+                              w-full h-full rounded-full relative
+                              transition-all duration-300
+                              backdrop-blur-[2px]
+                              border
+                              active:scale-110
+                              bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15
+                            `}
+                          >
+                            {/* 顶部高光 */}
+                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
+
+                            {/* 模型名称 */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-[7px] font-medium text-center leading-tight px-0.5 text-gray-400">
+                                {config.name}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   });
@@ -395,23 +443,28 @@ const Dashboard = () => {
                   const matchedModel = claudeHealth?.model_info?.available_models.find(m => {
                     const modelAlias = m.alias.toLowerCase();
                     const configName = config.name.toLowerCase();
+
+                    // 将空格替换为连字符进行匹配
+                    const normalizedConfigName = configName.replace(/\s+/g, '-');
+
                     // 精确匹配或包含匹配
                     return modelAlias === configName ||
-                           modelAlias.includes(configName.replace(/\s+/g, '-')) ||
-                           modelAlias.includes(configName.replace(/\s+/g, ''));
+                           modelAlias === normalizedConfigName ||
+                           modelAlias.includes(normalizedConfigName) ||
+                           normalizedConfigName.includes(modelAlias);
                   });
 
                   const isAvailable = matchedModel?.available ?? false;
 
-                  // 调试信息
-                  if (config.name === 'Opus') {
-                    console.log('Opus bubble:', {
-                      configName: config.name,
-                      matchedModel,
-                      isAvailable,
-                      allModels: claudeHealth?.model_info?.available_models
-                    });
-                  }
+                  // 调试信息 - 打印所有气泡的匹配情况
+                  console.log(`Bubble ${config.name}:`, {
+                    configName: config.name,
+                    matchedModel,
+                    isAvailable,
+                    tokenUsage,
+                    hasTokenUsage: !!tokenUsage,
+                    willShowWaterLevel: isAvailable && !!tokenUsage
+                  });
 
                   return (
                     <div
@@ -427,35 +480,73 @@ const Dashboard = () => {
                       }}
                       title={config.name}
                     >
-                      {/* 气泡主体 */}
-                      <div
-                        className={`
-                          w-full h-full rounded-full relative
-                          transition-all duration-300
-                          backdrop-blur-[2px]
-                          border
-                          hover:scale-110
-                          ${isAvailable
-                            ? 'bg-gradient-to-br from-green-500/30 via-green-500/15 to-green-500/5 border-green-500/40 shadow-[0_0_20px_rgba(34,197,94,0.4),0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]'
-                            : 'bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]'
-                          }
-                        `}
-                      >
-                        {/* 顶部高光 */}
-                        <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
+                      {/* 可用模型：显示绿色高亮边框和水位线 */}
+                      {isAvailable && tokenUsage ? (
+                        <div
+                          className={`
+                            w-full h-full rounded-full relative
+                            transition-all duration-300
+                            backdrop-blur-[2px]
+                            border-2
+                            hover:scale-110
+                            bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                            group
+                          `}
+                          style={{
+                            borderColor: 'rgba(34, 197, 94, 0.4)',
+                            boxShadow: '0 0 20px rgba(34, 197, 94, 0.4), 0 0 40px rgba(34, 197, 94, 0.2), inset 0 0 30px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
+                          }}
+                        >
+                          {/* 顶部高光 */}
+                          <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
 
-                        {/* 次级高光 */}
-                        <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
+                          {/* 次级高光 */}
+                          <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
 
-                        {/* 模型名称 - 更小更低调 */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <span className={`text-[8px] font-medium text-center leading-tight px-1 ${
-                            isAvailable ? 'text-green-400 font-bold' : 'text-gray-400'
-                          }`}>
-                            {config.name}
-                          </span>
+                          {/* 水位线 */}
+                          <WaterLevel percentage={tokenUsage.percentage} size={config.size} />
+
+                          {/* 模型名称 - 在水位线后面 */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                            <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
+                              {config.name}
+                            </span>
+                          </div>
+
+                          {/* Hover 显示 token 信息 */}
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                            <div className="bg-black/80 rounded-lg px-2 py-1 text-[7px] text-white whitespace-nowrap">
+                              <div className="font-bold">{tokenUsage.percentage.toFixed(1)}% Used</div>
+                              <div className="text-gray-300">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200000</div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        /* 不可用的模型显示原来的样式 */
+                        <div
+                          className={`
+                            w-full h-full rounded-full relative
+                            transition-all duration-300
+                            backdrop-blur-[2px]
+                            border
+                            hover:scale-110
+                            bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]
+                          `}
+                        >
+                          {/* 顶部高光 */}
+                          <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
+
+                          {/* 次级高光 */}
+                          <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
+
+                          {/* 模型名称 */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-[8px] font-medium text-center leading-tight px-1 text-gray-400">
+                              {config.name}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 });
