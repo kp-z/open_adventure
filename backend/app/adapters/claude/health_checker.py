@@ -68,7 +68,12 @@ class ClaudeHealthChecker:
             model_map = {
                 "opus": "claude-opus-4-6",
                 "sonnet": "claude-sonnet-4-6",
-                "haiku": "claude-haiku-4-6"
+                "haiku": "claude-haiku-4-6",
+                "haiku-3.5": "claude-3-5-haiku-20241022",
+                "sonnet-3.5": "claude-3-5-sonnet-20241022",
+                "sonnet-4": "claude-sonnet-4-20250514",
+                "opus-4": "claude-opus-4-20250514",
+                "opus-4.5": "claude-opus-4-5-20250514"
             }
 
             model_name = model_map.get(model_alias, model_alias)
@@ -121,6 +126,10 @@ class ClaudeHealthChecker:
                         # 400 可能是参数错误，但模型存在
                         logger.info(f"Model {model_alias} exists (400 response)")
                         return True
+                    elif response.status == 429:
+                        # 429 速率限制，说明模型存在且可用
+                        logger.info(f"Model {model_alias} available (429 rate limit)")
+                        return True
                     elif response.status == 404:
                         # 404 说明模型不存在
                         logger.info(f"Model {model_alias} not found (404)")
@@ -164,59 +173,69 @@ class ClaudeHealthChecker:
                 logger.error(f"Failed to read settings.json: {e}")
                 model_info["model_source"] = "default"
 
-        # 2. 定义所有模型（根据实际情况设置可用性）
+        # 2. 定义所有模型
         models = [
             {
                 "alias": "haiku",
                 "full_name": "claude-haiku-4-6",
-                "description": "Fast and efficient",
-                "available": False
+                "description": "Fast and efficient"
             },
             {
                 "alias": "sonnet",
                 "full_name": "claude-sonnet-4-6",
-                "description": "Balanced performance",
-                "available": False
+                "description": "Balanced performance"
             },
             {
                 "alias": "opus",
                 "full_name": "claude-opus-4-6",
-                "description": "Most capable model",
-                "available": True  # 当前只有 opus 可用
+                "description": "Most capable model"
             },
             {
                 "alias": "haiku-3.5",
                 "full_name": "claude-3-5-haiku-20241022",
-                "description": "Haiku 3.5",
-                "available": False
+                "description": "Haiku 3.5"
             },
             {
                 "alias": "sonnet-3.5",
                 "full_name": "claude-3-5-sonnet-20241022",
-                "description": "Sonnet 3.5",
-                "available": False
+                "description": "Sonnet 3.5"
             },
             {
                 "alias": "sonnet-4",
                 "full_name": "claude-sonnet-4-20250514",
-                "description": "Sonnet 4",
-                "available": False
+                "description": "Sonnet 4"
             },
             {
                 "alias": "opus-4",
                 "full_name": "claude-opus-4-20250514",
-                "description": "Opus 4",
-                "available": False
+                "description": "Opus 4"
             },
             {
                 "alias": "opus-4.5",
                 "full_name": "claude-opus-4-5-20250514",
-                "description": "Opus 4.5",
-                "available": False
+                "description": "Opus 4.5"
             }
         ]
 
-        model_info["available_models"] = models
+        # 3. 并发检测所有模型的可用性
+        availability_tasks = [
+            self.check_model_availability(model["alias"])
+            for model in models
+        ]
+
+        availabilities = await asyncio.gather(*availability_tasks, return_exceptions=True)
+
+        # 4. 组装结果
+        for model, available in zip(models, availabilities):
+            # 如果检测出错，默认为不可用
+            if isinstance(available, Exception):
+                logger.error(f"Exception checking {model['alias']}: {available}")
+                available = False
+
+            model_info["available_models"].append({
+                **model,
+                "available": available
+            })
 
         return model_info
 

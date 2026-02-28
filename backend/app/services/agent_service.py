@@ -4,6 +4,7 @@ Agent Service - Claude Code Subagent 业务逻辑层
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import yaml
+import shutil
 
 from app.repositories.agent_repository import AgentRepository
 from app.schemas.agent import (
@@ -32,13 +33,26 @@ class AgentService:
         同时创建文件和数据库记录
         """
         # 确定保存路径
-        if agent_data.scope == "project":
+        if agent_data.scope == "plugin":
+            # Plugin 级需要在 meta 中指定 plugin 名称
+            plugin_name = agent_data.meta.get("plugin_name") if agent_data.meta else None
+            if not plugin_name:
+                raise ConflictException("Plugin scope 需要在 meta 中指定 plugin_name")
+
+            # Plugin agents 直接保存在 plugin 根目录的 agents/ 下
+            agents_dir = Path.home() / ".claude" / "plugins" / plugin_name / "agents"
+
+            # 验证 plugin 是否存在
+            if not agents_dir.parent.exists():
+                raise NotFoundException(f"Plugin '{plugin_name}' 不存在")
+
+        elif agent_data.scope == "project":
             # 项目级需要在 meta 中指定项目路径
             project_path = agent_data.meta.get("project_path") if agent_data.meta else None
             if not project_path:
-                raise ConflictException("项目级子代理需要在 meta 中指定 project_path")
+                raise ConflictException("Project scope 需要在 meta 中指定 project_path")
             agents_dir = Path(project_path) / ".claude" / "agents"
-        else:
+        else:  # user
             agents_dir = settings.claude_config_dir / "agents"
 
         # 创建目录
@@ -179,11 +193,54 @@ class AgentService:
         if agent.is_builtin:
             raise ConflictException("内置子代理不支持修改")
 
+        # 检查是否修改了 scope
+        scope_changed = False
+        new_file_path = None
+
+        if agent_data.scope and agent_data.scope != agent.scope:
+            scope_changed = True
+            old_path = Path(agent.meta.get("path")) if agent.meta and agent.meta.get("path") else None
+
+            if not old_path or not old_path.exists():
+                raise ConflictException(f"无法找到原文件路径: {old_path}")
+
+            # 确定新路径
+            if agent_data.scope == "plugin":
+                plugin_name = agent_data.meta.get("plugin_name") if agent_data.meta else None
+                if not plugin_name:
+                    raise ConflictException("Plugin scope 需要在 meta 中指定 plugin_name")
+                new_dir = Path.home() / ".claude" / "plugins" / plugin_name / "agents"
+
+                # 验证 plugin 是否存在
+                if not new_dir.parent.exists():
+                    raise NotFoundException(f"Plugin '{plugin_name}' 不存在")
+
+            elif agent_data.scope == "project":
+                project_path = agent_data.meta.get("project_path") if agent_data.meta else None
+                if not project_path:
+                    raise ConflictException("Project scope 需要在 meta 中指定 project_path")
+                new_dir = Path(project_path) / ".claude" / "agents"
+            else:  # user
+                new_dir = settings.claude_config_dir / "agents"
+
+            # 创建新目录
+            new_dir.mkdir(parents=True, exist_ok=True)
+            new_file_path = new_dir / old_path.name
+
+            # 移动文件
+            shutil.move(str(old_path), str(new_file_path))
+            logger.info(f"Moved agent file from {old_path} to {new_file_path}")
+
+            # 更新 meta 中的路径
+            if not agent_data.meta:
+                agent_data.meta = {}
+            agent_data.meta["path"] = str(new_file_path)
+
         # 更新数据库
         updated_agent = await self.repository.update(agent_id, agent_data)
 
         # 如果有文件路径，同步更新文件
-        file_path = agent.meta.get("path") if agent.meta else None
+        file_path = new_file_path if scope_changed else (agent.meta.get("path") if agent.meta else None)
         if file_path and Path(file_path).exists():
             # 重新生成文件内容
             merged_data = agent_data.model_dump(exclude_unset=True)
