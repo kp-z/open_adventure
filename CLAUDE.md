@@ -145,3 +145,271 @@ frontend/src/
 - 创建文件前必须检查上述"文件组织规范"，将文件放到正确的目录
 - 生成截图、日志、文档时，自动使用规范的目录路径
 - 如发现根目录有不符合规范的文件，应立即移动到正确位置
+
+---
+
+## Release 发布规范
+
+### 版本号规则
+- 遵循语义化版本：`v{major}.{minor}.{patch}`
+- **Major**: 重大架构变更或不兼容更新
+- **Minor**: 新增功能或重要改进
+- **Patch**: Bug 修复和小优化
+
+### 发布前检查清单
+
+#### 1. 代码质量检查
+- [ ] 前端编译通过：`cd frontend && npm run build`
+- [ ] 后端无语法错误
+- [ ] 所有已知严重 Bug 已修复
+- [ ] 核心功能测试通过
+
+#### 2. 版本号更新
+- [ ] 更新 `frontend/package.json` 中的 `version` 字段
+- [ ] 确认版本号符合语义化版本规范
+
+#### 3. 文档准备
+- [ ] 创建 Release Notes：`docs/release-notes/RELEASE_NOTES_v{版本号}.md`
+- [ ] Release Notes 必须包含：
+  - 发布日期
+  - 本次更新重点（简要概述）
+  - 严重问题修复（🔴 标记）
+  - 中等问题修复（🟡 标记）
+  - 新增功能（✨ 标记）
+  - 文档更新（📝 标记）
+  - 升级指南（如有破坏性变更）
+  - 已知问题（如有）
+
+#### 4. 打包发布文件
+
+**必须同时发布 macOS 和 Linux 版本**
+
+##### macOS ARM64 版本
+```bash
+cd /Users/kp/项目/Proj
+tar \
+  --exclude='claude_manager/backend/venv' \
+  --exclude='claude_manager/backend/dist' \
+  --exclude='claude_manager/backend/build' \
+  --exclude='claude_manager/venv' \
+  --exclude='claude_manager/backend/__pycache__' \
+  --exclude='claude_manager/backend/app/__pycache__' \
+  --exclude='claude_manager/backend/app/*/__pycache__' \
+  --exclude='claude_manager/frontend/node_modules' \
+  --exclude='claude_manager/node_modules' \
+  --exclude='claude_manager/frontend/.vite' \
+  --exclude='claude_manager/.git' \
+  --exclude='claude_manager/dist' \
+  --exclude='claude_manager/release' \
+  --exclude='*.pyc' \
+  --exclude='.DS_Store' \
+  --exclude='claude_manager/docs/logs/*.log' \
+  --exclude='claude_manager/docs/releases' \
+  --exclude='claude_manager/.claude' \
+  --exclude='claude_manager/.figma' \
+  --exclude='claude_manager/.playwright-mcp' \
+  -czf /tmp/claude-manager-v{版本号}-macos-arm64.tar.gz claude_manager/
+
+mv /tmp/claude-manager-v{版本号}-macos-arm64.tar.gz claude_manager/docs/releases/
+```
+
+##### Linux x86_64 版本
+```bash
+cd /Users/kp/项目/Proj
+tar \
+  --exclude='claude_manager/backend/venv' \
+  --exclude='claude_manager/backend/dist' \
+  --exclude='claude_manager/backend/build' \
+  --exclude='claude_manager/venv' \
+  --exclude='claude_manager/backend/__pycache__' \
+  --exclude='claude_manager/backend/app/__pycache__' \
+  --exclude='claude_manager/backend/app/*/__pycache__' \
+  --exclude='claude_manager/frontend/node_modules' \
+  --exclude='claude_manager/node_modules' \
+  --exclude='claude_manager/frontend/.vite' \
+  --exclude='claude_manager/.git' \
+  --exclude='claude_manager/dist' \
+  --exclude='claude_manager/release' \
+  --exclude='*.pyc' \
+  --exclude='.DS_Store' \
+  --exclude='claude_manager/docs/logs/*.log' \
+  --exclude='claude_manager/docs/releases' \
+  --exclude='claude_manager/.claude' \
+  --exclude='claude_manager/.figma' \
+  --exclude='claude_manager/.playwright-mcp' \
+  -czf /tmp/claude-manager-v{版本号}-linux-x86_64.tar.gz claude_manager/
+
+mv /tmp/claude-manager-v{版本号}-linux-x86_64.tar.gz claude_manager/docs/releases/
+```
+
+**打包规范**：
+- 必须排除 `node_modules`、`venv`、`dist`、`build`、`.git` 等目录
+- 必须排除日志文件和已有的 releases 目录
+- 必须排除临时文件和缓存目录
+- 压缩包大小应控制在 100MB 以内（理想情况 < 70MB）
+
+#### 5. Git 提交和标签
+
+##### 提交代码
+```bash
+git add -A
+git commit -m "Release v{版本号}: {简要描述}
+
+🔴 严重问题修复:
+- {修复内容}
+
+🟡 中等问题修复:
+- {修复内容}
+
+✨ 新增功能:
+- {功能描述}
+
+📝 文档更新:
+- {文档更新}
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
+```
+
+##### 创建标签
+```bash
+git tag -a v{版本号} -m "Release v{版本号}
+
+🔴 严重问题修复:
+- {修复内容}
+
+🟡 中等问题修复:
+- {修复内容}
+
+✨ 新增功能:
+- {功能描述}
+
+📝 文档更新:
+- {文档更新}"
+```
+
+##### 推送到 GitHub
+```bash
+git push origin main
+git push origin v{版本号}
+```
+
+#### 6. 创建 GitHub Release
+
+**必须同时上传 macOS 和 Linux 版本**
+
+```bash
+gh release create v{版本号} \
+  --title "v{版本号} - {简要标题}" \
+  --notes-file docs/release-notes/RELEASE_NOTES_v{版本号}.md \
+  docs/releases/claude-manager-v{版本号}-macos-arm64.tar.gz \
+  docs/releases/claude-manager-v{版本号}-linux-x86_64.tar.gz
+```
+
+**GitHub Release 规范**：
+- 标题格式：`v{版本号} - {简要描述}`
+- 必须使用 Release Notes 文件作为说明
+- 必须同时上传 macOS 和 Linux 两个平台的压缩包
+- 压缩包命名必须包含平台和架构信息
+
+### 发布后验证
+
+#### 1. 验证 GitHub Release
+- [ ] 访问 Release 页面确认发布成功
+- [ ] 确认两个平台的压缩包都已上传
+- [ ] 确认 Release Notes 显示正确
+
+#### 2. 验证压缩包
+```bash
+# 下载并解压测试
+wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/claude-manager-v{版本号}-macos-arm64.tar.gz
+tar -xzf claude-manager-v{版本号}-macos-arm64.tar.gz
+cd claude-manager
+./start.sh
+```
+
+- [ ] 压缩包可以正常解压
+- [ ] 启动脚本可以正常运行
+- [ ] 前端和后端都能正常启动
+- [ ] 核心功能可以正常使用
+
+#### 3. 更新文档索引
+- [ ] 更新 `docs/README_INDEX.md` 中的 release-notes 部分
+- [ ] 确认新版本的文档链接正确
+
+### 注意事项
+
+1. **版本号一致性**
+   - `frontend/package.json` 的 version
+   - Git 标签
+   - Release Notes 文件名
+   - 压缩包文件名
+   - GitHub Release 标题
+   - 以上所有位置的版本号必须完全一致
+
+2. **平台支持**
+   - 必须同时发布 macOS ARM64 和 Linux x86_64 版本
+   - 如果某个平台无法测试，必须在 Release Notes 中说明
+
+3. **文件大小限制**
+   - GitHub 单文件建议不超过 50MB
+   - 如果超过 100MB，考虑使用 Git LFS 或外部托管
+   - 优先优化打包内容，减少不必要的文件
+
+4. **破坏性变更**
+   - 如有破坏性变更，必须在 Release Notes 中明确说明
+   - 必须提供详细的升级指南
+   - Major 版本号必须递增
+
+5. **回滚准备**
+   - 保留上一个版本的压缩包
+   - 记录数据库 schema 变更
+   - 准备回滚脚本（如需要）
+
+### 发布流程总结
+
+```bash
+# 1. 更新版本号
+# 编辑 frontend/package.json
+
+# 2. 构建前端
+cd frontend && npm run build
+
+# 3. 创建 Release Notes
+# 创建 docs/release-notes/RELEASE_NOTES_v{版本号}.md
+
+# 4. 打包两个平台版本
+# 执行上述 macOS 和 Linux 打包命令
+
+# 5. Git 提交和标签
+git add -A
+git commit -m "Release v{版本号}: ..."
+git tag -a v{版本号} -m "..."
+git push origin main
+git push origin v{版本号}
+
+# 6. 创建 GitHub Release
+gh release create v{版本号} \
+  --title "v{版本号} - ..." \
+  --notes-file docs/release-notes/RELEASE_NOTES_v{版本号}.md \
+  docs/releases/claude-manager-v{版本号}-macos-arm64.tar.gz \
+  docs/releases/claude-manager-v{版本号}-linux-x86_64.tar.gz
+
+# 7. 验证发布
+# 下载并测试压缩包
+```
+
+### 快速发布命令（AI 助手使用）
+
+当用户要求"发布新版本 release"时，AI 助手应该：
+
+1. 询问版本号（如果未指定）
+2. 确认是否已完成所有修改
+3. 按照上述流程执行：
+   - 更新版本号
+   - 构建前端
+   - 创建 Release Notes
+   - 打包 macOS 和 Linux 版本
+   - Git 提交和标签
+   - 创建 GitHub Release（同时上传两个平台）
+4. 验证发布成功
+5. 提供 Release 链接给用户
