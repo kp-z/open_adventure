@@ -8,6 +8,7 @@ import select
 import struct
 import fcntl
 import termios
+import uuid
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 
@@ -21,14 +22,12 @@ from app.services.project_path_service import ProjectPathService
 
 router = APIRouter()
 
-# 超时配置：15 分钟（900 秒）
-TERMINAL_TIMEOUT_SECONDS = int(os.getenv("TERMINAL_TIMEOUT_SECONDS", "900"))
-
 
 class TerminalSession:
     """Manages a PTY terminal session"""
 
-    def __init__(self, initial_dir: Optional[str] = None, auto_start_claude: bool = False):
+    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False):
+        self.session_id = session_id
         self.master_fd = None
         self.pid = None
         self.running = False
@@ -36,6 +35,18 @@ class TerminalSession:
         self.created_at = datetime.now()
         self.initial_dir = initial_dir
         self.auto_start_claude = auto_start_claude
+        self.websocket = None  # 当前连接的 WebSocket
+
+    def is_process_alive(self) -> bool:
+        """检查 PTY 进程是否还在运行"""
+        if not self.pid:
+            return False
+        try:
+            # 发送信号 0 检查进程是否存在
+            os.kill(self.pid, 0)
+            return True
+        except (OSError, ProcessLookupError):
+            return False
 
     def start(self):
         """Start a new PTY session"""
@@ -109,6 +120,7 @@ class TerminalSession:
     def close(self):
         """Close the terminal session"""
         self.running = False
+        self.websocket = None
         if self.master_fd:
             try:
                 os.close(self.master_fd)
@@ -121,50 +133,46 @@ class TerminalSession:
             except (OSError, ChildProcessError):
                 pass
 
-    def is_timeout(self) -> bool:
-        """Check if session has timed out"""
-        elapsed = (datetime.now() - self.last_activity).total_seconds()
-        return elapsed > TERMINAL_TIMEOUT_SECONDS
 
-
-# Store active sessions
+# Store active sessions - 使用持久化的 session ID
 sessions: Dict[str, TerminalSession] = {}
 
 # 后台清理任务
 cleanup_task = None
 
 
-async def cleanup_inactive_sessions():
-    """后台任务：定期清理超时的终端会话"""
+async def cleanup_dead_sessions():
+    """后台任务：定期清理已经结束的终端会话"""
     while True:
         try:
             await asyncio.sleep(60)  # 每分钟检查一次
 
             # 检查所有会话
-            timeout_sessions = []
+            dead_sessions = []
             for session_id, session in sessions.items():
-                if session.is_timeout():
-                    timeout_sessions.append(session_id)
-                    print(f"Session {session_id} timed out after {TERMINAL_TIMEOUT_SECONDS}s of inactivity")
+                # 只清理进程已经结束的会话
+                if not session.is_process_alive():
+                    dead_sessions.append(session_id)
+                    print(f"[Terminal] Session {session_id} process died (PID: {session.pid})")
 
-            # 关闭超时的会话
-            for session_id in timeout_sessions:
+            # 关闭已死亡的会话
+            for session_id in dead_sessions:
                 session = sessions.get(session_id)
                 if session:
                     session.close()
                     del sessions[session_id]
-                    print(f"Cleaned up session: {session_id}")
+                    print(f"[Terminal] Cleaned up dead session: {session_id}")
 
         except Exception as e:
-            print(f"Error in cleanup task: {e}")
+            print(f"[Terminal] Error in cleanup task: {e}")
 
 
 def start_cleanup_task():
     """启动后台清理任务"""
     global cleanup_task
     if cleanup_task is None:
-        cleanup_task = asyncio.create_task(cleanup_inactive_sessions())
-        print(f"Terminal cleanup task started (timeout: {TERMINAL_TIMEOUT_SECONDS}s)")
+        cleanup_task = asyncio.create_task(cleanup_dead_sessions())
+        print(f"[Terminal] Cleanup task started (only removes dead processes)")
 
 
 def stop_cleanup_task():
@@ -173,58 +181,100 @@ def stop_cleanup_task():
     if cleanup_task:
         cleanup_task.cancel()
         cleanup_task = None
-        print("Terminal cleanup task stopped")
+        print("[Terminal] Cleanup task stopped")
 
 
 @router.websocket("/ws")
 async def terminal_websocket(
     websocket: WebSocket,
     db: AsyncSession = Depends(get_db),
-    project_path: str = None
+    project_path: str = None,
+    session_id: str = None  # 支持重新连接到已存在的 session
 ):
     """WebSocket endpoint for terminal interaction"""
     await websocket.accept()
-    print(f"[Terminal] WebSocket connection accepted, project_path param: {project_path}")
 
-    # Get project path from URL parameter or use first enabled path
-    initial_dir = None
-    auto_start_claude = False
+    print(f"[Terminal] ========== NEW WEBSOCKET CONNECTION ==========")
+    print(f"[Terminal] Requested session ID: {session_id}")
+    print(f"[Terminal] Project path param: {project_path}")
+    print(f"[Terminal] Active sessions before: {len(sessions)}")
+    print(f"[Terminal] Active session IDs: {list(sessions.keys())}")
 
-    if project_path:
-        # Use the specified project path
-        initial_dir = project_path
-        auto_start_claude = True
-        print(f"[Terminal] Using specified project path: {initial_dir}")
+    # 检查是否要重新连接到已存在的 session
+    if session_id and session_id in sessions:
+        session = sessions[session_id]
+        print(f"[Terminal] Reconnecting to existing session: {session_id}")
+        print(f"[Terminal] Session PID: {session.pid}, Process alive: {session.is_process_alive()}")
+
+        if not session.is_process_alive():
+            print(f"[Terminal] Session {session_id} process is dead, creating new session")
+            session.close()
+            del sessions[session_id]
+            session_id = None  # 创建新 session
+        else:
+            # 重新连接到已存在的 session
+            session.websocket = websocket
+            print(f"[Terminal] Successfully reconnected to session {session_id}")
+
+            # 发送重连成功消息
+            await websocket.send_text("\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n")
     else:
-        # Get first enabled project path from database
-        try:
-            repository = ProjectPathRepository(db)
-            service = ProjectPathService(repository)
-            enabled_paths = await service.get_enabled_paths()
-            print(f"[Terminal] Found {len(enabled_paths)} enabled project paths")
+        session_id = None  # 创建新 session
 
-            if enabled_paths:
-                # Use the first enabled project path
-                first_path = enabled_paths[0]
-                initial_dir = first_path.path
-                auto_start_claude = True
-                print(f"[Terminal] Will start in project directory: {initial_dir}")
-                print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
-        except Exception as e:
-            print(f"[Terminal] Failed to get project paths: {e}")
-            # Continue with default behavior (home directory)
+    # 如果没有找到已存在的 session，创建新的
+    if session_id is None:
+        session_id = str(uuid.uuid4())
+        print(f"[Terminal] Creating new session with ID: {session_id}")
 
-    # Create a new terminal session
-    session = TerminalSession(initial_dir=initial_dir, auto_start_claude=auto_start_claude)
-    session_id = str(id(websocket))
-    sessions[session_id] = session
+        # Get project path from URL parameter or use first enabled path
+        initial_dir = None
+        auto_start_claude = False
+
+        if project_path:
+            # Use the specified project path
+            initial_dir = project_path
+            auto_start_claude = True
+            print(f"[Terminal] Using specified project path: {initial_dir}")
+        else:
+            # Get first enabled project path from database
+            try:
+                repository = ProjectPathRepository(db)
+                service = ProjectPathService(repository)
+                enabled_paths = await service.get_enabled_paths()
+                print(f"[Terminal] Found {len(enabled_paths)} enabled project paths")
+
+                if enabled_paths:
+                    # Use the first enabled project path
+                    first_path = enabled_paths[0]
+                    initial_dir = first_path.path
+                    auto_start_claude = True
+                    print(f"[Terminal] Will start in project directory: {initial_dir}")
+                    print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
+            except Exception as e:
+                print(f"[Terminal] Failed to get project paths: {e}")
+                # Continue with default behavior (home directory)
+
+        # Create a new terminal session
+        session = TerminalSession(session_id=session_id, initial_dir=initial_dir, auto_start_claude=auto_start_claude)
+        print(f"[Terminal] Creating new TerminalSession with ID: {session_id}")
+        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}")
+        sessions[session_id] = session
+        session.websocket = websocket
+        print(f"[Terminal] Active sessions after: {len(sessions)}")
+
+        # Send session ID to client
+        await websocket.send_text(f"\x1b]0;SESSION_ID:{session_id}\x07")  # 使用 OSC 序列发送 session ID
 
     try:
-        # Start the PTY
-        session.start()
+        # Start the PTY (only for new sessions)
+        is_new_session = not session.running
+        if is_new_session:
+            print(f"[Terminal] Starting PTY for session {session_id}...")
+            session.start()
+            print(f"[Terminal] PTY started successfully - PID: {session.pid}, FD: {session.master_fd}")
 
-        # If auto_start_claude is enabled, send commands after a short delay
-        if auto_start_claude and initial_dir:
+        # If auto_start_claude is enabled, send commands after a short delay (only for new sessions)
+        if auto_start_claude and initial_dir and is_new_session:
             print(f"[Terminal] Setting up auto-start commands for: {initial_dir}")
             async def send_startup_commands():
                 """Send cd and claude commands after shell is ready"""
@@ -297,14 +347,20 @@ async def terminal_websocket(
         )
 
     except WebSocketDisconnect:
-        print(f"WebSocket disconnected: {session_id}")
+        print(f"[Terminal] WebSocket disconnected: {session_id}")
     except Exception as e:
-        print(f"Terminal error: {e}")
+        print(f"[Terminal] Terminal error for session {session_id}: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
-        # Clean up
-        session.close()
+        # Clean up - 只断开 WebSocket，不关闭 session
+        print(f"[Terminal] WebSocket disconnected for session {session_id}...")
         if session_id in sessions:
-            del sessions[session_id]
+            session = sessions[session_id]
+            session.websocket = None  # 断开 WebSocket 连接
+            print(f"[Terminal] Session {session_id} WebSocket disconnected, but session kept alive")
+            print(f"[Terminal] Session PID: {session.pid}, Process alive: {session.is_process_alive()}")
+        print(f"[Terminal] Active sessions remaining: {len(sessions)}")
         try:
             await websocket.close()
         except:
@@ -314,8 +370,33 @@ async def terminal_websocket(
 @router.get("/status")
 async def terminal_status():
     """Get terminal service status"""
+    active_sessions = []
+    for session_id, session in sessions.items():
+        active_sessions.append({
+            "session_id": session_id,
+            "pid": session.pid,
+            "running": session.running,
+            "process_alive": session.is_process_alive(),
+            "initial_dir": session.initial_dir,
+            "created_at": session.created_at.isoformat(),
+            "last_activity": session.last_activity.isoformat(),
+        })
+
     return JSONResponse({
         "available": True,
-        "active_sessions": len(sessions),
+        "active_sessions_count": len(sessions),
+        "active_sessions": active_sessions,
         "platform": os.name,
     })
+
+
+@router.post("/sessions/{session_id}/close")
+async def close_session(session_id: str):
+    """手动关闭指定的 terminal session"""
+    if session_id in sessions:
+        session = sessions[session_id]
+        session.close()
+        del sessions[session_id]
+        return JSONResponse({"success": True, "message": f"Session {session_id} closed"})
+    else:
+        return JSONResponse({"success": False, "message": f"Session {session_id} not found"}, status_code=404)
