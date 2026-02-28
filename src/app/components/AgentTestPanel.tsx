@@ -247,6 +247,18 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     };
   }, [testHistory]);
 
+  // 处理模式切换，带确认对话框
+  const handleModeSwitch = (newMode: ViewMode) => {
+    if (isRunning) {
+      if (confirm('当前有正在执行的任务，切换模式将中断执行，是否继续？')) {
+        setViewMode(newMode);
+        setIsRunning(false); // 重置运行状态
+      }
+    } else {
+      setViewMode(newMode);
+    }
+  };
+
   // 滚动到输出区域
   useEffect(() => {
     if (currentOutput && outputRef.current) {
@@ -608,7 +620,7 @@ Agent 描述: ${agent.description}
               </h3>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setViewMode('chat')}
+                  onClick={() => handleModeSwitch('chat')}
                   className={`p-2 rounded-lg transition-all ${
                     viewMode === 'chat'
                       ? 'bg-blue-500/20 text-blue-400'
@@ -619,7 +631,7 @@ Agent 描述: ${agent.description}
                   <MessageSquare size={16} />
                 </button>
                 <button
-                  onClick={() => setViewMode('terminal')}
+                  onClick={() => handleModeSwitch('terminal')}
                   className={`p-2 rounded-lg transition-all ${
                     viewMode === 'terminal'
                       ? 'bg-green-500/20 text-green-400'

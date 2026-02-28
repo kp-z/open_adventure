@@ -18,33 +18,44 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentInputRef = useRef<string>('');
+
+  const MAX_RETRIES = 3;
 
   // 自动滚动到最新消息
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isRunning) return;
+  const handleSend = async (retryInput?: string) => {
+    const messageContent = retryInput || input.trim();
+    if (!messageContent || isRunning) return;
+
+    // 保存当前输入用于重试
+    currentInputRef.current = messageContent;
 
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: input.trim(),
+      content: messageContent,
       timestamp: new Date().toISOString(),
       status: 'success',
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    // 只在非重试时添加用户消息
+    if (!retryInput) {
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+    }
     setIsRunning(true);
 
     const agentMessageId = `agent-${Date.now()}`;
     const agentMessage: ChatMessage = {
       id: agentMessageId,
       role: 'agent',
-      content: '',
+      content: retryCount > 0 ? `正在重试 (${retryCount}/${MAX_RETRIES})...\n` : '',
       timestamp: new Date().toISOString(),
       status: 'sending',
     };
@@ -52,12 +63,12 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
     setMessages((prev) => [...prev, agentMessage]);
 
     const startTime = Date.now();
-    let fullOutput = '';
+    let fullOutput = retryCount > 0 ? `正在重试 (${retryCount}/${MAX_RETRIES})...\n` : '';
 
     try {
       agentsApi.testStream(
         agentId,
-        userMessage.content,
+        messageContent,
         // onLog
         (log: string) => {
           fullOutput += log + '\n';
@@ -80,11 +91,12 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
             )
           );
           setIsRunning(false);
+          setRetryCount(0); // 成功后重置重试计数
 
           // 保存到测试历史
           onTestComplete({
             id: `test-${Date.now()}`,
-            input: userMessage.content,
+            input: messageContent,
             output: data.output,
             success: data.success,
             duration: data.duration,
@@ -95,37 +107,97 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
         },
         // onError
         (error: string) => {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMessageId
-                ? { ...msg, content: error, status: 'error' }
-                : msg
-            )
-          );
-          setIsRunning(false);
+          // 重试逻辑
+          if (retryCount < MAX_RETRIES) {
+            const nextRetryCount = retryCount + 1;
+            setRetryCount(nextRetryCount);
 
-          onTestComplete({
-            id: `test-${Date.now()}`,
-            input: userMessage.content,
-            output: error,
-            success: false,
-            duration: (Date.now() - startTime) / 1000,
-            timestamp: new Date().toISOString(),
-            model: 'unknown',
-            agentId,
-          });
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === agentMessageId
+                  ? {
+                      ...msg,
+                      content: `${fullOutput}\n⚠️ 请求失败，${2}秒后自动重试 (${nextRetryCount}/${MAX_RETRIES})...`,
+                      status: 'error'
+                    }
+                  : msg
+              )
+            );
+
+            setIsRunning(false);
+
+            setTimeout(() => {
+              handleSend(currentInputRef.current);
+            }, 2000);
+          } else {
+            // 达到最大重试次数
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === agentMessageId
+                  ? {
+                      ...msg,
+                      content: `${error}\n\n❌ 已达到最大重试次数 (${MAX_RETRIES})，请稍后再试`,
+                      status: 'error'
+                    }
+                  : msg
+              )
+            );
+            setIsRunning(false);
+            setRetryCount(0);
+
+            onTestComplete({
+              id: `test-${Date.now()}`,
+              input: messageContent,
+              output: error,
+              success: false,
+              duration: (Date.now() - startTime) / 1000,
+              timestamp: new Date().toISOString(),
+              model: 'unknown',
+              agentId,
+            });
+          }
         }
       );
     } catch (error) {
       console.error('Send message failed:', error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === agentMessageId
-            ? { ...msg, content: '发送失败，请重试', status: 'error' }
-            : msg
-        )
-      );
-      setIsRunning(false);
+
+      // 重试逻辑
+      if (retryCount < MAX_RETRIES) {
+        const nextRetryCount = retryCount + 1;
+        setRetryCount(nextRetryCount);
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === agentMessageId
+              ? {
+                  ...msg,
+                  content: `发送失败，${2}秒后自动重试 (${nextRetryCount}/${MAX_RETRIES})...`,
+                  status: 'error'
+                }
+              : msg
+          )
+        );
+
+        setIsRunning(false);
+
+        setTimeout(() => {
+          handleSend(currentInputRef.current);
+        }, 2000);
+      } else {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === agentMessageId
+              ? {
+                  ...msg,
+                  content: `发送失败\n\n❌ 已达到最大重试次数 (${MAX_RETRIES})，请稍后再试`,
+                  status: 'error'
+                }
+              : msg
+          )
+        );
+        setIsRunning(false);
+        setRetryCount(0);
+      }
     }
   };
 

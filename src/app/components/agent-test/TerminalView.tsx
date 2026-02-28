@@ -33,6 +33,10 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
     isConnected: false,
     isReady: false,
   });
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const MAX_RECONNECT_ATTEMPTS = 3;
 
   // 初始化终端
   useEffect(() => {
@@ -74,6 +78,10 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
       window.removeEventListener('resize', handleResize);
       terminal.dispose();
       xtermRef.current = null;
+      // 清理重连定时器
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -88,6 +96,7 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
     ws.onopen = () => {
       terminal.writeln('$ Connected to agent session');
       setSession(prev => ({ ...prev, ws, isConnected: true }));
+      setReconnectAttempts(0); // 连接成功后重置重连计数
 
       // 发送终端尺寸
       if (fitAddonRef.current) {
@@ -147,7 +156,22 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
 
     ws.onclose = () => {
       terminal.writeln('\r\n$ Connection closed\r\n');
-      setSession({ ws: null, isConnected: false, isReady: false });
+
+      // 重连逻辑
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        const nextAttempt = reconnectAttempts + 1;
+        terminal.writeln(`$ Reconnecting in 2 seconds... (${nextAttempt}/${MAX_RECONNECT_ATTEMPTS})\r\n`);
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          setReconnectAttempts(nextAttempt);
+          setSession({ ws: null, isConnected: false, isReady: false });
+        }, 2000);
+      } else {
+        terminal.writeln(`\x1b[31m$ Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts\x1b[0m\r\n`);
+        terminal.writeln('$ Please refresh the page to try again\r\n');
+        setSession({ ws: null, isConnected: false, isReady: false });
+        setReconnectAttempts(0);
+      }
     };
 
     // 处理用户输入
@@ -164,8 +188,12 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
       if (ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
+      // 清理重连定时器
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
     };
-  }, [agentId, agentName, session.isConnected, onTestComplete]);
+  }, [agentId, agentName, session.isConnected, reconnectAttempts, onTestComplete]);
 
   return (
     <div className="h-[500px] bg-black/60 rounded-xl p-4">
