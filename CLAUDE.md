@@ -199,12 +199,12 @@ tar \
   --exclude='claude_manager/node_modules' \
   --exclude='claude_manager/frontend/.vite' \
   --exclude='claude_manager/.git' \
+  --exclude='claude_manager/frontend/.git' \
   --exclude='claude_manager/dist' \
   --exclude='claude_manager/release' \
+  --exclude='claude_manager/docs' \
   --exclude='*.pyc' \
   --exclude='.DS_Store' \
-  --exclude='claude_manager/docs/logs/*.log' \
-  --exclude='claude_manager/docs/releases' \
   --exclude='claude_manager/.claude' \
   --exclude='claude_manager/.figma' \
   --exclude='claude_manager/.playwright-mcp' \
@@ -228,12 +228,12 @@ tar \
   --exclude='claude_manager/node_modules' \
   --exclude='claude_manager/frontend/.vite' \
   --exclude='claude_manager/.git' \
+  --exclude='claude_manager/frontend/.git' \
   --exclude='claude_manager/dist' \
   --exclude='claude_manager/release' \
+  --exclude='claude_manager/docs' \
   --exclude='*.pyc' \
   --exclude='.DS_Store' \
-  --exclude='claude_manager/docs/logs/*.log' \
-  --exclude='claude_manager/docs/releases' \
   --exclude='claude_manager/.claude' \
   --exclude='claude_manager/.figma' \
   --exclude='claude_manager/.playwright-mcp' \
@@ -243,10 +243,15 @@ mv /tmp/claude-manager-v{版本号}-linux-x86_64.tar.gz claude_manager/docs/rele
 ```
 
 **打包规范**：
-- 必须排除 `node_modules`、`venv`、`dist`、`build`、`.git` 等目录
-- 必须排除日志文件和已有的 releases 目录
-- 必须排除临时文件和缓存目录
-- 压缩包大小应控制在 100MB 以内（理想情况 < 70MB）
+- 必须排除 `node_modules`、`venv`、`dist`、`build`、`.git`（包括子目录的 `.git`）等目录
+- **必须排除整个 `docs` 目录**（包含开发文档、设计资源、历史版本，不需要分发给用户）
+- 必须排除临时文件和缓存目录（`.claude`、`.figma`、`.playwright-mcp`、`.vite`、`__pycache__`）
+- 压缩包应仅包含运行所需的核心文件：
+  - 后端代码（`backend/app/`、`backend/alembic/` 等）
+  - 前端代码（`frontend/src/`、`frontend/dist/`、`frontend/public/` 等）
+  - 配置文件（`README.md`、`start.sh`、`requirements.txt`、`package.json`、`.env.example` 等）
+  - 工具脚本（`scripts/`）
+- 压缩包大小应控制在 **5MB 以内**（理想情况 < 3MB）
 
 #### 5. Git 提交和标签
 
