@@ -921,37 +921,59 @@ async def agent_terminal(
             system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
 
         # 创建一个交互式会话命令
-        # 使用 claude 命令启动交互式会话
-        agent_command = f'{cli_path} --setting-sources user'
-
-        # 如果指定了模型，添加模型参数
+        # 使用 bash 作为 shell，保持交互式
+        # 在 bash 中运行 claude 命令
+        claude_args = '--setting-sources user'
         if agent.model and agent.model != "inherit":
-            agent_command += f' --model {agent.model}'
+            claude_args += f' --model {agent.model}'
+
+        # 使用 bash -i 启动交互式 shell
+        agent_command = f'bash -i'
 
         print(f"[AgentTerminal] Starting agent session with command: {agent_command}")
+        print(f"[AgentTerminal] Claude CLI path: {cli_path}")
+        print(f"[AgentTerminal] Claude args: {claude_args}")
 
         session = TerminalSession(agent_id, agent.name, agent_command)
 
         try:
             await session.start(websocket)
+            print(f"[AgentTerminal] Session started, entering message loop")
 
-            while session.running:
+            # 改进的 WebSocket 循环 - 不依赖 session.running
+            # 而是依赖 WebSocket 连接状态
+            while True:
                 try:
-                    data = await websocket.receive_text()
+                    # 使用超时来避免无限阻塞
+                    data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
                     message = json.loads(data)
+                    print(f"[AgentTerminal] Received message: {message.get('type')}")
 
                     if message['type'] == 'input':
                         await session.write_input(message['data'])
                     elif message['type'] == 'resize':
                         await session.resize(message['cols'], message['rows'])
                     elif message['type'] == 'close':
+                        print(f"[AgentTerminal] Received close message")
                         break
+                except asyncio.TimeoutError:
+                    # 超时是正常的，继续循环
+                    # 检查 session 是否还在运行
+                    if not session.running:
+                        print(f"[AgentTerminal] Session stopped running")
+                        # 不立即退出，等待用户关闭或继续接收消息
+                        pass
+                    continue
                 except WebSocketDisconnect:
                     print(f"[AgentTerminal] WebSocket disconnected for agent {agent_id}")
                     break
                 except Exception as e:
                     print(f"[AgentTerminal] Error processing message: {e}")
+                    import traceback
+                    traceback.print_exc()
                     break
+
+            print(f"[AgentTerminal] Exiting message loop")
 
         except Exception as e:
             print(f"[AgentTerminal] Session error: {e}")

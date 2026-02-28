@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat API 测试</title>
+    <style>
+        body {
+            font-family: monospace;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        #output {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            min-height: 300px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .error {
+            color: #ff6b6b;
+        }
+        .success {
+            color: #51cf66;
+        }
+        .log {
+            color: #74c0fc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat API 测试</h1>
+    <p>测试 Agent Test Stream API</p>
+
+    <button onclick="testChatAPI()">测试 Chat API</button>
+
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+
+        function log(message, type = 'log') {
+            const line = document.createElement('div');
+            line.className = type;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            while (output.firstChild) {
+                output.removeChild(output.firstChild);
+            }
+        }
+
+        async function testChatAPI() {
+            clearOutput();
+            log('开始测试...', 'log');
+
+            const agentId = 18; // Bash agent
+            const prompt = 'hello';
+            const url = `http://localhost:8000/api/agents/${agentId}/test-stream?prompt=${encodeURIComponent(prompt)}`;
+
+            log(`请求 URL: ${url}`, 'log');
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+
+                log('连接成功，开始接收数据...', 'success');
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                        log('数据接收完成', 'success');
+                        break;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const jsonStr = line.substring(6).trim();
+                                if (!jsonStr) continue;
+
+                                const event = JSON.parse(jsonStr);
+
+                                if (event.type === 'log') {
+                                    log(`[LOG] ${event.message}`, 'log');
+                                } else if (event.type === 'complete') {
+                                    log(`[COMPLETE] 成功: ${event.data.success}`, 'success');
+                                    log(`[COMPLETE] 输出: ${event.data.output}`, 'success');
+                                    log(`[COMPLETE] 耗时: ${event.data.duration}s`, 'success');
+                                    log(`[COMPLETE] 模型: ${event.data.model}`, 'success');
+                                } else if (event.type === 'error') {
+                                    log(`[ERROR] ${event.message}`, 'error');
+                                }
+                            } catch (e) {
+                                log(`解析错误: ${e.message}`, 'error');
+                                log(`原始数据: ${line}`, 'error');
+                            }
+                        }
+                    }
+                }
+
+                // 处理缓冲区中剩余的数据
+                if (buffer.trim() && buffer.startsWith('data: ')) {
+                    try {
+                        const jsonStr = buffer.substring(6).trim();
+                        if (jsonStr) {
+                            const event = JSON.parse(jsonStr);
+                            if (event.type === 'log') {
+                                log(`[LOG] ${event.message}`, 'log');
+                            } else if (event.type === 'complete') {
+                                log(`[COMPLETE] ${JSON.stringify(event.data)}`, 'success');
+                            } else if (event.type === 'error') {
+                                log(`[ERROR] ${event.message}`, 'error');
+                            }
+                        }
+                    } catch (e) {
+                        log(`解析最后数据错误: ${e.message}`, 'error');
+                    }
+                }
+
+            } catch (error) {
+                log(`请求失败: ${error.message}`, 'error');
+                console.error('详细错误:', error);
+            }
+        }
+    </script>
+</body>
+</html>
