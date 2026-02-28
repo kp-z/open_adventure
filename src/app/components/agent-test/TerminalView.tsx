@@ -77,6 +77,96 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
     };
   }, []);
 
+  // 建立 WebSocket 连接
+  useEffect(() => {
+    if (!xtermRef.current || session.isConnected) return;
+
+    const terminal = xtermRef.current;
+    const wsUrl = `ws://localhost:8000/agents/${agentId}/terminal`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      terminal.writeln('$ Connected to agent session');
+      setSession(prev => ({ ...prev, ws, isConnected: true }));
+
+      // 发送终端尺寸
+      if (fitAddonRef.current) {
+        ws.send(JSON.stringify({
+          type: 'resize',
+          cols: terminal.cols,
+          rows: terminal.rows,
+        }));
+      }
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+
+        switch (message.type) {
+          case 'output':
+            terminal.write(message.data);
+            break;
+
+          case 'ready':
+            terminal.writeln(`\r\n$ ${message.message}`);
+            terminal.writeln(`$ Agent "${agentName}" ready. Type your message and press Enter.\r\n`);
+            setSession(prev => ({ ...prev, isReady: true }));
+            break;
+
+          case 'exit':
+            terminal.writeln(`\r\n$ Session ended (exit code: ${message.code})`);
+            setSession(prev => ({ ...prev, isReady: false }));
+
+            // 保存到测试历史
+            onTestComplete({
+              id: `test-${Date.now()}`,
+              input: 'Terminal session',
+              output: message.output || '',
+              success: message.code === 0,
+              duration: 0,
+              timestamp: new Date().toISOString(),
+              model: 'terminal',
+              agentId,
+            });
+            break;
+
+          case 'error':
+            terminal.writeln(`\r\n\x1b[31mError: ${message.message}\x1b[0m\r\n`);
+            break;
+        }
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      terminal.writeln('\r\n\x1b[31m$ Connection error\x1b[0m\r\n');
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      terminal.writeln('\r\n$ Connection closed\r\n');
+      setSession({ ws: null, isConnected: false, isReady: false });
+    };
+
+    // 处理用户输入
+    terminal.onData((data) => {
+      if (session.isReady && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'input',
+          data,
+        }));
+      }
+    });
+
+    return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, [agentId, agentName, session.isConnected, onTestComplete]);
+
   return (
     <div className="h-[500px] bg-black/60 rounded-xl p-4">
       <div ref={terminalRef} className="h-full" />
