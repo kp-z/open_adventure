@@ -29,7 +29,7 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
     if (!input.trim() || isRunning) return;
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: `user-${Date.now()}`,
       role: 'user',
       content: input.trim(),
       timestamp: new Date().toISOString(),
@@ -40,31 +40,91 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
     setInput('');
     setIsRunning(true);
 
-    try {
-      // TODO: 实际调用 Agent 测试 API
-      // const result = await agentsApi.testAgent(agentId, input.trim());
+    const agentMessageId = `agent-${Date.now()}`;
+    const agentMessage: ChatMessage = {
+      id: agentMessageId,
+      role: 'agent',
+      content: '',
+      timestamp: new Date().toISOString(),
+      status: 'sending',
+    };
 
-      // 模拟 Agent 响应
-      setTimeout(() => {
-        const agentMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'agent',
-          content: `收到消息: ${input.trim()}`,
-          timestamp: new Date().toISOString(),
-          status: 'success',
-        };
-        setMessages((prev) => [...prev, agentMessage]);
-        setIsRunning(false);
-      }, 1000);
+    setMessages((prev) => [...prev, agentMessage]);
+
+    const startTime = Date.now();
+    let fullOutput = '';
+
+    try {
+      agentsApi.testStream(
+        agentId,
+        userMessage.content,
+        // onLog
+        (log: string) => {
+          fullOutput += log + '\n';
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMessageId
+                ? { ...msg, content: fullOutput }
+                : msg
+            )
+          );
+        },
+        // onComplete
+        (data) => {
+          const duration = (Date.now() - startTime) / 1000;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMessageId
+                ? { ...msg, content: data.output, status: 'success' }
+                : msg
+            )
+          );
+          setIsRunning(false);
+
+          // 保存到测试历史
+          onTestComplete({
+            id: `test-${Date.now()}`,
+            input: userMessage.content,
+            output: data.output,
+            success: data.success,
+            duration: data.duration,
+            timestamp: new Date().toISOString(),
+            model: data.model,
+            agentId,
+          });
+        },
+        // onError
+        (error: string) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === agentMessageId
+                ? { ...msg, content: error, status: 'error' }
+                : msg
+            )
+          );
+          setIsRunning(false);
+
+          onTestComplete({
+            id: `test-${Date.now()}`,
+            input: userMessage.content,
+            output: error,
+            success: false,
+            duration: (Date.now() - startTime) / 1000,
+            timestamp: new Date().toISOString(),
+            model: 'unknown',
+            agentId,
+          });
+        }
+      );
     } catch (error) {
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'agent',
-        content: '执行失败，请重试',
-        timestamp: new Date().toISOString(),
-        status: 'error',
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      console.error('Send message failed:', error);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === agentMessageId
+            ? { ...msg, content: '发送失败，请重试', status: 'error' }
+            : msg
+        )
+      );
       setIsRunning(false);
     }
   };
