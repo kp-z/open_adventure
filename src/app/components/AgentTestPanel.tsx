@@ -46,6 +46,9 @@ import { agentsApi, skillsApi } from '@/lib/api';
 import { GlassCard } from './ui-shared';
 import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { useNotifications } from '../contexts/NotificationContext';
+import { ChatView } from './agent-test/ChatView';
+import { TerminalView } from './agent-test/TerminalView';
+import type { ViewMode } from './agent-test/types';
 import 'highlight.js/styles/github-dark.css';
 import '../../styles/markdown.css';
 
@@ -153,6 +156,7 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
   const [isUsageExpanded, setIsUsageExpanded] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showMarkdownView, setShowMarkdownView] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('chat');
   const outputRef = useRef<HTMLDivElement>(null);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
@@ -249,6 +253,13 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
       outputRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [currentOutput]);
+
+  // 处理测试完成回调（供 ChatView 和 TerminalView 使用）
+  const handleTestComplete = (result: TestResult) => {
+    const newHistory = [result, ...testHistory];
+    setTestHistory(newHistory);
+    saveTestHistory(newHistory);
+  };
 
   // 测试 Agent - 使用流式 API
   const handleTest = async () => {
@@ -590,244 +601,68 @@ Agent 描述: ${agent.description}
         <div className="lg:col-span-2 space-y-6">
           {/* 统一的测试卡片 - 输入和输出在一起 */}
           <GlassCard className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Terminal size={18} className="text-blue-400" />
-              <h3 className="font-bold">测试控制台</h3>
-            </div>
-
-            {/* 输入区域 */}
-            <div className="mb-4">
-              <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">
-                输入
-              </label>
-              <div className="relative">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && e.ctrlKey) {
-                      handleTest();
-                    }
-                  }}
-                  placeholder="输入测试提示... (Ctrl+Enter 运行)"
-                  rows={4}
-                  disabled={isRunning}
-                  className="w-full px-4 py-3 pr-12 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 transition-all resize-none font-mono text-sm"
-                />
-                <div className="absolute right-2 top-2">
-                  <PromptOptimizeButton
-                    value={input}
-                    onChange={setInput}
-                    context={`Testing Agent: ${agent.name}`}
-                    iconOnly
-                  />
-                </div>
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <div className="text-xs text-gray-500">
-                  {input.length} 字符 · 按 Ctrl+Enter 运行
-                </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold flex items-center gap-2">
+                <Terminal size={16} />
+                测试控制台
+              </h3>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={handleTest}
-                  disabled={!input.trim() || isRunning}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all shadow-lg text-sm"
+                  onClick={() => setViewMode('chat')}
+                  className={`p-2 rounded-lg transition-all ${
+                    viewMode === 'chat'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  }`}
+                  title="对话框模式"
                 >
-                  {isRunning ? (
-                    <>
-                      <Loader size={18} className="animate-spin" />
-                      运行中...
-                    </>
-                  ) : (
-                    <>
-                      <Send size={18} />
-                      运行
-                    </>
-                  )}
+                  <MessageSquare size={16} />
+                </button>
+                <button
+                  onClick={() => setViewMode('terminal')}
+                  className={`p-2 rounded-lg transition-all ${
+                    viewMode === 'terminal'
+                      ? 'bg-green-500/20 text-green-400'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  }`}
+                  title="终端模式"
+                >
+                  <Terminal size={16} />
                 </button>
               </div>
             </div>
 
-            {/* 分隔线 */}
-            <div className="border-t border-white/10 my-4" />
-
-            {/* 输出区域 */}
-            <div ref={outputRef}>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">
-                  输出
-                </label>
-                {currentOutput && (
-                  <div className="flex items-center gap-2">
-                    {/* Markdown 切换按钮 */}
-                    {isMarkdownContent(currentOutput) && (
-                      <button
-                        onClick={() => setShowMarkdownView(!showMarkdownView)}
-                        className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg transition-colors ${
-                          showMarkdownView
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                            : 'hover:bg-white/10 text-gray-400'
-                        }`}
-                      >
-                        {showMarkdownView ? (
-                          <>
-                            <FileText size={14} />
-                            <span>Markdown</span>
-                          </>
-                        ) : (
-                          <>
-                            <Code size={14} />
-                            <span>原始</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleCopyOutput(currentOutput, 'current')}
-                      className="flex items-center gap-1 px-2 py-1 text-xs hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                      {copiedId === 'current' ? (
-                        <Check size={14} className="text-green-400" />
-                      ) : (
-                        <Copy size={14} className="text-gray-400" />
-                      )}
-                      <span className="text-gray-400">复制</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <AnimatePresence mode="wait">
-                {isRunning ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="p-6 bg-black/40 rounded-xl border border-white/10 flex items-center justify-center"
-                  >
-                    <div className="flex items-center gap-3 text-gray-400">
-                      <Loader size={20} className="animate-spin" />
-                      <span>Agent 正在处理请求...</span>
-                    </div>
-                  </motion.div>
-                ) : currentOutput ? (
-                  <motion.div
-                    key="output"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className={`p-4 bg-black/40 rounded-xl border-2 ${
-                      currentSuccess
-                        ? 'border-green-500/30'
-                        : 'border-red-500/30'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      {currentSuccess ? (
-                        <CheckCircle size={16} className="text-green-400" />
-                      ) : (
-                        <XCircle size={16} className="text-red-400" />
-                      )}
-                      <span className={`text-sm font-bold ${currentSuccess ? 'text-green-400' : 'text-red-400'}`}>
-                        {currentSuccess ? '执行成功' : '执行失败'}
-                      </span>
-                      {testHistory[0] && (
-                        <span className="text-xs text-gray-500 ml-2">
-                          {testHistory[0].duration.toFixed(2)}s · {testHistory[0].model}
-                        </span>
-                      )}
-                    </div>
-                    {showMarkdownView && isMarkdownContent(currentOutput) ? (
-                      <div className="prose prose-invert prose-sm max-w-none max-h-80 overflow-y-auto">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                          components={{
-                            // 自定义代码块样式
-                            code: ({ className, children, ...props }) => {
-                              const isInline = !className;
-                              return isInline ? (
-                                <code className="px-1.5 py-0.5 bg-white/10 rounded text-blue-400 font-mono text-xs" {...props}>
-                                  {children}
-                                </code>
-                              ) : (
-                                <code className={`${className} block p-3 bg-black/60 rounded-lg overflow-x-auto`} {...props}>
-                                  {children}
-                                </code>
-                              );
-                            },
-                            // 自定义链接样式
-                            a: ({ children, ...props }) => (
-                              <a className="text-blue-400 hover:text-blue-300 underline" target="_blank" rel="noopener noreferrer" {...props}>
-                                {children}
-                              </a>
-                            ),
-                            // 自定义表格样式
-                            table: ({ children, ...props }) => (
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full border border-white/10" {...props}>
-                                  {children}
-                                </table>
-                              </div>
-                            ),
-                            th: ({ children, ...props }) => (
-                              <th className="border border-white/10 px-3 py-2 bg-white/5 font-bold" {...props}>
-                                {children}
-                              </th>
-                            ),
-                            td: ({ children, ...props }) => (
-                              <td className="border border-white/10 px-3 py-2" {...props}>
-                                {children}
-                              </td>
-                            ),
-                          }}
-                        >
-                          {currentOutput}
-                        </ReactMarkdown>
-                      </div>
-                    ) : (
-                      <pre className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap font-mono max-h-80 overflow-y-auto">
-                        {currentOutput}
-                      </pre>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="p-6 bg-black/40 rounded-xl border border-dashed border-white/10 text-center"
-                  >
-                    <MessageSquare size={32} className="text-gray-600 mx-auto mb-2" />
-                    <p className="text-gray-500 text-sm">输入提示并运行，输出将显示在这里</p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* 控制台日志区域 */}
-            {consoleLogs.length > 0 && (
-              <div className="mt-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Terminal size={14} className="text-gray-400" />
-                  <label className="text-xs font-bold text-gray-400 uppercase">
-                    控制台日志
-                  </label>
-                  <span className="text-xs text-gray-500">({consoleLogs.length} 条)</span>
-                </div>
-                <div className="p-3 bg-black/60 rounded-xl border border-white/10 max-h-60 overflow-y-auto">
-                  <div className="space-y-1 font-mono text-xs">
-                    {consoleLogs.map((log, index) => (
-                      <div key={index} className="text-gray-400">
-                        <span className="text-gray-600 mr-2">[{index + 1}]</span>
-                        {log}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {viewMode === 'chat' ? (
+                <motion.div
+                  key="chat"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChatView
+                    agentId={agent.id}
+                    agentName={agent.name}
+                    onTestComplete={handleTestComplete}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="terminal"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TerminalView
+                    agentId={agent.id}
+                    agentName={agent.name}
+                    onTestComplete={handleTestComplete}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </GlassCard>
 
           {/* 建议的测试 */}
