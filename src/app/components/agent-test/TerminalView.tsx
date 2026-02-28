@@ -1,95 +1,85 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { TerminalSession } from './types';
+import React, { useEffect, useRef, useState } from 'react';
+import { Terminal } from 'xterm';
+import { FitAddon } from 'xterm-addon-fit';
+import { WebLinksAddon } from 'xterm-addon-web-links';
+import 'xterm/css/xterm.css';
+import type { TerminalSession } from './types';
 
-interface TerminalViewProps {
-  agentId: string;
-  wsUrl: string;
+export interface TestResult {
+  id: string;
+  input: string;
+  output: string;
+  success: boolean;
+  duration: number;
+  timestamp: string;
+  model: string;
+  agentId: number;
 }
 
-export const TerminalView: React.FC<TerminalViewProps> = ({ agentId, wsUrl }) => {
+interface TerminalViewProps {
+  agentId: number;
+  agentName: string;
+  onTestComplete: (result: TestResult) => void;
+}
+
+export function TerminalView({ agentId, agentName, onTestComplete }: TerminalViewProps) {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
   const [session, setSession] = useState<TerminalSession>({
     ws: null,
     isConnected: false,
     isReady: false,
   });
-  const [output, setOutput] = useState<string[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const terminalRef = useRef<HTMLDivElement>(null);
 
+  // 初始化终端
   useEffect(() => {
-    // WebSocket connection will be implemented in next phase
+    if (!terminalRef.current || xtermRef.current) return;
+
+    const terminal = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: {
+        background: '#1a1a1a',
+        foreground: '#ffffff',
+        cursor: '#ffffff',
+      },
+      rows: 24,
+      cols: 80,
+    });
+
+    const fitAddon = new FitAddon();
+    const webLinksAddon = new WebLinksAddon();
+
+    terminal.loadAddon(fitAddon);
+    terminal.loadAddon(webLinksAddon);
+    terminal.open(terminalRef.current);
+    fitAddon.fit();
+
+    xtermRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+
+    terminal.writeln('$ Initializing terminal...');
+
+    // 窗口大小变化时自适应
+    const handleResize = () => {
+      fitAddon.fit();
+    };
+    window.addEventListener('resize', handleResize);
+
     return () => {
-      if (session.ws) {
-        session.ws.close();
-      }
+      window.removeEventListener('resize', handleResize);
+      terminal.dispose();
+      xtermRef.current = null;
     };
   }, []);
 
-  const scrollToBottom = () => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
-    }
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [output]);
-
-  const handleSend = () => {
-    if (!inputValue.trim() || !session.isConnected) return;
-
-    // Add user input to output
-    setOutput((prev) => [...prev, `$ ${inputValue}`]);
-
-    // Send to WebSocket (to be implemented)
-    if (session.ws && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(inputValue);
-    }
-
-    setInputValue('');
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-green-400 font-mono">
-      {/* Terminal Output */}
-      <div
-        ref={terminalRef}
-        className="flex-1 overflow-y-auto p-4 space-y-1"
-      >
-        {!session.isConnected && (
-          <div className="text-yellow-400">
-            [等待连接到 Agent...]
-          </div>
-        )}
-        {output.map((line, index) => (
-          <div key={index} className="whitespace-pre-wrap">
-            {line}
-          </div>
-        ))}
-      </div>
-
-      {/* Terminal Input */}
-      <div className="border-t border-gray-700 p-2 flex items-center gap-2">
-        <span className="text-green-400">$</span>
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          disabled={!session.isConnected}
-          placeholder={session.isConnected ? '输入命令...' : '等待连接...'}
-          className="flex-1 bg-transparent outline-none text-green-400 placeholder-gray-600"
-        />
-      </div>
+    <div className="h-[500px] bg-black/60 rounded-xl p-4">
+      <div ref={terminalRef} className="h-full" />
     </div>
   );
-};
+}
