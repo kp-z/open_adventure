@@ -32,6 +32,8 @@ class TerminalSession:
         """启动 PTY 进程"""
         try:
             print(f"[AgentTerminal] Starting PTY for agent {self.agent_name}...")
+            print(f"[AgentTerminal] Command: {self.agent_command}")
+
             self.pid, self.master_fd = pty.fork()
 
             if self.pid == 0:
@@ -46,10 +48,10 @@ class TerminalSession:
 
                 # 执行 agent 命令
                 print(f"[AgentTerminal] Child process - Executing: {self.agent_command}")
-                os.execvp('/bin/sh', ['/bin/sh', '-c', self.agent_command])
+                os.execvp('/bin/bash', ['/bin/bash', '-i'])
 
             # Parent process
-            print(f"[AgentTerminal] PTY started with PID: {self.pid}")
+            print(f"[AgentTerminal] PTY started with PID: {self.pid}, FD: {self.master_fd}")
             self.running = True
 
             # Set non-blocking mode
@@ -61,12 +63,16 @@ class TerminalSession:
                 'type': 'ready',
                 'message': f'Agent session started'
             })
+            print(f"[AgentTerminal] Sent ready message")
 
             # 启动输出读取任务
             asyncio.create_task(self._read_output(websocket))
+            print(f"[AgentTerminal] Started output reading task")
 
         except Exception as e:
             print(f"[AgentTerminal] Error starting PTY: {e}")
+            import traceback
+            traceback.print_exc()
             await websocket.send_json({
                 'type': 'error',
                 'message': str(e)
@@ -74,8 +80,9 @@ class TerminalSession:
 
     async def _read_output(self, websocket: WebSocket):
         """读取 PTY 输出并发送到 WebSocket"""
+        print(f"[AgentTerminal] Starting output reading loop...")
         try:
-            while self.running and self.master_fd:
+            while self.master_fd:
                 try:
                     # Use select to check if data is available
                     ready, _, _ = select.select([self.master_fd], [], [], 0.1)
@@ -84,10 +91,16 @@ class TerminalSession:
                         if data:
                             decoded = data.decode('utf-8', errors='ignore')
                             self.output_buffer += decoded
+                            print(f"[AgentTerminal] Read {len(data)} bytes: {decoded[:50]}...")
                             await websocket.send_json({
                                 'type': 'output',
                                 'data': decoded
                             })
+                        else:
+                            # EOF - process exited
+                            print(f"[AgentTerminal] EOF detected, process exited")
+                            self.running = False
+                            break
                 except OSError as e:
                     print(f"[AgentTerminal] PTY read error: {e}")
                     self.running = False
@@ -96,12 +109,15 @@ class TerminalSession:
                 await asyncio.sleep(0.01)
 
             # 进程结束
+            print(f"[AgentTerminal] Output reading loop ended")
             exit_code = 0
             if self.pid:
                 try:
                     _, status = os.waitpid(self.pid, os.WNOHANG)
                     exit_code = os.WEXITSTATUS(status) if os.WIFEXITED(status) else 1
-                except (OSError, ChildProcessError):
+                    print(f"[AgentTerminal] Process exit code: {exit_code}")
+                except (OSError, ChildProcessError) as e:
+                    print(f"[AgentTerminal] Error getting exit code: {e}")
                     exit_code = 1
 
             await websocket.send_json({
@@ -109,9 +125,12 @@ class TerminalSession:
                 'code': exit_code,
                 'output': self.output_buffer
             })
+            print(f"[AgentTerminal] Sent exit message")
 
         except Exception as e:
             print(f"[AgentTerminal] Error reading PTY output: {e}")
+            import traceback
+            traceback.print_exc()
 
     async def write_input(self, data: str):
         """写入用户输入到 PTY"""

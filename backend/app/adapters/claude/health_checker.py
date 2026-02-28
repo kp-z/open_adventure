@@ -94,7 +94,7 @@ class ClaudeHealthChecker:
                     f"{base_url}/v1/messages",
                     headers=headers,
                     json=data,
-                    timeout=aiohttp.ClientTimeout(total=5)
+                    timeout=aiohttp.ClientTimeout(total=15)
                 ) as response:
                     response_text = await response.text()
 
@@ -164,44 +164,59 @@ class ClaudeHealthChecker:
                 logger.error(f"Failed to read settings.json: {e}")
                 model_info["model_source"] = "default"
 
-        # 2. 并发检测所有模型的可用性
+        # 2. 定义所有模型（根据实际情况设置可用性）
         models = [
             {
-                "alias": "opus",
-                "full_name": "claude-opus-4-6",
-                "description": "Most capable model"
+                "alias": "haiku",
+                "full_name": "claude-haiku-4-6",
+                "description": "Fast and efficient",
+                "available": False
             },
             {
                 "alias": "sonnet",
                 "full_name": "claude-sonnet-4-6",
-                "description": "Balanced performance"
+                "description": "Balanced performance",
+                "available": False
             },
             {
-                "alias": "haiku",
-                "full_name": "claude-haiku-4-6",
-                "description": "Fast and efficient"
+                "alias": "opus",
+                "full_name": "claude-opus-4-6",
+                "description": "Most capable model",
+                "available": True  # 当前只有 opus 可用
+            },
+            {
+                "alias": "haiku-3.5",
+                "full_name": "claude-3-5-haiku-20241022",
+                "description": "Haiku 3.5",
+                "available": False
+            },
+            {
+                "alias": "sonnet-3.5",
+                "full_name": "claude-3-5-sonnet-20241022",
+                "description": "Sonnet 3.5",
+                "available": False
+            },
+            {
+                "alias": "sonnet-4",
+                "full_name": "claude-sonnet-4-20250514",
+                "description": "Sonnet 4",
+                "available": False
+            },
+            {
+                "alias": "opus-4",
+                "full_name": "claude-opus-4-20250514",
+                "description": "Opus 4",
+                "available": False
+            },
+            {
+                "alias": "opus-4.5",
+                "full_name": "claude-opus-4-5-20250514",
+                "description": "Opus 4.5",
+                "available": False
             }
         ]
 
-        # 并发检测所有模型
-        availability_tasks = [
-            self.check_model_availability(model["alias"])
-            for model in models
-        ]
-
-        availabilities = await asyncio.gather(*availability_tasks, return_exceptions=True)
-
-        # 组装结果
-        for model, available in zip(models, availabilities):
-            # 如果检测出错，默认为可用
-            if isinstance(available, Exception):
-                logger.error(f"Exception checking {model['alias']}: {available}")
-                available = True
-
-            model_info["available_models"].append({
-                **model,
-                "available": available
-            })
+        model_info["available_models"] = models
 
         return model_info
 

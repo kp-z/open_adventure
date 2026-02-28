@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Terminal WebSocket Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        #output {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #007acc;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005a9e;
+        }
+        input {
+            padding: 10px;
+            width: 300px;
+            background: #2d2d2d;
+            color: #d4d4d4;
+            border: 1px solid #555;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.connected {
+            background: #0e5c0e;
+        }
+        .status.disconnected {
+            background: #5c0e0e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Terminal WebSocket Test</h1>
+
+    <div>
+        <label>Agent ID: <input type="number" id="agentId" value="18"></label>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div>
+        <input type="text" id="input" placeholder="Type command and press Enter">
+        <button onclick="sendInput()">Send</button>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        let ws = null;
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const inputField = document.getElementById('input');
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.style.color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#fff';
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function connect() {
+            const agentId = document.getElementById('agentId').value;
+            const url = `ws://localhost:8000/api/agents/${agentId}/terminal`;
+
+            log(`Connecting to ${url}...`);
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                log('✓ WebSocket connected', 'success');
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    log(`Received: ${data.type} - ${JSON.stringify(data).substring(0, 100)}`);
+
+                    if (data.type === 'output') {
+                        log(`Output: ${data.data}`, 'success');
+                    } else if (data.type === 'ready') {
+                        log(`✓ Terminal ready: ${data.message}`, 'success');
+                    } else if (data.type === 'exit') {
+                        log(`✓ Process exited with code ${data.code}`, 'success');
+                    } else if (data.type === 'error') {
+                        log(`✗ Error: ${data.message}`, 'error');
+                    }
+                } catch (e) {
+                    log(`Parse error: ${e}`, 'error');
+                }
+            };
+
+            ws.onerror = (error) => {
+                log(`✗ WebSocket error: ${error}`, 'error');
+            };
+
+            ws.onclose = (event) => {
+                log(`✗ WebSocket closed: ${event.code} - ${event.reason}`);
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.send(JSON.stringify({ type: 'close' }));
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function sendInput() {
+            const input = inputField.value;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log(`Sending: ${input}`);
+                ws.send(JSON.stringify({
+                    type: 'input',
+                    data: input + '\n'
+                }));
+                inputField.value = '';
+            } else {
+                log('Not connected', 'error');
+            }
+        }
+
+        inputField.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendInput();
+            }
+        });
+    </script>
+</body>
+</html>
