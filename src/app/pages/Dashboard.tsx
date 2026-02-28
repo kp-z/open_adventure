@@ -377,7 +377,7 @@ const Dashboard = () => {
                             <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
 
                             {/* 水位线 */}
-                            <WaterLevel percentage={tokenUsage.percentage} size={config.size} />
+                            <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={config.size} />
 
                             {/* 模型名称 - 在水位线后面 */}
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
@@ -391,12 +391,12 @@ const Dashboard = () => {
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                                 <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
                                   <div className="font-bold mb-1">{config.name}</div>
-                                  <div className="text-gray-300 mb-1.5 text-[7px]">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200,000</div>
+                                  <div className="text-gray-300 mb-1.5 text-[7px]">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000</div>
                                   {/* 横向柱状图 */}
                                   <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                     <div
                                       className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300"
-                                      style={{ width: `${tokenUsage.percentage}%` }}
+                                      style={{ width: `${tokenUsage?.percentage ?? 0}%` }}
                                     />
                                   </div>
                                   <div className="text-[6px] text-gray-400 mt-1">{tokenUsage.percentage.toFixed(1)}% Used</div>
@@ -536,7 +536,7 @@ const Dashboard = () => {
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                               <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
                                 <div className="font-bold mb-1">{config.name}</div>
-                                <div className="text-gray-300 mb-2">{(200000 - 200000 * tokenUsage.percentage / 100).toFixed(0)} / 200,000 tokens</div>
+                                <div className="text-gray-300 mb-2">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000 tokens</div>
                                 {/* 横向柱状图 */}
                                 <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
                                   <div
@@ -544,7 +544,7 @@ const Dashboard = () => {
                                     style={{ width: `${tokenUsage.percentage}%` }}
                                   />
                                 </div>
-                                <div className="text-[8px] text-gray-400 mt-1">{tokenUsage.percentage.toFixed(1)}% Used</div>
+                                <div className="text-[8px] text-gray-400 mt-1">{(tokenUsage?.percentage ?? 0).toFixed(1)}% Used</div>
                               </div>
                               {/* 小三角箭头 */}
                               <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
