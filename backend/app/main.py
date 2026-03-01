@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 
     # 停止终端清理任务并清理所有会话
     terminal.stop_cleanup_task()
-    terminal.cleanup_all_sessions()
+    terminal.cleanup_dead_sessions()
 
     # 清理所有 WebSocket 连接
     from app.services.websocket_manager import get_connection_manager
