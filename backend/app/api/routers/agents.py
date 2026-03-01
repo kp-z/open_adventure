@@ -15,9 +15,13 @@ from pathlib import Path
 
 from app.core.database import get_db
 from app.repositories.agent_repository import AgentRepository
+from app.repositories.executions_repo import ExecutionRepository
 from app.services.agent_service import AgentService
+from app.services.agent_test_service import AgentTestService
 from app.adapters.claude.file_scanner import ClaudeFileScanner
 from app.config.settings import settings
+from app.models.task import ExecutionStatus
+from datetime import datetime
 from app.schemas.agent import (
     AgentCreate,
     AgentUpdate,
@@ -430,7 +434,8 @@ async def delete_agent(
 async def test_agent_stream(
     agent_id: int,
     prompt: str = Query(..., description="测试提示"),
-    service: AgentService = Depends(get_agent_service)
+    service: AgentService = Depends(get_agent_service),
+    db: AsyncSession = Depends(get_db)
 ):
     """
     运行子代理进行测试，实时流式输出日志
@@ -446,10 +451,25 @@ async def test_agent_stream(
     agent = await service.get_agent(agent_id)
     cli_path = settings.claude_cli_path
 
+    # 创建 Execution 记录
+    agent_test_service = AgentTestService(db)
+    execution = await agent_test_service.create_agent_test_execution(
+        agent_id=agent_id,
+        test_input=prompt
+    )
+    execution_id = execution.id
+
     async def generate_stream():
         start_time = time.time()
 
         try:
+            # 更新执行状态为 RUNNING
+            execution_repo = ExecutionRepository(db)
+            execution = await execution_repo.get(execution_id)
+            execution.status = ExecutionStatus.RUNNING
+            execution.started_at = datetime.utcnow()
+            await db.commit()
+
             # 发送开始日志
             yield f"data: {json.dumps({'type': 'log', 'message': f'开始执行 Agent: {agent.name}'})}\n\n"
 
@@ -537,18 +557,50 @@ Please respond according to your role and capabilities."""
                     # 超时，继续等待
                     continue
 
-            # 发送完成消息
+            # 发送完成消息并更新 Execution 状态
             if result_data:
+                execution_repo = ExecutionRepository(db)
+                execution = await execution_repo.get(execution_id)
+
                 if result_data["success"]:
+                    # 更新为成功状态
+                    execution.status = ExecutionStatus.SUCCEEDED
+                    execution.test_output = result_data['output']
+                    execution.finished_at = datetime.utcnow()
+                    await db.commit()
+
                     yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': result_data['output'], 'duration': result_data['duration'], 'model': model_name}})}\n\n"
                 else:
+                    # 更新为失败状态
                     error_msg = f"Agent 执行失败: {result_data['error']}"
+                    execution.status = ExecutionStatus.FAILED
+                    execution.error_message = result_data['error']
+                    execution.test_output = error_msg
+                    execution.finished_at = datetime.utcnow()
+                    await db.commit()
+
                     yield f"data: {json.dumps({'type': 'complete', 'data': {'success': False, 'output': error_msg, 'duration': result_data['duration'], 'model': model_name}})}\n\n"
 
         except FileNotFoundError:
+            # 更新为失败状态
+            execution_repo = ExecutionRepository(db)
+            execution = await execution_repo.get(execution_id)
+            execution.status = ExecutionStatus.FAILED
+            execution.error_message = '未找到 Claude CLI，请确保已安装'
+            execution.finished_at = datetime.utcnow()
+            await db.commit()
+
             yield f"data: {json.dumps({'type': 'error', 'message': '未找到 Claude CLI，请确保已安装'})}\n\n"
         except Exception as e:
+            # 更新为失败状态
             duration = time.time() - start_time
+            execution_repo = ExecutionRepository(db)
+            execution = await execution_repo.get(execution_id)
+            execution.status = ExecutionStatus.FAILED
+            execution.error_message = str(e)
+            execution.finished_at = datetime.utcnow()
+            await db.commit()
+
             yield f"data: {json.dumps({'type': 'error', 'message': f'执行错误: {str(e)}'})}\n\n"
 
     return StreamingResponse(
