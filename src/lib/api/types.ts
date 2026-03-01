@@ -427,6 +427,10 @@ export interface TaskUpdate {
 export type TaskListResponse = PaginatedResponse<Task>;
 
 // ============ Execution 相关类型 ============
+export type ExecutionType = 'workflow' | 'agent_test' | 'agent_team';
+
+export type ExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+
 export interface ExecutionStep {
   step_id: string;
   node_id: string;
@@ -441,11 +445,24 @@ export interface ExecutionStep {
 export interface Execution {
   id: number;
   task_id: number;
-  steps: ExecutionStep[];
-  metadata: Record<string, any> | null;
+  workflow_id: number;
+  status: ExecutionStatus;
+  execution_type: ExecutionType;
+  agent_id?: number;
+  test_input?: string;
+  test_output?: string;
+  started_at?: string;
+  finished_at?: string;
+  error_message?: string;
   created_at: string;
   updated_at: string;
   task?: Task;
+}
+
+export interface ExecutionStatsByType {
+  workflow: number;
+  agent_test: number;
+  agent_team: number;
 }
 
 export type ExecutionListResponse = PaginatedResponse<Execution>;
