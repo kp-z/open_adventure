@@ -164,12 +164,12 @@ const Executions = () => {
 
             return (
               <motion.div
-                key={task.id}
+                key={execution.id}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.1 }}
               >
-                <GameCard rarity={task.status === 'succeeded' ? 'rare' : task.status === 'running' ? 'epic' : 'common'} className="p-0 flex flex-col sm:flex-row items-stretch gap-0 overflow-hidden group">
+                <GameCard rarity={execution.status === 'succeeded' ? 'rare' : execution.status === 'running' ? 'epic' : 'common'} className="p-0 flex flex-col sm:flex-row items-stretch gap-0 overflow-hidden group">
                   {/* Hero Avatar Section */}
                   <div className="w-full sm:w-28 bg-black/40 relative overflow-hidden flex items-center justify-center shrink-0 min-h-[100px] sm:min-h-0">
                     <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent z-10" />
@@ -190,19 +190,26 @@ const Executions = () => {
                   <div className="flex-1 p-4 flex flex-col sm:flex-row items-center gap-6">
                     <div className="flex-1 text-center sm:text-left">
                       <div className="flex items-center gap-2 justify-center sm:justify-start">
-                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">T-{task.id}</p>
-                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${getPriorityTag(task).color}`}>
-                          {getPriorityTag(task).text}
+                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-widest">E-{execution.id}</p>
+                        <span className={`
+                          text-[8px] font-black uppercase px-1.5 py-0.5 rounded
+                          ${execution.execution_type === 'workflow' ? 'bg-blue-500' :
+                            execution.execution_type === 'agent_test' ? 'bg-green-500' :
+                            'bg-purple-500'}
+                        `}>
+                          {execution.execution_type === 'workflow' ? 'WORKFLOW' :
+                           execution.execution_type === 'agent_test' ? 'AGENT' :
+                           'TEAM'}
                         </span>
                       </div>
-                      <h3 className="text-xl font-black uppercase italic tracking-wider text-white mt-1">{task.title}</h3>
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">{task.description}</p>
+                      <h3 className="text-xl font-black uppercase italic tracking-wider text-white mt-1">{execution.task?.title || `Execution #${execution.id}`}</h3>
+                      <p className="text-xs text-gray-400 mt-1 line-clamp-1">{execution.task?.description || 'No description'}</p>
                       <div className="flex flex-wrap justify-center sm:justify-start gap-4 mt-2">
                         <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
-                          <Clock size={12} /> {formatDuration(task.created_at, task.updated_at)}
+                          <Clock size={12} /> {formatDuration(execution.created_at, execution.updated_at)}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
-                          <History size={12} /> {formatTime(task.created_at)}
+                          <History size={12} /> {formatTime(execution.created_at)}
                         </span>
                       </div>
                     </div>
@@ -286,33 +293,40 @@ const Executions = () => {
           <tbody className="divide-y divide-white/5">
             {filteredExecutions.length > 0 ? (
               filteredExecutions.map((execution) => (
-                <tr key={task.id} className="hover:bg-white/5 transition-colors group">
+                <tr key={execution.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      {getStatusIcon(task.status)}
-                      <span className={`text-xs font-bold capitalize ${getStatusColor(task.status)}`}>
-                        {task.status}
+                      {getStatusIcon(execution.status)}
+                      <span className={`text-xs font-bold capitalize ${getStatusColor(execution.status)}`}>
+                        {execution.status}
                       </span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div>
-                      <p className="text-sm font-bold">{task.title}</p>
-                      <p className="text-[10px] text-gray-500 line-clamp-1">{task.description}</p>
+                      <p className="text-sm font-bold">{execution.task?.title || `Execution #${execution.id}`}</p>
+                      <p className="text-[10px] text-gray-500 line-clamp-1">{execution.task?.description || 'No description'}</p>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-1">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded w-fit ${getPriorityTag(task).color}`}>
-                        {getPriorityTag(task).text}
+                      <span className={`
+                        px-2 py-1 rounded text-xs font-bold
+                        ${execution.execution_type === 'workflow' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                          execution.execution_type === 'agent_test' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                          'bg-purple-500/20 text-purple-400 border border-purple-500/30'}
+                      `}>
+                        {execution.execution_type === 'workflow' ? 'Workflow' :
+                         execution.execution_type === 'agent_test' ? 'Agent' :
+                         'AgentTeam'}
                       </span>
-                      {task.workflow_id && (
-                        <span className="text-[10px] text-gray-500">Workflow #{task.workflow_id}</span>
+                      {execution.workflow_id && (
+                        <span className="text-[10px] text-gray-500">Workflow #{execution.workflow_id}</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-xs text-gray-400">{formatDuration(task.created_at, task.updated_at)}</td>
-                  <td className="px-6 py-4 text-xs text-gray-400">{formatTime(task.created_at)}</td>
+                  <td className="px-6 py-4 text-xs text-gray-400">{formatDuration(execution.created_at, execution.updated_at)}</td>
+                  <td className="px-6 py-4 text-xs text-gray-400">{formatTime(execution.created_at)}</td>
                   <td className="px-6 py-4 text-right">
                     <button className="p-2 text-gray-500 hover:text-blue-400 transition-colors">
                       <ArrowRight size={18} />
@@ -323,7 +337,7 @@ const Executions = () => {
             ) : (
               <tr>
                 <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  No tasks found
+                  No executions found
                 </td>
               </tr>
             )}
@@ -335,12 +349,12 @@ const Executions = () => {
       <div className="md:hidden space-y-3">
         {filteredExecutions.length > 0 ? (
           filteredExecutions.map((execution) => (
-            <GlassCard key={task.id} className="p-4">
+            <GlassCard key={execution.id} className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  {getStatusIcon(task.status)}
-                  <span className={`text-xs font-bold capitalize ${getStatusColor(task.status)}`}>
-                    {task.status}
+                  {getStatusIcon(execution.status)}
+                  <span className={`text-xs font-bold capitalize ${getStatusColor(execution.status)}`}>
+                    {execution.status}
                   </span>
                 </div>
                 <button className="p-1 text-gray-500 hover:text-blue-400 transition-colors">
@@ -348,12 +362,12 @@ const Executions = () => {
                 </button>
               </div>
               <div className="mb-3">
-                <p className="text-sm font-bold mb-1">{task.title}</p>
-                <p className="text-xs text-gray-500 line-clamp-2">{task.description}</p>
+                <p className="text-sm font-bold mb-1">{execution.task?.title || `Execution #${execution.id}`}</p>
+                <p className="text-xs text-gray-500 line-clamp-2">{execution.task?.description || 'No description'}</p>
               </div>
               <div className="flex items-center justify-between text-xs text-gray-400">
-                <span>{formatDuration(task.created_at, task.updated_at)}</span>
-                <span>{formatTime(task.created_at)}</span>
+                <span>{formatDuration(execution.created_at, execution.updated_at)}</span>
+                <span>{formatTime(execution.created_at)}</span>
               </div>
             </GlassCard>
           ))
