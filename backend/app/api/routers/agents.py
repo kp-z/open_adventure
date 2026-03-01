@@ -43,6 +43,220 @@ def get_agent_service(db: AsyncSession = Depends(get_db)) -> AgentService:
     return AgentService(repository)
 
 
+@router.websocket("/{agent_id}/test-ws")
+async def test_agent_websocket(
+    websocket: WebSocket,
+    agent_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    WebSocket 端点：Agent 测试
+
+    支持双向通信：
+    - 客户端发送测试消息
+    - 服务器实时返回执行日志和结果
+    """
+    import os
+    import time
+    import json
+    import asyncio
+    from app.adapters.claude.cli_client import ClaudeCliClient
+
+    await websocket.accept()
+
+    try:
+        # 获取 Agent 信息
+        service = get_agent_service(db)
+        agent = await service.get_agent(agent_id)
+
+        # 发送就绪消息
+        await websocket.send_json({
+            'type': 'ready',
+            'message': f'Agent "{agent.name}" ready. Send your message to start.'
+        })
+
+        # 等待客户端发送测试消息
+        while True:
+            data = await websocket.receive_text()
+            message_data = json.loads(data)
+
+            if message_data.get('type') == 'test':
+                prompt = message_data.get('prompt', '')
+
+                # 创建 Execution 记录
+                agent_test_service = AgentTestService(db)
+                execution = await agent_test_service.create_agent_test_execution(
+                    agent_id=agent_id,
+                    test_input=prompt
+                )
+                execution_id = execution.id
+
+                # 更新执行状态为 RUNNING
+                execution_repo = ExecutionRepository(db)
+                execution = await execution_repo.get(execution_id)
+                execution.status = ExecutionStatus.RUNNING
+                execution.started_at = datetime.utcnow()
+                await db.commit()
+
+                # 发送开始日志
+                await websocket.send_json({
+                    'type': 'log',
+                    'message': f'开始执行 Agent: {agent.name}'
+                })
+
+                # 构建带有子代理配置的提示
+                system_context = ""
+                if agent.system_prompt:
+                    system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
+
+                full_prompt = f"""You are acting as the subagent "{agent.name}".
+Description: {agent.description}
+{system_context}
+User Request: {prompt}
+
+Please respond according to your role and capabilities."""
+
+                cli_path = settings.claude_cli_path
+                cmd = [
+                    cli_path,
+                    "-p", full_prompt,
+                    "--output-format", "text",
+                    "--disable-slash-commands",
+                    "--setting-sources", "user"
+                ]
+
+                # 如果指定了模型，添加模型参数
+                if agent.model and agent.model != "inherit":
+                    cmd.extend(["--model", agent.model])
+
+                model_name = agent.model or "inherit"
+                await websocket.send_json({
+                    'type': 'log',
+                    'message': f'使用模型: {model_name}'
+                })
+                await websocket.send_json({
+                    'type': 'log',
+                    'message': '执行命令...'
+                })
+
+                # 使用队列来传递日志
+                log_queue = asyncio.Queue()
+                execution_done = asyncio.Event()
+
+                # 定义日志回调函数
+                def log_callback(stream_type: str, line: str):
+                    asyncio.create_task(log_queue.put((stream_type, line)))
+
+                # 在后台执行命令
+                async def run_command():
+                    try:
+                        # 创建环境变量副本，移除 CLAUDECODE
+                        env = os.environ.copy()
+                        env.pop("CLAUDECODE", None)
+
+                        client = ClaudeCliClient()
+                        result = await client.run_command_with_streaming(
+                            cmd=cmd,
+                            log_callback=log_callback,
+                            timeout=180,
+                            env=env
+                        )
+                        await log_queue.put(('result', result))
+                    except Exception as e:
+                        await log_queue.put(('error', str(e)))
+                    finally:
+                        execution_done.set()
+
+                # 启动后台任务
+                asyncio.create_task(run_command())
+
+                # 持续从队列中读取日志并推送
+                result_data = None
+                while not execution_done.is_set() or not log_queue.empty():
+                    try:
+                        item = await asyncio.wait_for(log_queue.get(), timeout=0.1)
+
+                        if item[0] == 'result':
+                            result_data = item[1]
+                            break
+                        elif item[0] == 'error':
+                            await websocket.send_json({
+                                'type': 'error',
+                                'message': f'执行错误: {item[1]}'
+                            })
+
+                            # 更新为失败状态
+                            execution = await execution_repo.get(execution_id)
+                            execution.status = ExecutionStatus.FAILED
+                            execution.error_message = item[1]
+                            execution.finished_at = datetime.utcnow()
+                            await db.commit()
+                            break
+                        else:
+                            # 推送日志
+                            stream_type, line = item
+                            await websocket.send_json({
+                                'type': 'log',
+                                'message': line
+                            })
+
+                    except asyncio.TimeoutError:
+                        continue
+
+                # 发送完成消息并更新 Execution 状态
+                if result_data:
+                    execution = await execution_repo.get(execution_id)
+
+                    if result_data["success"]:
+                        # 更新为成功状态
+                        execution.status = ExecutionStatus.SUCCEEDED
+                        execution.test_output = result_data['output']
+                        execution.finished_at = datetime.utcnow()
+                        await db.commit()
+
+                        await websocket.send_json({
+                            'type': 'complete',
+                            'data': {
+                                'success': True,
+                                'output': result_data['output'],
+                                'duration': result_data['duration'],
+                                'model': model_name
+                            }
+                        })
+                    else:
+                        # 更新为失败状态
+                        error_msg = f"Agent 执行失败: {result_data['error']}"
+                        execution.status = ExecutionStatus.FAILED
+                        execution.error_message = result_data['error']
+                        execution.test_output = error_msg
+                        execution.finished_at = datetime.utcnow()
+                        await db.commit()
+
+                        await websocket.send_json({
+                            'type': 'complete',
+                            'data': {
+                                'success': False,
+                                'output': error_msg,
+                                'duration': result_data['duration'],
+                                'model': model_name
+                            }
+                        })
+
+            elif message_data.get('type') == 'ping':
+                await websocket.send_json({'type': 'pong'})
+
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        try:
+            await websocket.send_json({
+                'type': 'error',
+                'message': f'WebSocket 错误: {str(e)}'
+            })
+        except:
+            pass
+
+
 @router.post(
     "/sync",
     response_model=AgentSyncResponse,
