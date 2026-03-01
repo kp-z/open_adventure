@@ -32,6 +32,7 @@ class ExecutionType(str, enum.Enum):
     """执行类型"""
     WORKFLOW = "workflow"
     AGENT_TEST = "agent_test"
+    AGENT_TEAM = "agent_team"
 
 
 class Task(Base):
