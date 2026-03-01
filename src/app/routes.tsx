@@ -4,7 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Skills from './pages/Skills';
 import Agents from './pages/Agents';
 import Workflows from './pages/Workflows';
-import Tasks from './pages/Tasks';
+import Executions from './pages/Executions';
 import Settings from './pages/Settings';
 import Teams from './pages/Teams';
 import Terminal from './pages/Terminal';
@@ -35,8 +35,8 @@ export const router = createBrowserRouter([
         Component: Workflows,
       },
       {
-        path: 'tasks',
-        Component: Tasks,
+        path: 'executions',
+        Component: Executions,
       },
       {
         path: 'settings',
