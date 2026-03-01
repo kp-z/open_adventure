@@ -12,6 +12,7 @@ import {
 import { useMode } from '../contexts/ModeContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { WebSocketMonitor } from '../components/WebSocketMonitor';
 import { motion } from 'motion/react';
 import { getAvatarById } from '../lib/avatars';
 import { executionsApi } from '@/lib/api';
@@ -241,6 +242,9 @@ const Executions = () => {
           <p className="text-sm md:text-base text-gray-400">查看所有执行历史记录（Workflow、Agent、AgentTeam）</p>
         </div>
       </header>
+
+      {/* WebSocket 监控卡片 */}
+      <WebSocketMonitor />
 
       <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
         <div className="relative flex-1">
