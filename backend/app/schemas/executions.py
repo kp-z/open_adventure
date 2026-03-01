@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, ConfigDict
 
-from app.models.task import ExecutionStatus
+from app.models.task import ExecutionStatus, ExecutionType
 
 
 class NodeExecutionResponse(BaseModel):
@@ -30,7 +30,11 @@ class ExecutionResponse(BaseModel):
     task_id: int
     workflow_id: int
     status: ExecutionStatus
-    started_at: datetime
+    execution_type: ExecutionType
+    agent_id: Optional[int] = None
+    test_input: Optional[str] = None
+    test_output: Optional[str] = None
+    started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     error_message: Optional[str] = None
     created_at: datetime
