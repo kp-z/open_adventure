@@ -205,8 +205,19 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
   // 首次加载时自动发送启动消息
   useEffect(() => {
     if (!hasAutoSent && messages.length === 0 && !isRunning) {
-      const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力。`;
+      const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力和职责。`;
       setHasAutoSent(true);
+
+      // 添加系统消息显示正在启动
+      const systemMessage: ChatMessage = {
+        id: `system-${Date.now()}`,
+        role: 'system',
+        content: `🚀 正在启动 Agent: ${agentName}\n⏳ 初始化中...`,
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+      };
+      setMessages([systemMessage]);
+
       // 延迟 500ms 发送，确保组件完全加载
       const timer = setTimeout(() => {
         handleSend(welcomeMessage);

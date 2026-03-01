@@ -36,14 +36,14 @@ export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ m
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
-        className={`max-w-[70%] rounded-lg px-4 py-2 ${
+        className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-sm ${
           isUser
-            ? 'bg-blue-500 text-white'
-            : 'bg-gray-200 text-gray-900'
+            ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white'
+            : 'bg-white/10 backdrop-blur-sm border border-white/20 text-gray-100'
         }`}
       >
         {/* Markdown 渲染 */}
-        <div className={`text-sm prose prose-sm max-w-none ${isUser ? 'text-white' : 'text-gray-900'}`}>
+        <div className={`text-sm prose prose-sm max-w-none ${isUser ? 'prose-invert' : 'prose-invert'}`}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
@@ -52,16 +52,16 @@ export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ m
               p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
               code: ({ inline, children, ...props }: any) =>
                 inline ? (
-                  <code className={`px-1 py-0.5 rounded ${isUser ? 'bg-blue-600' : 'bg-gray-300'}`} {...props}>
+                  <code className={`px-1.5 py-0.5 rounded ${isUser ? 'bg-blue-700/50' : 'bg-white/20'}`} {...props}>
                     {children}
                   </code>
                 ) : (
-                  <code className="block p-2 rounded bg-gray-800 text-gray-100 overflow-x-auto" {...props}>
+                  <code className="block p-3 rounded-lg bg-gray-900/90 text-gray-100 overflow-x-auto border border-white/10" {...props}>
                     {children}
                   </code>
                 ),
               a: ({ children, ...props }) => (
-                <a className={`underline ${isUser ? 'text-blue-100' : 'text-blue-600'}`} {...props}>
+                <a className={`underline ${isUser ? 'text-blue-100 hover:text-white' : 'text-blue-300 hover:text-blue-200'}`} {...props}>
                   {children}
                 </a>
               ),
@@ -76,7 +76,7 @@ export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ m
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className={`flex items-center gap-1 text-xs mt-2 ${
-              isUser ? 'text-blue-100 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+              isUser ? 'text-blue-100 hover:text-white' : 'text-gray-300 hover:text-white'
             } transition-colors`}
           >
             {isExpanded ? (
@@ -94,13 +94,13 @@ export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ m
         )}
 
         {/* 时间戳 */}
-        <div className={`text-xs mt-1 ${isUser ? 'text-blue-100' : 'text-gray-500'}`}>
+        <div className={`text-xs mt-2 ${isUser ? 'text-blue-100/80' : 'text-gray-400'}`}>
           {new Date(message.timestamp).toLocaleTimeString()}
         </div>
 
         {/* 状态 */}
         {message.status && (
-          <div className="text-xs mt-1">
+          <div className={`text-xs mt-1 ${isUser ? 'text-blue-100/80' : 'text-gray-400'}`}>
             {message.status === 'sending' && '发送中...'}
             {message.status === 'error' && '发送失败'}
           </div>
