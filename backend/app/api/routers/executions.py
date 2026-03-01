@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db, get_claude_adapter
 from app.services.execution_engine import ExecutionEngine, WorkflowValidationError
 from app.repositories.executions_repo import ExecutionRepository
+from app.models.task import ExecutionType
 from app.schemas.executions import (
     ExecutionResponse,
     NodeExecutionResponse,
@@ -94,6 +95,7 @@ async def list_executions(
     limit: int = 20,
     task_id: int | None = None,
     workflow_id: int | None = None,
+    execution_type: ExecutionType | None = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -104,6 +106,7 @@ async def list_executions(
         limit: 返回记录数
         task_id: 按任务 ID 过滤
         workflow_id: 按工作流 ID 过滤
+        execution_type: 按执行类型过滤 (workflow/agent_test/agent_team)
 
     Returns:
         ExecutionListResponse: 执行列表
@@ -115,6 +118,8 @@ async def list_executions(
         filters["task_id"] = task_id
     if workflow_id is not None:
         filters["workflow_id"] = workflow_id
+    if execution_type is not None:
+        filters["execution_type"] = execution_type
 
     executions = await repo.list(skip=skip, limit=limit, filters=filters)
     total = await repo.count(filters=filters)
@@ -151,3 +156,17 @@ async def validate_workflow(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+
+
+@router.get("/stats/by-type")
+async def get_execution_stats_by_type(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取各类型执行数量统计
+
+    Returns:
+        Dict: {"workflow": 10, "agent_test": 5, "agent_team": 0}
+    """
+    repo = ExecutionRepository(db)
+    return await repo.count_by_type()
