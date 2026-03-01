@@ -17,7 +17,7 @@ import { getAvatarById } from '../lib/avatars';
 import { tasksApi } from '@/lib/api';
 import type { Task } from '@/lib/api';
 
-const Tasks = () => {
+const Executions = () => {
   const { mode } = useMode();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -352,4 +352,4 @@ const Tasks = () => {
   );
 };
 
-export default Tasks;
+export default Executions;
