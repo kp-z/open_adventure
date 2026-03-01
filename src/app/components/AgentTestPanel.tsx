@@ -42,7 +42,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { Agent, Skill } from '@/lib/api';
-import { agentsApi, skillsApi } from '@/lib/api';
+import { agentsApi, skillsApi, executionsApi } from '@/lib/api';
 import { GlassCard } from './ui-shared';
 import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -186,15 +186,55 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     };
   }, [showSkillSelector]);
 
-  // 加载持久化的测试历史
+  // 加载持久化的测试历史（从后端 API 获取）
   useEffect(() => {
-    const history = loadTestHistory(agent.id);
-    setTestHistory(history);
-    // 如果有历史记录，显示最近一次的输出
-    if (history.length > 0) {
-      setCurrentOutput(history[0].output);
-      setCurrentSuccess(history[0].success);
-    }
+    const loadHistory = async () => {
+      try {
+        // 从后端 API 获取 Agent 的执行历史
+        const response = await executionsApi.list({
+          execution_type: 'agent_test',
+          limit: 100,
+        });
+
+        // 过滤出当前 Agent 的执行记录
+        const agentExecutions = response.items.filter(
+          (execution) => execution.agent_id === agent.id
+        );
+
+        // 将 Execution 映射为 TestResult
+        const history: TestResult[] = agentExecutions.map((execution) => ({
+          id: execution.id.toString(),
+          input: execution.test_input || '',
+          output: execution.test_output || '',
+          success: execution.status === 'succeeded',
+          duration: execution.finished_at && execution.started_at
+            ? new Date(execution.finished_at).getTime() - new Date(execution.started_at).getTime()
+            : 0,
+          timestamp: execution.created_at,
+          model: 'inherit', // 可以从 execution.meta 中获取
+          agentId: agent.id,
+        }));
+
+        setTestHistory(history);
+
+        // 如果有历史记录，显示最近一次的输出
+        if (history.length > 0) {
+          setCurrentOutput(history[0].output);
+          setCurrentSuccess(history[0].success);
+        }
+      } catch (error) {
+        console.error('Failed to load test history from API:', error);
+        // 如果 API 失败，回退到 localStorage
+        const localHistory = loadTestHistory(agent.id);
+        setTestHistory(localHistory);
+        if (localHistory.length > 0) {
+          setCurrentOutput(localHistory[0].output);
+          setCurrentSuccess(localHistory[0].success);
+        }
+      }
+    };
+
+    loadHistory();
   }, [agent.id]);
 
   // 加载可用的 Skills
