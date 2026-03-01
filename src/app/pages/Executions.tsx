@@ -158,9 +158,9 @@ const Executions = () => {
         </header>
 
         <div className="space-y-4">
-          {filteredTasks.slice(0, 10).map((task, idx) => {
+          {filteredExecutions.slice(0, 10).map((execution, idx) => {
             const avatar = avatars[idx % avatars.length];
-            const rating = getRating(task);
+            const rating = getRating(execution.task || execution);
 
             return (
               <motion.div
@@ -284,8 +284,8 @@ const Executions = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => (
+            {filteredExecutions.length > 0 ? (
+              filteredExecutions.map((execution) => (
                 <tr key={task.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
@@ -333,8 +333,8 @@ const Executions = () => {
 
       {/* 移动端卡片展示 - 仅在 <md 显示 */}
       <div className="md:hidden space-y-3">
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task) => (
+        {filteredExecutions.length > 0 ? (
+          filteredExecutions.map((execution) => (
             <GlassCard key={task.id} className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2">
