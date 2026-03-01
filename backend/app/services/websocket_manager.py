@@ -5,14 +5,23 @@ WebSocket 连接管理器
 from typing import Dict
 from fastapi import WebSocket
 import logging
+import asyncio
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class ConnectionManager:
     """WebSocket 连接管理器"""
 
+    # 配置参数
+    MAX_CONNECTIONS = 100  # 最大连接数
+    CONNECTION_TIMEOUT = 3600  # 连接超时时间（秒），1小时
+    CLEANUP_INTERVAL = 300  # 清理间隔（秒），5分钟
+
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
+        self.connection_timestamps: Dict[str, datetime] = {}  # 记录连接创建时间
+        self._cleanup_task = None  # 清理任务
 
     async def connect(self, client_id: str, websocket: WebSocket):
         """
@@ -22,8 +31,20 @@ class ConnectionManager:
             client_id: 客户端唯一标识
             websocket: WebSocket 连接对象
         """
+        # 检查是否超过最大连接数
+        if len(self.active_connections) >= self.MAX_CONNECTIONS:
+            logger.warning(f"Max connections ({self.MAX_CONNECTIONS}) reached, rejecting new connection: {client_id}")
+            await websocket.close(code=1008, reason="Server at maximum capacity")
+            return
+
         await websocket.accept()
         self.active_connections[client_id] = websocket
+        self.connection_timestamps[client_id] = datetime.now()
+
+        # 启动清理任务（如果还没有启动）
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+
         logger.info(f"WebSocket connected: {client_id}, total connections: {len(self.active_connections)}")
 
     def disconnect(self, client_id: str):
@@ -34,7 +55,58 @@ class ConnectionManager:
             client_id: 客户端唯一标识
         """
         self.active_connections.pop(client_id, None)
+        self.connection_timestamps.pop(client_id, None)
         logger.info(f"WebSocket disconnected: {client_id}, total connections: {len(self.active_connections)}")
+
+    async def _periodic_cleanup(self):
+        """
+        定期清理超时和断开的连接
+        """
+        logger.info("Starting periodic WebSocket cleanup task")
+        try:
+            while True:
+                await asyncio.sleep(self.CLEANUP_INTERVAL)
+
+                # 查找超时的连接
+                now = datetime.now()
+                timeout_threshold = now - timedelta(seconds=self.CONNECTION_TIMEOUT)
+
+                disconnected_clients = []
+                for client_id, timestamp in list(self.connection_timestamps.items()):
+                    if timestamp < timeout_threshold:
+                        logger.warning(f"Connection {client_id} timed out (created at {timestamp})")
+                        disconnected_clients.append(client_id)
+                    else:
+                        # 检查连接是否仍然活跃
+                        connection = self.active_connections.get(client_id)
+                        if connection:
+                            try:
+                                # 发送 ping 消息测试连接
+                                await connection.send_json({"type": "ping"})
+                            except Exception as e:
+                                logger.warning(f"Connection {client_id} is dead: {e}")
+                                disconnected_clients.append(client_id)
+
+                # 清理断开的连接
+                for client_id in disconnected_clients:
+                    connection = self.active_connections.get(client_id)
+                    if connection:
+                        try:
+                            await connection.close()
+                        except Exception:
+                            pass
+                    self.disconnect(client_id)
+
+                if disconnected_clients:
+                    logger.info(f"Cleaned up {len(disconnected_clients)} stale connections")
+
+                # 记录当前连接状态
+                logger.info(f"Active connections: {len(self.active_connections)}/{self.MAX_CONNECTIONS}")
+
+        except asyncio.CancelledError:
+            logger.info("Periodic cleanup task cancelled")
+        except Exception as e:
+            logger.error(f"Error in periodic cleanup: {e}")
 
     async def broadcast_execution_update(self, execution_data: dict):
         """
