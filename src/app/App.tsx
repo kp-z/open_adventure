@@ -124,10 +124,10 @@ const router = createBrowserRouter(
           },
         },
         {
-          path: 'tasks',
+          path: 'executions',
           lazy: async () => {
-            const Tasks = await import('./pages/Tasks');
-            return { Component: Tasks.default };
+            const Executions = await import('./pages/Executions');
+            return { Component: Executions.default };
           },
         },
         {
