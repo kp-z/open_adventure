@@ -14,40 +14,45 @@ import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { motion } from 'motion/react';
 import { getAvatarById } from '../lib/avatars';
-import { tasksApi } from '@/lib/api';
-import type { Task } from '@/lib/api';
+import { executionsApi } from '@/lib/api';
+import type { Execution, ExecutionType } from '@/lib/api';
 
 const Executions = () => {
   const { mode } = useMode();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<ExecutionType | 'all'>('all');
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    fetchExecutions();
+  }, [selectedType]);
 
-  const fetchTasks = async () => {
+  const fetchExecutions = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await tasksApi.list({ limit: 50 });
-      setTasks(response.items);
+      const params: any = { limit: 50 };
+      if (selectedType !== 'all') {
+        params.execution_type = selectedType;
+      }
+      const response = await executionsApi.list(params);
+      setExecutions(response.items);
     } catch (err) {
-      console.error('Failed to fetch tasks:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load tasks');
+      console.error('Failed to fetch executions:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load executions');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTasks = searchQuery.trim() === '' 
-    ? tasks 
-    : tasks.filter(task =>
-        task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.project_path?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredExecutions = searchQuery.trim() === ''
+    ? executions
+    : executions.filter(execution =>
+        execution.task?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        execution.task?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        execution.task?.project_path?.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
   const getStatusIcon = (status: string) => {
@@ -224,12 +229,9 @@ const Executions = () => {
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION TASKS</h1>
-            <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
-              敬请期待
-            </span>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION HISTORY</h1>
           </div>
-          <p className="text-sm md:text-base text-gray-400">Track and monitor the history of all AI agent activities.</p>
+          <p className="text-sm md:text-base text-gray-400">查看所有执行历史记录（Workflow、Agent、AgentTeam）</p>
         </div>
       </header>
 
@@ -238,21 +240,34 @@ const Executions = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Search task logs..."
+            placeholder="Search execution logs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm md:text-base focus:outline-none focus:border-blue-500/50 transition-all"
           />
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-xs md:text-sm font-bold text-gray-400 hover:text-white transition-all">
-            <Filter size={16} /> <span className="hidden sm:inline">Filter</span>
+      </div>
+
+      {/* 类型筛选器 */}
+      <div className="flex gap-2 flex-wrap">
+        {(['all', 'workflow', 'agent_test', 'agent_team'] as const).map((type) => (
+          <button
+            key={type}
+            onClick={() => setSelectedType(type)}
+            className={`
+              px-4 py-2 rounded-xl text-sm font-bold transition-all
+              ${selectedType === type
+                ? 'bg-blue-500/20 border-2 border-blue-500/50 text-blue-400'
+                : 'bg-white/5 border border-white/10 text-gray-400 hover:text-white'
+              }
+            `}
+          >
+            {type === 'all' ? 'All' :
+             type === 'workflow' ? 'Workflow' :
+             type === 'agent_test' ? 'Agent' :
+             'AgentTeam'}
           </button>
-          <ActionButton variant="secondary" className="text-xs md:text-sm">
-            <span className="hidden sm:inline">Clear History</span>
-            <span className="sm:hidden">Clear</span>
-          </ActionButton>
-        </div>
+        ))}
       </div>
 
       {/* 桌面端表格 - 仅在 ≥md 显示 */}
