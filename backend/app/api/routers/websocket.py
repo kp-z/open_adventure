@@ -9,6 +9,42 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
 
+@router.get("/stats")
+async def get_websocket_stats(
+    manager: ConnectionManager = Depends(get_connection_manager)
+):
+    """
+    获取 WebSocket 连接统计信息
+
+    返回：
+    - total_connections: 当前活跃连接数
+    - max_connections: 最大连接数限制
+    - connection_timeout: 连接超时时间（秒）
+    - cleanup_interval: 清理间隔（秒）
+    - connections: 连接详情列表
+    """
+    from datetime import datetime
+
+    connections = []
+    now = datetime.now()
+
+    for client_id, timestamp in manager.connection_timestamps.items():
+        age_seconds = (now - timestamp).total_seconds()
+        connections.append({
+            "client_id": client_id,
+            "connected_at": timestamp.isoformat(),
+            "age_seconds": int(age_seconds),
+            "is_active": client_id in manager.active_connections
+        })
+
+    return {
+        "total_connections": len(manager.active_connections),
+        "max_connections": manager.MAX_CONNECTIONS,
+        "connection_timeout": manager.CONNECTION_TIMEOUT,
+        "cleanup_interval": manager.CLEANUP_INTERVAL,
+        "connections": connections
+    }
+
 @router.websocket("/ws/executions")
 async def websocket_executions(
     websocket: WebSocket,

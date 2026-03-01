@@ -135,6 +135,33 @@ class ConnectionManager:
 
         logger.debug(f"Broadcasted execution update to {len(self.active_connections)} clients")
 
+    async def shutdown(self):
+        """
+        关闭所有连接并停止清理任务
+        """
+        logger.info("Shutting down WebSocket manager...")
+
+        # 停止清理任务
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+
+        # 关闭所有活跃连接
+        for client_id, connection in list(self.active_connections.items()):
+            try:
+                await connection.close()
+            except Exception as e:
+                logger.error(f"Error closing connection {client_id}: {e}")
+
+        # 清空连接记录
+        self.active_connections.clear()
+        self.connection_timestamps.clear()
+
+        logger.info(f"WebSocket manager shutdown complete. Closed {len(self.active_connections)} connections")
+
 # 全局单例
 _connection_manager = None
 

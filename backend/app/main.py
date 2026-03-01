@@ -36,11 +36,18 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down Claude Manager Backend...")
 
-    # 停止终端清理任务
+    # 停止终端清理任务并清理所有会话
     terminal.stop_cleanup_task()
+    terminal.cleanup_all_sessions()
+
+    # 清理所有 WebSocket 连接
+    from app.services.websocket_manager import get_connection_manager
+    manager = get_connection_manager()
+    await manager.shutdown()
 
     await close_db()
     logger.info("Database connections closed")
+    logger.info("All processes cleaned up")
 
 
 # Create FastAPI app
