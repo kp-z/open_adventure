@@ -61,8 +61,8 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       icon: mode === "adventure" ? Map : GitBranch,
     },
     {
-      name: t("tasks"),
-      path: "/tasks",
+      name: t("executions"),
+      path: "/executions",
       icon: mode === "adventure" ? Trophy : History,
     },
     {
