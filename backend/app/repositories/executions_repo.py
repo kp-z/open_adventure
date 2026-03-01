@@ -65,3 +65,23 @@ class ExecutionRepository(BaseRepository[Execution]):
             .order_by(Execution.created_at.desc())
         )
         return result.scalars().all()
+
+    async def count_by_type(self) -> Dict[str, int]:
+        """
+        统计各类型的执行数量
+
+        Returns:
+            Dict[str, int]: {"workflow": 10, "agent_test": 5, "agent_team": 0}
+        """
+        from app.models.task import ExecutionType
+
+        result = {}
+        for exec_type in ExecutionType:
+            count_result = await self.db.execute(
+                select(func.count())
+                .select_from(Execution)
+                .where(Execution.execution_type == exec_type)
+            )
+            result[exec_type.value] = count_result.scalar_one()
+
+        return result
