@@ -89,7 +89,7 @@ app.include_router(plugins.router, prefix=f"{settings.api_prefix}")
 app.include_router(settings_router.router, prefix=f"{settings.api_prefix}")
 app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
-app.include_router(websocket.router)
+app.include_router(websocket.router, prefix=f"{settings.api_prefix}/ws")
 
 
 # 静态文件服务（用于打包版本）- 必须在所有路由之后
