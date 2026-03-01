@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { PromptOptimizeButton } from '../PromptOptimizeButton';
-import { agentsApi } from '@/lib/api';
 import type { ChatMessage } from './types';
 import type { TestResult } from '../AgentTestPanel';
 
@@ -18,25 +17,181 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [hasAutoSent, setHasAutoSent] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const currentInputRef = useRef<string>('');
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
-  const MAX_RETRIES = 3;
+  const MAX_RECONNECT_ATTEMPTS = 3;
 
   // 自动滚动到最新消息
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = useCallback(async (retryInput?: string) => {
-    const messageContent = retryInput || input.trim();
-    if (!messageContent || isRunning) return;
+  // 建立 WebSocket 连接
+  const connectWebSocket = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      return;
+    }
 
-    // 保存当前输入用于重试
-    currentInputRef.current = messageContent;
+    const wsUrl = `ws://localhost:8000/api/agents/${agentId}/test-ws`;
+    const ws = new WebSocket(wsUrl);
 
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      setIsConnected(true);
+      setReconnectAttempts(0);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+
+        switch (message.type) {
+          case 'ready':
+            // Agent 就绪，自动发送欢迎消息
+            const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力和职责。`;
+            ws.send(JSON.stringify({
+              type: 'test',
+              prompt: welcomeMessage
+            }));
+
+            // 添加用户消息
+            const userMessage: ChatMessage = {
+              id: `user-${Date.now()}`,
+              role: 'user',
+              content: welcomeMessage,
+              timestamp: new Date().toISOString(),
+              status: 'success',
+            };
+            setMessages([userMessage]);
+
+            // 添加 Agent 消息占位符
+            const agentMessage: ChatMessage = {
+              id: `agent-${Date.now()}`,
+              role: 'agent',
+              content: '',
+              timestamp: new Date().toISOString(),
+              status: 'sending',
+            };
+            setMessages((prev) => [...prev, agentMessage]);
+            setIsRunning(true);
+            break;
+
+          case 'log':
+            // 更新 Agent 消息内容
+            setMessages((prev) => {
+              const lastMessage = prev[prev.length - 1];
+              if (lastMessage && lastMessage.role === 'agent') {
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    ...lastMessage,
+                    content: lastMessage.content + message.message + '\n',
+                  },
+                ];
+              }
+              return prev;
+            });
+            break;
+
+          case 'complete':
+            // 测试完成
+            setMessages((prev) => {
+              const lastMessage = prev[prev.length - 1];
+              if (lastMessage && lastMessage.role === 'agent') {
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    ...lastMessage,
+                    content: message.data.output,
+                    status: message.data.success ? 'success' : 'error',
+                  },
+                ];
+              }
+              return prev;
+            });
+            setIsRunning(false);
+
+            // 保存到测试历史
+            onTestComplete({
+              id: `test-${Date.now()}`,
+              input: messages[messages.length - 2]?.content || '',
+              output: message.data.output,
+              success: message.data.success,
+              duration: message.data.duration,
+              timestamp: new Date().toISOString(),
+              model: message.data.model,
+              agentId,
+            });
+            break;
+
+          case 'error':
+            // 错误消息
+            setMessages((prev) => {
+              const lastMessage = prev[prev.length - 1];
+              if (lastMessage && lastMessage.role === 'agent') {
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    ...lastMessage,
+                    content: message.message,
+                    status: 'error',
+                  },
+                ];
+              }
+              return prev;
+            });
+            setIsRunning(false);
+            break;
+        }
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      setIsConnected(false);
+      wsRef.current = null;
+
+      // 尝试重连
+      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectTimeoutRef.current = setTimeout(() => {
+          setReconnectAttempts((prev) => prev + 1);
+          connectWebSocket();
+        }, 2000);
+      }
+    };
+
+    wsRef.current = ws;
+  }, [agentId, agentName, reconnectAttempts, messages, onTestComplete]);
+
+  // 组件挂载时建立连接
+  useEffect(() => {
+    connectWebSocket();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [connectWebSocket]);
+
+  const handleSend = useCallback(() => {
+    const messageContent = input.trim();
+    if (!messageContent || isRunning || !isConnected) return;
+
+    // 添加用户消息
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -44,187 +199,28 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
       timestamp: new Date().toISOString(),
       status: 'success',
     };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput('');
 
-    // 只在非重试时添加用户消息
-    if (!retryInput) {
-      setMessages((prev) => [...prev, userMessage]);
-      setInput('');
-    }
-    setIsRunning(true);
-
-    const agentMessageId = `agent-${Date.now()}`;
+    // 添加 Agent 消息占位符
     const agentMessage: ChatMessage = {
-      id: agentMessageId,
+      id: `agent-${Date.now()}`,
       role: 'agent',
-      content: retryCount > 0 ? `正在重试 (${retryCount}/${MAX_RETRIES})...\n` : '',
+      content: '',
       timestamp: new Date().toISOString(),
       status: 'sending',
     };
-
     setMessages((prev) => [...prev, agentMessage]);
+    setIsRunning(true);
 
-    const startTime = Date.now();
-    let fullOutput = retryCount > 0 ? `正在重试 (${retryCount}/${MAX_RETRIES})...\n` : '';
-
-    try {
-      agentsApi.testStream(
-        agentId,
-        messageContent,
-        // onLog
-        (log: string) => {
-          fullOutput += log + '\n';
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMessageId
-                ? { ...msg, content: fullOutput }
-                : msg
-            )
-          );
-        },
-        // onComplete
-        (data) => {
-          const duration = (Date.now() - startTime) / 1000;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === agentMessageId
-                ? { ...msg, content: data.output, status: 'success' }
-                : msg
-            )
-          );
-          setIsRunning(false);
-          setRetryCount(0); // 成功后重置重试计数
-
-          // 保存到测试历史
-          onTestComplete({
-            id: `test-${Date.now()}`,
-            input: messageContent,
-            output: data.output,
-            success: data.success,
-            duration: data.duration,
-            timestamp: new Date().toISOString(),
-            model: data.model,
-            agentId,
-          });
-        },
-        // onError
-        (error: string) => {
-          // 重试逻辑
-          if (retryCount < MAX_RETRIES) {
-            const nextRetryCount = retryCount + 1;
-            setRetryCount(nextRetryCount);
-
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === agentMessageId
-                  ? {
-                      ...msg,
-                      content: `${fullOutput}\n⚠️ 请求失败，${2}秒后自动重试 (${nextRetryCount}/${MAX_RETRIES})...`,
-                      status: 'error'
-                    }
-                  : msg
-              )
-            );
-
-            setIsRunning(false);
-
-            setTimeout(() => {
-              handleSend(currentInputRef.current);
-            }, 2000);
-          } else {
-            // 达到最大重试次数
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === agentMessageId
-                  ? {
-                      ...msg,
-                      content: `${error}\n\n❌ 已达到最大重试次数 (${MAX_RETRIES})，请稍后再试`,
-                      status: 'error'
-                    }
-                  : msg
-              )
-            );
-            setIsRunning(false);
-            setRetryCount(0);
-
-            onTestComplete({
-              id: `test-${Date.now()}`,
-              input: messageContent,
-              output: error,
-              success: false,
-              duration: (Date.now() - startTime) / 1000,
-              timestamp: new Date().toISOString(),
-              model: 'unknown',
-              agentId,
-            });
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Send message failed:', error);
-
-      // 重试逻辑
-      if (retryCount < MAX_RETRIES) {
-        const nextRetryCount = retryCount + 1;
-        setRetryCount(nextRetryCount);
-
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === agentMessageId
-              ? {
-                  ...msg,
-                  content: `发送失败，${2}秒后自动重试 (${nextRetryCount}/${MAX_RETRIES})...`,
-                  status: 'error'
-                }
-              : msg
-          )
-        );
-
-        setIsRunning(false);
-
-        setTimeout(() => {
-          handleSend(currentInputRef.current);
-        }, 2000);
-      } else {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === agentMessageId
-              ? {
-                  ...msg,
-                  content: `发送失败\n\n❌ 已达到最大重试次数 (${MAX_RETRIES})，请稍后再试`,
-                  status: 'error'
-                }
-              : msg
-          )
-        );
-        setIsRunning(false);
-        setRetryCount(0);
-      }
+    // 发送测试消息
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'test',
+        prompt: messageContent
+      }));
     }
-  }, [agentId, input, isRunning, retryCount, onTestComplete]);
-
-  // 首次加载时自动发送启动消息
-  useEffect(() => {
-    if (!hasAutoSent && messages.length === 0 && !isRunning) {
-      const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力和职责。`;
-      setHasAutoSent(true);
-
-      // 添加系统消息显示正在启动
-      const systemMessage: ChatMessage = {
-        id: `system-${Date.now()}`,
-        role: 'system',
-        content: `🚀 正在启动 Agent: ${agentName}\n⏳ 初始化中...`,
-        timestamp: new Date().toISOString(),
-        status: 'sending',
-      };
-      setMessages([systemMessage]);
-
-      // 延迟 500ms 发送，确保组件完全加载
-      const timer = setTimeout(() => {
-        handleSend(welcomeMessage);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [hasAutoSent, messages.length, isRunning, agentName, handleSend]);
+  }, [input, isRunning, isConnected]);
 
   return (
     <div className="flex flex-col h-[500px]">
@@ -234,7 +230,9 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             <div className="text-center">
               <p>👋 欢迎使用对话模式</p>
-              <p className="mt-2">输入消息与 Agent 对话，支持一键优化 prompt</p>
+              <p className="mt-2">
+                {isConnected ? '正在连接 Agent...' : '连接中...'}
+              </p>
             </div>
           </div>
         ) : (
@@ -258,7 +256,7 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
               }
             }}
             placeholder="输入消息..."
-            disabled={isRunning}
+            disabled={isRunning || !isConnected}
             className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl resize-none focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
             rows={3}
           />
@@ -266,12 +264,12 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
             <PromptOptimizeButton
               value={input}
               onChange={setInput}
-              disabled={isRunning}
+              disabled={isRunning || !isConnected}
               iconOnly
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isRunning}
+              disabled={!input.trim() || isRunning || !isConnected}
               className="p-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all"
               title="发送消息"
             >
