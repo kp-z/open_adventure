@@ -486,7 +486,7 @@ export const Layout = () => {
                   }
                 `}
                 >
-                  Claude
+                  Open
                 </span>
                 <span
                   className={`
@@ -498,13 +498,7 @@ export const Layout = () => {
                   }
                 `}
                 >
-                  {mode === "adventure"
-                    ? lang === "zh"
-                      ? "大冒险"
-                      : "Adventure"
-                    : lang === "zh"
-                      ? "管理器"
-                      : "Manager"}
+                  Adventure
                 </span>
               </motion.div>
             </div>
@@ -590,7 +584,7 @@ export const Layout = () => {
                     }
                   `}
                   >
-                    Claude
+                    Open
                   </span>
                   <span
                     className={`
@@ -602,13 +596,7 @@ export const Layout = () => {
                     }
                   `}
                   >
-                    {mode === "adventure"
-                      ? lang === "zh"
-                        ? "大冒险"
-                        : "Adventure"
-                      : lang === "zh"
-                        ? "管理器"
-                        : "Manager"}
+                    Adventure
                   </span>
                 </div>
               </button>
