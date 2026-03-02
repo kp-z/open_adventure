@@ -1,10 +1,28 @@
 #!/bin/bash
 
+# 严格模式：遇到错误立即退出
+set -e
+
 # 获取脚本所在目录
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+# 创建 PID 文件目录
+PID_DIR="$SCRIPT_DIR/.run"
+mkdir -p "$PID_DIR"
+BACKEND_PID_FILE="$PID_DIR/backend.pid"
+FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
+
+# 检查是否为后台运行模式
+DAEMON_MODE=false
+if [[ "$1" == "-d" ]] || [[ "$1" == "--daemon" ]]; then
+    DAEMON_MODE=true
+fi
+
 echo "🚀 Starting Claude Manager..."
+if [ "$DAEMON_MODE" = true ]; then
+    echo "📌 Running in daemon mode (background)"
+fi
 echo ""
 
 # 检查 backend 和 frontend 目录
@@ -64,6 +82,18 @@ export ENV=development
 # 确保日志目录存在
 mkdir -p "$SCRIPT_DIR/docs/logs"
 
+# 检查并清理旧的 PID 文件
+if [ -f "$BACKEND_PID_FILE" ]; then
+    OLD_PID=$(cat "$BACKEND_PID_FILE")
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "⚠️  Found running backend process from previous session (PID: $OLD_PID)"
+        echo "Cleaning up old process..."
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 1
+    fi
+    rm -f "$BACKEND_PID_FILE"
+fi
+
 # 检查端口占用
 echo "Checking port availability..."
 if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -74,10 +104,17 @@ if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     read -r response
     if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
         echo "Stopping existing backend processes..."
-        pkill -f "uvicorn app.main:app" 2>/dev/null || true
-        pkill -f "python run.py" 2>/dev/null || true
+        # 强制清理所有占用端口 8000 的进程
+        lsof -ti :8000 | xargs kill -9 2>/dev/null || true
         sleep 2
-        echo "✅ Existing processes stopped"
+
+        # 验证端口是否已释放
+        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+            echo "❌ Failed to release port 8000"
+            echo "Please manually stop the processes and try again"
+            exit 1
+        fi
+        echo "✅ Port 8000 released"
     else
         echo "❌ Cannot start: Port 8000 is occupied"
         echo "Please stop the existing service manually or choose 'y' to stop it automatically"
@@ -87,9 +124,24 @@ fi
 
 # 启动后端服务器（后台运行）
 echo "Starting backend server..."
+# macOS 不支持 setsid，直接使用后台运行
 python run.py > ../docs/logs/backend.log 2>&1 &
 BACKEND_PID=$!
+echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 echo "✅ Backend started (PID: $BACKEND_PID)"
+
+# 等待后端启动（最多 10 秒）
+echo "Waiting for backend to start..."
+for i in {1..20}; do
+    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "✅ Backend is ready"
+        break
+    fi
+    if [ $i -eq 20 ]; then
+        echo "⚠️  Backend may not have started properly, check logs/backend.log"
+    fi
+    sleep 0.5
+done
 
 # ============ 前端设置 ============
 cd "$SCRIPT_DIR/frontend"
@@ -137,31 +189,124 @@ fi
 # 启动前端服务器
 echo ""
 echo "Starting frontend server..."
-echo ""
-echo "============================================"
-echo "✅ Claude Manager is running!"
-echo "============================================"
-echo ""
-echo "🌐 Local Access:"
-echo "   Frontend: http://localhost:5173"
-echo "   Backend API: http://localhost:8000"
-echo "   API Docs: http://localhost:8000/docs"
-if [ -n "$LAN_IP" ]; then
+
+if [ "$DAEMON_MODE" = true ]; then
+    # 后台模式：前端也在后台运行
+    npm run dev > ../docs/logs/frontend.log 2>&1 &
+    FRONTEND_PID=$!
+    echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
+
+    # 等待前端启动（最多 10 秒）
+    echo "Waiting for frontend to start..."
+    for i in {1..20}; do
+        if lsof -Pi :5173 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "✅ Frontend is ready (PID: $FRONTEND_PID)"
+            break
+        fi
+        if [ $i -eq 20 ]; then
+            echo "⚠️  Frontend may not have started properly, check docs/logs/frontend.log"
+        fi
+        sleep 0.5
+    done
+
     echo ""
-    echo "🌍 LAN Access (from other devices):"
-    echo "   Frontend: http://${LAN_IP}:5173"
-    echo "   Backend API: http://${LAN_IP}:8000"
+    echo "============================================"
+    echo "✅ Claude Manager is running in background!"
+    echo "============================================"
+    echo ""
+    echo "🌐 Local Access:"
+    echo "   Frontend: http://localhost:5173"
+    echo "   Backend API: http://localhost:8000"
+    echo "   API Docs: http://localhost:8000/docs"
+    if [ -n "$LAN_IP" ]; then
+        echo ""
+        echo "🌍 LAN Access (from other devices):"
+        echo "   Frontend: http://${LAN_IP}:5173"
+        echo "   Backend API: http://${LAN_IP}:8000"
+    fi
+    echo ""
+    echo "📋 Process IDs:"
+    echo "   Backend PID: $BACKEND_PID"
+    echo "   Frontend PID: $FRONTEND_PID"
+    echo ""
+    echo "📝 Logs:"
+    echo "   Backend: docs/logs/backend.log"
+    echo "   Frontend: docs/logs/frontend.log"
+    echo ""
+    echo "🛑 To stop all servers, run: ./stop.sh"
+    echo "============================================"
+    echo ""
+else
+    # 前台模式：前端在前台运行
+    echo ""
+    echo "============================================"
+    echo "✅ Claude Manager is running!"
+    echo "============================================"
+    echo ""
+    echo "🌐 Local Access:"
+    echo "   Frontend: http://localhost:5173"
+    echo "   Backend API: http://localhost:8000"
+    echo "   API Docs: http://localhost:8000/docs"
+    if [ -n "$LAN_IP" ]; then
+        echo ""
+        echo "🌍 LAN Access (from other devices):"
+        echo "   Frontend: http://${LAN_IP}:5173"
+        echo "   Backend API: http://${LAN_IP}:8000"
+    fi
+    echo ""
+    echo "Press Ctrl+C to stop all servers"
+    echo "============================================"
+    echo ""
+
+    # 设置退出信号处理
+    cleanup() {
+        echo ""
+        echo "🛑 Shutting down servers..."
+
+        # 1. 优先使用 PID 文件中的 PID
+        if [ -f "$BACKEND_PID_FILE" ]; then
+            SAVED_PID=$(cat "$BACKEND_PID_FILE")
+            if [ -n "$SAVED_PID" ] && kill -0 "$SAVED_PID" 2>/dev/null; then
+                echo "Stopping backend (PID: $SAVED_PID)..."
+                # 使用进程组 kill，确保子进程也被停止
+                kill -- -"$SAVED_PID" 2>/dev/null || kill "$SAVED_PID" 2>/dev/null
+                # 等待进程退出（最多 5 秒）
+                for i in {1..10}; do
+                    if ! kill -0 "$SAVED_PID" 2>/dev/null; then
+                        break
+                    fi
+                    sleep 0.5
+                done
+            fi
+            rm -f "$BACKEND_PID_FILE"
+        fi
+
+        # 2. 如果 BACKEND_PID 变量存在，也尝试清理
+        if [ -n "$BACKEND_PID" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
+            kill -- -"$BACKEND_PID" 2>/dev/null || kill "$BACKEND_PID" 2>/dev/null
+            wait "$BACKEND_PID" 2>/dev/null
+        fi
+
+        # 3. 额外保险：强制清理可能残留的进程
+        pkill -f "uvicorn app.main:app" 2>/dev/null || true
+        pkill -f "python.*run\.py" 2>/dev/null || true
+
+        # 4. 最后验证端口是否释放
+        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "⚠️  Warning: Port 8000 still occupied, forcing cleanup..."
+            lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+        fi
+
+        echo "✅ All servers stopped"
+        exit 0
+    }
+
+    # 捕获 Ctrl+C (SIGINT) 和 SIGTERM
+    trap cleanup SIGINT SIGTERM
+
+    # 启动前端（前台运行）
+    npm run dev
+
+    # 当前端正常退出时，也停止后端
+    cleanup
 fi
-echo ""
-echo "Press Ctrl+C to stop all servers"
-echo "============================================"
-echo ""
-
-# 启动前端（前台运行）
-npm run dev
-
-# 当前端停止时，也停止后端
-echo ""
-echo "Stopping backend server..."
-kill $BACKEND_PID 2>/dev/null
-echo "✅ All servers stopped"

@@ -135,6 +135,33 @@ class ConnectionManager:
 
         logger.debug(f"Broadcasted execution update to {len(self.active_connections)} clients")
 
+    async def broadcast_terminal_execution_update(self, execution_data: dict):
+        """
+        广播 terminal 执行状态更新到所有连接的客户端
+
+        Args:
+            execution_data: 执行数据字典，包含 session_id 等信息
+        """
+        message = {
+            "type": "terminal_execution_update",
+            "data": execution_data
+        }
+
+        # 广播到所有活跃连接
+        disconnected_clients = []
+        for client_id, connection in self.active_connections.items():
+            try:
+                await connection.send_json(message)
+            except Exception as e:
+                logger.error(f"Failed to send message to {client_id}: {e}")
+                disconnected_clients.append(client_id)
+
+        # 清理断开的连接
+        for client_id in disconnected_clients:
+            self.disconnect(client_id)
+
+        logger.debug(f"Broadcasted terminal execution update to {len(self.active_connections)} clients")
+
     async def shutdown(self):
         """
         关闭所有连接并停止清理任务

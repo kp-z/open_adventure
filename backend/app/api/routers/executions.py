@@ -170,3 +170,42 @@ async def get_execution_stats_by_type(
     """
     repo = ExecutionRepository(db)
     return await repo.count_by_type()
+
+
+@router.get("/session/{session_id}", response_model=ExecutionResponse)
+async def get_execution_by_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    根据 session_id 获取执行记录（用于页面恢复）
+
+    Args:
+        session_id: Terminal session ID
+
+    Returns:
+        ExecutionResponse: 执行记录
+    """
+    repo = ExecutionRepository(db)
+    execution = await repo.get_by_session_id(session_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found for this session")
+
+    return ExecutionResponse.model_validate(execution)
+
+
+@router.get("/active-sessions", response_model=List[ExecutionResponse])
+async def get_active_sessions(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取所有活跃的 session 执行记录
+
+    Returns:
+        List[ExecutionResponse]: 活跃的执行记录列表
+    """
+    repo = ExecutionRepository(db)
+    executions = await repo.get_active_sessions()
+
+    return [ExecutionResponse.model_validate(e) for e in executions]

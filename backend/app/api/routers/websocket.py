@@ -45,7 +45,7 @@ async def get_websocket_stats(
         "connections": connections
     }
 
-@router.websocket("/ws/executions")
+@router.websocket("/executions")
 async def websocket_executions(
     websocket: WebSocket,
     client_id: str = Query(..., description="客户端唯一标识"),

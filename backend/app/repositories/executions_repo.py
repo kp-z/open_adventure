@@ -85,3 +85,39 @@ class ExecutionRepository(BaseRepository[Execution]):
             result[exec_type.value] = count_result.scalar_one()
 
         return result
+
+    async def get_by_session_id(self, session_id: str) -> Optional[Execution]:
+        """
+        根据 session_id 获取执行记录
+
+        Args:
+            session_id: Terminal session ID
+
+        Returns:
+            Optional[Execution]: 执行记录，如果不存在则返回 None
+        """
+        result = await self.db.execute(
+            select(Execution)
+            .where(Execution.session_id == session_id)
+            .order_by(Execution.created_at.desc())
+        )
+        return result.scalars().first()
+
+    async def get_active_sessions(self) -> List[Execution]:
+        """
+        获取所有活跃的 session 执行记录（状态为 running 或 pending）
+
+        Returns:
+            List[Execution]: 活跃的执行记录列表
+        """
+        from app.models.task import ExecutionStatus
+
+        result = await self.db.execute(
+            select(Execution)
+            .where(
+                Execution.session_id.isnot(None),
+                Execution.status.in_([ExecutionStatus.RUNNING, ExecutionStatus.PENDING])
+            )
+            .order_by(Execution.last_activity_at.desc())
+        )
+        return result.scalars().all()

@@ -19,6 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.repositories.project_path_repository import ProjectPathRepository
 from app.services.project_path_service import ProjectPathService
+from app.repositories.executions_repo import ExecutionRepository
+from app.repositories.task_repository import TaskRepository
+from app.models.task import ExecutionType, ExecutionStatus, TaskStatus
+from app.services.websocket_manager import get_connection_manager
 
 router = APIRouter()
 
@@ -36,6 +40,7 @@ class TerminalSession:
         self.initial_dir = initial_dir
         self.auto_start_claude = auto_start_claude
         self.websocket = None  # 当前连接的 WebSocket
+        self.execution_id = None  # 关联的 execution ID
 
     def is_process_alive(self) -> bool:
         """检查 PTY 进程是否还在运行"""
@@ -262,6 +267,66 @@ async def terminal_websocket(
         session.websocket = websocket
         print(f"[Terminal] Active sessions after: {len(sessions)}")
 
+        # 创建执行记录
+        try:
+            task_repo = TaskRepository(db)
+            execution_repo = ExecutionRepository(db)
+
+            # 创建 Task
+            from app.models.task import Task
+            task = Task(
+                title=f"Terminal Session: {initial_dir or 'Home'}" if initial_dir else "Terminal Session",
+                description=f"Terminal session started at {initial_dir or 'home directory'}",
+                project_path=initial_dir,
+                status=TaskStatus.RUNNING
+            )
+            task = await task_repo.create(task)
+            await db.commit()
+            await db.refresh(task)
+
+            # 创建 Execution
+            from app.models.task import Execution
+            execution = Execution(
+                task_id=task.id,
+                workflow_id=1,  # 使用默认 workflow ID，或者可以创建一个专门的 terminal workflow
+                execution_type=ExecutionType.AGENT_TEST,
+                status=ExecutionStatus.RUNNING,
+                session_id=session_id,
+                started_at=datetime.now(),
+                last_activity_at=datetime.now(),
+                is_background=True
+            )
+            execution = await execution_repo.create(execution)
+            await db.commit()
+            await db.refresh(execution)
+
+            session.execution_id = execution.id
+            print(f"[Terminal] Created execution record: {execution.id} for session {session_id}")
+
+            # 广播执行记录创建
+            ws_manager = get_connection_manager()
+            await ws_manager.broadcast_terminal_execution_update({
+                "id": execution.id,
+                "task_id": task.id,
+                "session_id": session_id,
+                "execution_type": "agent_test",
+                "status": "running",
+                "started_at": execution.started_at.isoformat() if execution.started_at else None,
+                "created_at": execution.created_at.isoformat(),
+                "task": {
+                    "id": task.id,
+                    "title": task.title,
+                    "description": task.description,
+                    "project_path": task.project_path
+                }
+            })
+            print(f"[Terminal] Broadcasted terminal execution update for session {session_id}")
+
+        except Exception as e:
+            print(f"[Terminal] Failed to create execution record: {e}")
+            import traceback
+            traceback.print_exc()
+
         # Send session ID to client
         await websocket.send_text(f"\x1b]0;SESSION_ID:{session_id}\x07")  # 使用 OSC 序列发送 session ID
 
@@ -360,6 +425,19 @@ async def terminal_websocket(
             session.websocket = None  # 断开 WebSocket 连接
             print(f"[Terminal] Session {session_id} WebSocket disconnected, but session kept alive")
             print(f"[Terminal] Session PID: {session.pid}, Process alive: {session.is_process_alive()}")
+
+            # 更新执行记录的最后活动时间
+            if session.execution_id:
+                try:
+                    execution_repo = ExecutionRepository(db)
+                    execution = await execution_repo.get(session.execution_id)
+                    if execution:
+                        execution.last_activity_at = datetime.now()
+                        await db.commit()
+                        print(f"[Terminal] Updated last_activity_at for execution {session.execution_id}")
+                except Exception as e:
+                    print(f"[Terminal] Failed to update execution last_activity_at: {e}")
+
         print(f"[Terminal] Active sessions remaining: {len(sessions)}")
         try:
             await websocket.close()

@@ -105,6 +105,12 @@ class Execution(Base):
     test_input: Mapped[Optional[str]] = mapped_column(String(5000), nullable=True)
     test_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Agent Session 相关字段
+    session_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_background: Mapped[bool] = mapped_column(default=False, nullable=False)
+    chat_history: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON 格式的聊天历史
+
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
