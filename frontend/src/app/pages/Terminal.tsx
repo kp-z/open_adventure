@@ -58,12 +58,6 @@ const TerminalPane: React.FC<{
       console.log('[TerminalPane] Terminal focused:', reason);
     };
 
-    // 点击或触摸时聚焦
-    const handleInteraction = (e: Event) => {
-      // 不阻止默认行为，允许正常的触摸滚动
-      focusTerminal('interaction');
-    };
-
     // 监听焦点事件（使用 focusin/focusout，支持冒泡）
     const handleFocusIn = (e: FocusEvent) => {
       console.log('[TerminalPane] Focus in:', e.target);
@@ -116,8 +110,6 @@ const TerminalPane: React.FC<{
     };
 
     const terminalElement = terminalRef.current;
-    terminalElement.addEventListener('click', handleInteraction);
-    terminalElement.addEventListener('touchstart', handleInteraction, { passive: false });
     terminalElement.addEventListener('focusin', handleFocusIn);
     terminalElement.addEventListener('focusout', handleFocusOut);
     terminalElement.addEventListener('scroll', handleScroll, { passive: true });
@@ -125,8 +117,8 @@ const TerminalPane: React.FC<{
     terminalElement.addEventListener('compositionupdate', handleCompositionUpdate);
     terminalElement.addEventListener('compositionend', handleCompositionEnd);
 
-    // 初始聚焦
-    setTimeout(() => focusTerminal('initial'), 100);
+    // 移除初始自动聚焦，只在用户主动点击键盘按钮时聚焦
+    // setTimeout(() => focusTerminal('initial'), 100);
 
     // 窗口大小变化时重新适配
     const handleResize = () => {
@@ -145,8 +137,6 @@ const TerminalPane: React.FC<{
 
     return () => {
       resizeObserver.disconnect();
-      terminalElement.removeEventListener('click', handleInteraction);
-      terminalElement.removeEventListener('touchstart', handleInteraction);
       terminalElement.removeEventListener('focusin', handleFocusIn);
       terminalElement.removeEventListener('focusout', handleFocusOut);
       terminalElement.removeEventListener('scroll', handleScroll);
@@ -336,25 +326,25 @@ const Terminal = () => {
     };
   }, [isMobile, activeTerminal]);
 
-  // 键盘弹出时自动滚动到底部
-  useEffect(() => {
-    if (isKeyboardVisible && activeTerminal) {
-      setTimeout(() => {
-        activeTerminal.term.scrollToBottom();
-      }, 100);
-    }
-  }, [isKeyboardVisible, activeTerminal]);
+  // 移除键盘弹出时自动滚动到底部，避免意外聚焦
+  // useEffect(() => {
+  //   if (isKeyboardVisible && activeTerminal) {
+  //     setTimeout(() => {
+  //       activeTerminal.term.scrollToBottom();
+  //     }, 100);
+  //   }
+  // }, [isKeyboardVisible, activeTerminal]);
 
-  // 移动端：当终端变为活跃时自动聚焦
-  useEffect(() => {
-    if (isMobile && activeTerminal) {
-      // 延迟聚焦，确保 DOM 已更新
-      const timer = setTimeout(() => {
-        activeTerminal.term.focus();
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [isMobile, activeTabId, activeTerminal]);
+  // 移动端：移除自动聚焦，只在用户点击键盘按钮时聚焦
+  // useEffect(() => {
+  //   if (isMobile && activeTerminal) {
+  //     // 延迟聚焦，确保 DOM 已更新
+  //     const timer = setTimeout(() => {
+  //       activeTerminal.term.focus();
+  //     }, 150);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, [isMobile, activeTabId, activeTerminal]);
 
   const handleSplit = (direction: 'horizontal' | 'vertical') => {
     if (!activeTabId) return;
