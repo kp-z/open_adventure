@@ -58,44 +58,6 @@ export const WaterLevel: React.FC<WaterLevelProps> = ({ percentage, size = 60 })
         />
       </svg>
 
-      {/* 横向波浪线 - 第一层 */}
-      <svg
-        className="absolute left-0 w-full transition-all duration-1000 ease-out pointer-events-none"
-        style={{
-          top: `${wavePosition}px`,
-          height: '10px',
-          transform: 'translateY(-5px)',
-          zIndex: 21
-        }}
-        viewBox="0 0 1440 320"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <clipPath id={`wave-clip-${size}`}>
-            <rect x="0" y="0" width="1440" height="320" />
-          </clipPath>
-        </defs>
-        <path
-          stroke={color}
-          strokeWidth="6"
-          fill="none"
-          strokeOpacity="0.7"
-          clipPath={`url(#wave-clip-${size})`}
-          d="M0,160L48,144C96,128,192,96,288,90.7C384,85,480,107,576,128C672,149,768,171,864,165.3C960,160,1056,128,1152,122.7C1248,117,1344,139,1392,149.3L1440,160"
-        >
-          <animate
-            attributeName="d"
-            dur="3s"
-            repeatCount="indefinite"
-            values="
-              M0,160L48,144C96,128,192,96,288,90.7C384,85,480,107,576,128C672,149,768,171,864,165.3C960,160,1056,128,1152,122.7C1248,117,1344,139,1392,149.3L1440,160;
-              M0,192L48,181.3C96,171,192,149,288,154.7C384,160,480,192,576,197.3C672,203,768,181,864,170.7C960,160,1056,160,1152,170.7C1248,181,1344,203,1392,213.3L1440,224;
-              M0,160L48,144C96,128,192,96,288,90.7C384,85,480,107,576,128C672,149,768,171,864,165.3C960,160,1056,128,1152,122.7C1248,117,1344,139,1392,149.3L1440,160
-            "
-          />
-        </path>
-      </svg>
-
       {/* 横向波浪线 - 第二层（增加深度感） */}
       <svg
         className="absolute left-0 w-full transition-all duration-1000 ease-out pointer-events-none"

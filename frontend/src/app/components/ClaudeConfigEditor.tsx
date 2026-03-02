@@ -50,7 +50,8 @@ export const ClaudeConfigEditor: React.FC<ClaudeConfigEditorProps> = ({ onClose,
       setLoading(true);
       setError(null);
       const data = await claudeApi.getSettings();
-      setSettings(data);
+      // 使用当前生效的配置
+      setSettings(data.active_config);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
     } finally {

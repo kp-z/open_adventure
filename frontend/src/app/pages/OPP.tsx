@@ -65,13 +65,13 @@ export default function OPP() {
   ];
 
   return (
-    <div className="max-w-[1800px] mx-auto">
+    <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-6 sm:mb-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">OPP Command Center</h1>
-            <p className="text-gray-400">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">OPP Command Center</h1>
+            <p className="text-sm sm:text-base text-gray-400 mt-1">
               AI Task Orchestration Platform - Objectives, Planning & Progress
             </p>
           </div>
@@ -79,7 +79,7 @@ export default function OPP() {
             onClick={handleFeishuImport}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all group"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all group w-full sm:w-auto"
           >
             <FileDown size={18} className="text-white group-hover:animate-bounce" />
             <span className="text-white">从飞书导入</span>
@@ -88,7 +88,7 @@ export default function OPP() {
         </header>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -99,23 +99,23 @@ export default function OPP() {
                 onClick={() => setActiveTab(tab.id)}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className={`relative p-4 rounded-xl transition-all border-2 ${
+                className={`relative p-3 sm:p-4 rounded-xl transition-all border-2 ${
                   isActive ? tab.activeClass : tab.inactiveClass
                 }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 ${
                       isActive ? 'bg-white/10' : 'bg-white/5'
                     }`}
                   >
-                    <Icon size={20} className={isActive ? tab.iconColor : 'text-white/60'} />
+                    <Icon size={18} className={isActive ? tab.iconColor : 'text-white/60'} />
                   </div>
-                  <div className="text-left">
-                    <div className={`font-bold ${isActive ? 'text-white' : 'text-white/60'}`}>
+                  <div className="text-left min-w-0">
+                    <div className={`font-bold text-sm sm:text-base ${isActive ? 'text-white' : 'text-white/60'}`}>
                       {tab.label}
                     </div>
-                    <div className="text-xs text-white/40">{tab.description}</div>
+                    <div className="text-xs text-white/40 hidden sm:block">{tab.description}</div>
                   </div>
                 </div>
                 {isActive && (

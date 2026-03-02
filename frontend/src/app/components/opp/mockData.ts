@@ -21,6 +21,10 @@ export interface Objective {
   quarter: string;
   keyResults: KeyResult[];
   status: 'not-started' | 'in-progress' | 'at-risk' | 'completed';
+  progress: number;
+  priority: 'low' | 'medium' | 'high';
+  deadline: string;
+  alignment?: string;
 }
 
 export interface Task {
@@ -30,6 +34,18 @@ export interface Task {
   progress: number;
   assignedTo?: string;
   dueDate?: string;
+}
+
+export interface PlanTask {
+  id: string;
+  title: string;
+  description: string;
+  status: 'todo' | 'in-progress' | 'review' | 'done';
+  krId: string;
+  krTitle: string;
+  assignedAgent?: string;
+  priority: 'low' | 'medium' | 'high';
+  dueDate: string;
 }
 
 export interface Plan {
@@ -70,6 +86,10 @@ export const mockObjectives: Objective[] = [
     description: '优化核心功能，提升用户体验，降低响应时间',
     quarter: 'Q1 2026',
     status: 'in-progress',
+    progress: 65,
+    priority: 'high',
+    deadline: '2026-03-31',
+    alignment: 'Company Goal: Improve User Satisfaction',
     keyResults: [
       {
         id: 'kr-1',
@@ -121,6 +141,10 @@ export const mockObjectives: Objective[] = [
     description: '提升系统可靠性，降低故障率',
     quarter: 'Q1 2026',
     status: 'in-progress',
+    progress: 72,
+    priority: 'high',
+    deadline: '2026-03-31',
+    alignment: 'Company Goal: Operational Excellence',
     keyResults: [
       {
         id: 'kr-4',
@@ -158,6 +182,9 @@ export const mockObjectives: Objective[] = [
     description: '优化用户界面，提升用户满意度',
     quarter: 'Q1 2026',
     status: 'not-started',
+    progress: 15,
+    priority: 'medium',
+    deadline: '2026-03-31',
     keyResults: [
       {
         id: 'kr-6',
@@ -277,6 +304,109 @@ export const mockPlans: Plan[] = [
         dueDate: '2026-03-25',
       },
     ],
+  },
+];
+
+// Mock Plan Tasks 数据（用于 PlanView 的看板）
+export const mockPlanTasks: PlanTask[] = [
+  {
+    id: 'task-1',
+    title: '设计用户界面原型',
+    description: '创建移动端和桌面端的UI原型',
+    status: 'done',
+    krId: 'kr-1',
+    krTitle: 'API 响应时间优化',
+    assignedAgent: 'Performance Agent',
+    priority: 'high',
+    dueDate: '2026-02-15',
+  },
+  {
+    id: 'task-2',
+    title: '实现缓存策略',
+    description: '集成 Redis 缓存',
+    status: 'in-progress',
+    krId: 'kr-1',
+    krTitle: 'API 响应时间优化',
+    assignedAgent: 'Performance Agent',
+    priority: 'high',
+    dueDate: '2026-03-01',
+  },
+  {
+    id: 'task-3',
+    title: 'API 接口重构',
+    description: '优化 API 结构',
+    status: 'review',
+    krId: 'kr-1',
+    krTitle: 'API 响应时间优化',
+    assignedAgent: 'Performance Agent',
+    priority: 'medium',
+    dueDate: '2026-02-28',
+  },
+  {
+    id: 'task-4',
+    title: '性能测试',
+    description: '进行压力测试',
+    status: 'todo',
+    krId: 'kr-1',
+    krTitle: 'API 响应时间优化',
+    assignedAgent: 'Performance Agent',
+    priority: 'low',
+    dueDate: '2026-03-10',
+  },
+  {
+    id: 'task-5',
+    title: '慢查询分析',
+    description: '分析并优化慢查询',
+    status: 'done',
+    krId: 'kr-2',
+    krTitle: '数据库查询优化',
+    assignedAgent: 'Backend Team',
+    priority: 'high',
+    dueDate: '2026-02-10',
+  },
+  {
+    id: 'task-6',
+    title: '索引优化',
+    description: '添加和优化数据库索引',
+    status: 'in-progress',
+    krId: 'kr-2',
+    krTitle: '数据库查询优化',
+    assignedAgent: 'Backend Team',
+    priority: 'high',
+    dueDate: '2026-03-05',
+  },
+  {
+    id: 'task-7',
+    title: '查询语句重写',
+    description: '重写复杂查询',
+    status: 'todo',
+    krId: 'kr-2',
+    krTitle: '数据库查询优化',
+    assignedAgent: 'Backend Team',
+    priority: 'medium',
+    dueDate: '2026-03-15',
+  },
+  {
+    id: 'task-8',
+    title: '代码分割',
+    description: '实现前端代码分割',
+    status: 'in-progress',
+    krId: 'kr-3',
+    krTitle: '前端加载速度优化',
+    assignedAgent: 'Frontend Agent',
+    priority: 'high',
+    dueDate: '2026-03-20',
+  },
+  {
+    id: 'task-9',
+    title: '资源压缩',
+    description: '压缩图片和静态资源',
+    status: 'todo',
+    krId: 'kr-3',
+    krTitle: '前端加载速度优化',
+    assignedAgent: 'Frontend Agent',
+    priority: 'medium',
+    dueDate: '2026-03-25',
   },
 ];
 

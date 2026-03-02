@@ -98,22 +98,87 @@ async def check_claude_health():
 @router.get("/settings")
 async def get_claude_settings():
     """
-    获取 Claude settings.json 配置
+    获取 Claude 配置（支持 settings.json 和 cc-switch）
+
+    自动检测并返回当前生效的配置源，优先显示生效的配置
 
     Returns:
-        Dict: settings.json 的完整内容
+        Dict: 包含配置数据和元信息
+        {
+            "active_source": "cc-switch" | "settings.json" | "none",
+            "cc_switch": {...} | null,  # cc-switch 配置（如果存在）
+            "settings_json": {...} | null,  # settings.json 配置（如果存在）
+            "active_config": {...}  # 当前生效的配置
+        }
     """
+    result = {
+        "active_source": "none",
+        "cc_switch": None,
+        "settings_json": None,
+        "active_config": {}
+    }
+
+    # 1. 尝试读取 cc-switch 配置
+    cc_switch_db = Path.home() / ".cc-switch" / "cc-switch.db"
+    if cc_switch_db.exists():
+        try:
+            import sqlite3
+            conn = sqlite3.connect(str(cc_switch_db))
+            cursor = conn.cursor()
+
+            # 查询当前激活的 provider（is_current = 1）
+            cursor.execute("""
+                SELECT id, app_type, name, settings_config, provider_type
+                FROM providers
+                WHERE app_type = 'claude' AND is_current = 1
+                LIMIT 1
+            """)
+
+            row = cursor.fetchone()
+            if row:
+                provider_id, app_type, provider_name, settings_config_str, provider_type = row
+
+                # 解析 settings_config JSON
+                settings_config = json.loads(settings_config_str)
+
+                result["cc_switch"] = {
+                    "provider_id": provider_id,
+                    "provider_name": provider_name,
+                    "provider_type": provider_type or "custom",
+                    "config": settings_config
+                }
+                result["active_source"] = "cc-switch"
+                result["active_config"] = settings_config
+
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Failed to read cc-switch config: {e}")
+            # 不抛出异常，继续尝试读取 settings.json
+
+    # 2. 尝试读取 settings.json
     settings_file = settings.claude_config_dir / "settings.json"
+    if settings_file.exists():
+        try:
+            with open(settings_file, 'r', encoding='utf-8') as f:
+                settings_data = json.load(f)
 
-    if not settings_file.exists():
-        raise HTTPException(status_code=404, detail="settings.json not found")
+            result["settings_json"] = settings_data
 
-    try:
-        with open(settings_file, 'r', encoding='utf-8') as f:
-            settings_data = json.load(f)
-        return settings_data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read settings.json: {str(e)}")
+            # 如果 cc-switch 不存在或未激活，则 settings.json 为生效配置
+            if result["active_source"] == "none":
+                result["active_source"] = "settings.json"
+                result["active_config"] = settings_data
+        except Exception as e:
+            logger.warning(f"Failed to read settings.json: {e}")
+
+    # 3. 如果两者都不存在，返回错误
+    if result["active_source"] == "none":
+        raise HTTPException(
+            status_code=404,
+            detail="No Claude configuration found (neither cc-switch nor settings.json)"
+        )
+
+    return result
 
 
 @router.put("/settings")
