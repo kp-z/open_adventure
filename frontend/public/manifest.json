@@ -1,0 +1,10 @@
+{
+  "name": "Claude Manager",
+  "short_name": "Claude Manager",
+  "description": "Claude AI 生态管理系统",
+  "theme_color": "#0f111a",
+  "background_color": "#0f111a",
+  "display": "standalone",
+  "start_url": "/",
+  "icons": []
+}
