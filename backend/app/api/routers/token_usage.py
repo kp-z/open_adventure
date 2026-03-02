@@ -30,14 +30,9 @@ async def get_token_usage():
         TokenUsageResponse: Token 使用情况
     """
     try:
-        # 直接返回测试数据以便显示水位线
-        usage = {
-            "used": 112311,
-            "total": 200000,
-            "remaining": 87689,
-            "percentage": 56.16,
-            "last_updated": "2026-02-28T13:12:00.000000"
-        }
+        # 使用 TokenUsageService 获取真实数据
+        service = TokenUsageService()
+        usage = service.get_token_usage()
 
         return TokenUsageResponse(**usage)
     except Exception as e:

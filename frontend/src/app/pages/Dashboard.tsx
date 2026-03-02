@@ -318,16 +318,16 @@ const Dashboard = () => {
             <div className="block md:hidden">
               <div className="relative h-32 flex items-center justify-center">
                 {(() => {
-                  // 移动端气泡配置 - 更紧凑的布局，更小的尺寸
+                  // 移动端气泡配置 - 使用桌面端相同尺寸
                   const mobileBubbleConfigs = [
-                    { name: 'Haiku', size: 24, top: '20%', left: '5%' },
-                    { name: 'Sonnet', size: 36, top: '55%', left: '8%' },
-                    { name: 'Opus', size: 40, top: '15%', left: '25%' },
-                    { name: 'Haiku 3.5', size: 26, top: '65%', left: '32%' },
-                    { name: 'Sonnet 3.5', size: 34, top: '22%', left: '50%' },
-                    { name: 'Sonnet 4', size: 30, top: '60%', left: '58%' },
-                    { name: 'Opus 4', size: 42, top: '12%', left: '75%' },
-                    { name: 'Opus 4.5', size: 28, top: '58%', left: '85%' }
+                    { name: 'Haiku', size: 28, top: '15%', left: '8%' },
+                    { name: 'Sonnet', size: 48, top: '50%', left: '12%' },
+                    { name: 'Opus', size: 52, top: '10%', left: '28%' },
+                    { name: 'Haiku 3.5', size: 32, top: '65%', left: '35%' },
+                    { name: 'Sonnet 3.5', size: 45, top: '18%', left: '50%' },
+                    { name: 'Sonnet 4', size: 38, top: '58%', left: '60%' },
+                    { name: 'Opus 4', size: 55, top: '8%', left: '75%' },
+                    { name: 'Opus 4.5', size: 35, top: '55%', left: '85%' }
                   ];
 
                   return mobileBubbleConfigs.map((config, index) => {

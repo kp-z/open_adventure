@@ -176,7 +176,7 @@ const Terminal = () => {
   const [splitTerminalId, setSplitTerminalId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   const [projectPaths, setProjectPaths] = useState<ProjectPath[]>([]);
-  const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [selectedProjectPath, setSelectedProjectPath] = useState<string>('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -193,6 +193,10 @@ const Terminal = () => {
         const response = await fetch(`${API_CONFIG.BASE_URL}/project-paths?enabled=true`);
         const data = await response.json();
         setProjectPaths(data.items || []);
+        // 默认选择第一个
+        if (data.items && data.items.length > 0) {
+          setSelectedProjectPath(data.items[0].path);
+        }
       } catch (error) {
         console.error('Failed to fetch project paths:', error);
       }
@@ -200,11 +204,17 @@ const Terminal = () => {
     fetchProjectPaths();
   }, []);
 
-  // 处理选择项目并创建新终端
-  const handleSelectProject = (projectPath: string) => {
-    console.log('[Terminal] Creating new terminal for project path:', projectPath);
-    createTerminal(projectPath);
-    setShowProjectSelector(false);
+  // 当选择的项目路径改变时，创建新的终端进程
+  const handleProjectPathChange = (newPath: string) => {
+    console.log('[Terminal] handleProjectPathChange called with:', newPath);
+    console.log('[Terminal] Current terminals count:', terminals.length);
+    setSelectedProjectPath(newPath);
+
+    // 始终创建新的终端进程
+    console.log('[Terminal] Creating new terminal for project path:', newPath);
+    const newTerminal = createTerminal(newPath);
+    console.log('[Terminal] New terminal created:', newTerminal.id);
+    // createTerminal 内部已经调用了 setActiveTabId，所以新终端会自动成为活跃终端
   };
 
   // 初始化第一个终端（只在没有恢复 session 时）
@@ -217,14 +227,14 @@ const Terminal = () => {
 
     // 延迟检查，等待恢复逻辑完成
     const timer = setTimeout(() => {
-      if (terminals.length === 0) {
+      if (terminals.length === 0 && selectedProjectPath) {
         console.log('[Terminal] No terminals found, creating initial terminal');
-        createTerminal();
+        createTerminal(selectedProjectPath);
       }
     }, 200); // 等待恢复逻辑完成
 
     return () => clearTimeout(timer);
-  }, [isRestoring]);
+  }, [selectedProjectPath, isRestoring]);
 
   // 监听虚拟键盘事件
   useEffect(() => {
@@ -469,62 +479,29 @@ const Terminal = () => {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SHELL</h1>
           <div className="flex items-center gap-3 mt-2">
-            <p className="text-sm md:text-base text-gray-400">
-              <span className="text-green-500">{terminals.length} terminal{terminals.length > 1 ? 's' : ''}</span> active
-            </p>
+            {/* 项目路径选择器 */}
+            {projectPaths.length > 0 && (
+              <div className="flex items-center gap-2 relative z-10">
+                <FolderOpen size={14} className="text-gray-400 shrink-0" />
+                <select
+                  value={selectedProjectPath}
+                  onChange={(e) => handleProjectPathChange(e.target.value)}
+                  className="bg-black/40 text-gray-300 text-xs px-2 py-1 rounded border border-white/10 focus:border-green-500/50 focus:outline-none min-w-0 max-w-[200px] md:max-w-none"
+                >
+                  {projectPaths.map((path) => (
+                    <option key={path.id} value={path.path}>
+                      {path.alias}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex gap-2">
-          {/* 添加按钮 - 点击显示项目选择器 */}
-          <div className="relative">
-            <ActionButton
-              variant="secondary"
-              onClick={() => setShowProjectSelector(!showProjectSelector)}
-              title="New Tab"
-            >
-              <Plus size={16} />
-            </ActionButton>
-
-            {/* 项目选择器下拉菜单 */}
-            {showProjectSelector && (
-              <>
-                {/* 遮罩层 */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowProjectSelector(false)}
-                />
-
-                {/* 下拉菜单 */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden">
-                  <div className="p-2 border-b border-white/10">
-                    <p className="text-xs text-gray-400 px-2 py-1">选择项目路径</p>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {projectPaths.length > 0 ? (
-                      projectPaths.map((path) => (
-                        <button
-                          key={path.id}
-                          onClick={() => handleSelectProject(path.path)}
-                          className="w-full text-left px-4 py-2 hover:bg-white/10 transition-colors flex items-center gap-2"
-                        >
-                          <FolderOpen size={14} className="text-gray-400 shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white truncate">{path.alias}</p>
-                            <p className="text-xs text-gray-500 truncate">{path.path}</p>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-gray-500">
-                        暂无项目路径
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
+          <ActionButton variant="secondary" onClick={() => createTerminal(selectedProjectPath)} title="New Tab">
+            <Plus size={16} />
+          </ActionButton>
           {!isMobile && (
             <>
               <ActionButton

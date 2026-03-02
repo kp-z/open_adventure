@@ -55,15 +55,21 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
     });
   };
 
-  // 检查是否在 workflow 子路径下
-  const isWorkflowPath = location.pathname.startsWith('/workflows') || location.pathname === '/executions';
-
-  // 如果在 workflow 路径下，自动展开
+  // 自动展开逻辑
   React.useEffect(() => {
-    if (isWorkflowPath && !collapsed) {
-      setExpandedMenus(prev => new Set(prev).add('workflows'));
-    }
-  }, [isWorkflowPath, collapsed]);
+    navItems.forEach(item => {
+      if (item.subItems && item.id) {
+        const hasActiveChild = item.subItems.some(sub =>
+          location.pathname === sub.path ||
+          location.pathname.startsWith(sub.path + '/')
+        );
+
+        if (hasActiveChild && !collapsed) {
+          setExpandedMenus(prev => new Set(prev).add(item.id!));
+        }
+      }
+    });
+  }, [location.pathname, collapsed]);
 
   const navItems = [
     {
@@ -72,25 +78,33 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       icon: mode === "adventure" ? Sword : LayoutDashboard,
     },
     {
-      name: t("skills"),
-      path: "/skills",
+      name: t("library"),
+      path: "/library",
       icon: mode === "adventure" ? BookOpen : Wrench,
+      id: 'library',
+      subItems: [
+        {
+          name: t("skills"),
+          path: "/skills",
+          icon: mode === "adventure" ? BookOpen : Wrench,
+        },
+        {
+          name: t("agents"),
+          path: "/agents",
+          icon: mode === "adventure" ? Shield : Users,
+        },
+        {
+          name: t("teams"),
+          path: "/teams",
+          icon: mode === "adventure" ? UsersRound : Network,
+        },
+      ],
     },
     {
-      name: t("agents"),
-      path: "/agents",
-      icon: mode === "adventure" ? Shield : Users,
-    },
-    {
-      name: t("teams"),
-      path: "/teams",
-      icon: mode === "adventure" ? UsersRound : Network,
-    },
-    {
-      name: t("workflows"),
-      path: "/workflows",
+      name: t("automation"),
+      path: "/automation",
       icon: mode === "adventure" ? Map : GitBranch,
-      id: 'workflows',
+      id: 'automation',
       subItems: [
         {
           name: t("workflows"),
@@ -98,12 +112,12 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
           icon: mode === "adventure" ? Map : GitBranch,
         },
         {
-          name: "OPP",
+          name: t("opp"),
           path: "/workflows/opp",
           icon: Target,
         },
         {
-          name: t("executions"),
+          name: t("history"),
           path: "/executions",
           icon: mode === "adventure" ? Trophy : History,
         },
@@ -121,10 +135,15 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       {navItems.map((item) => {
         const hasSubItems = item.subItems && item.subItems.length > 0;
         const isExpanded = expandedMenus.has(item.id || '');
-        // 父菜单按钮只在直接访问父路径时高亮，不在子路径时高亮
-        const isParentActive = location.pathname === item.path;
-        // 检查是否有任何子菜单项被激活（用于自动展开）
-        const hasActiveChild = hasSubItems && item.subItems?.some(sub => location.pathname === sub.path);
+
+        // 父菜单三态逻辑
+        const isDirectActive = location.pathname === item.path;
+        const hasActiveChild = hasSubItems && item.subItems?.some(sub =>
+          location.pathname === sub.path
+        );
+
+        // 确定父菜单状态：active（直接激活）、partial（子菜单激活）、inactive（未激活）
+        const menuState = isDirectActive ? 'active' : hasActiveChild ? 'partial' : 'inactive';
 
         return (
           <div key={item.path}>
@@ -136,10 +155,14 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
                   className={`
                     w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all
                     ${
-                      isParentActive
+                      menuState === 'active'
                         ? mode === "adventure"
-                          ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                          : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                          ? "bg-yellow-500/30 text-yellow-300 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                          : "bg-blue-600/30 text-blue-300 border border-blue-500/50"
+                        : menuState === 'partial'
+                        ? mode === "adventure"
+                          ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                          : "bg-blue-600/10 text-blue-400 border border-blue-500/20"
                         : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }
                   `}
@@ -172,6 +195,7 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
                         <NavLink
                           key={subItem.path}
                           to={subItem.path}
+                          end={subItem.path === '/workflows'}
                           className={({ isActive }) => `
                             flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all
                             ${
@@ -261,8 +285,8 @@ export const Layout = () => {
   const [canGoForward, setCanGoForward] = React.useState(false);
   const [activeBottomMenu, setActiveBottomMenu] = React.useState<string | null>(null);
 
-  // 定义导航分组
-  const agentMenuItems = [
+  // 定义导航分组（移动端底部菜单）
+  const libraryMenuItems = [
     {
       name: t("skills"),
       path: "/skills",
@@ -278,38 +302,36 @@ export const Layout = () => {
       path: "/teams",
       icon: mode === "adventure" ? UsersRound : Network,
     },
-    {
-      name: t("terminal"),
-      path: "/terminal",
-      icon: Terminal,
-    },
   ];
 
-  const workflowMenuItems = [
+  const automationMenuItems = [
     {
       name: t("workflows"),
       path: "/workflows",
       icon: mode === "adventure" ? Map : GitBranch,
     },
     {
-      name: "OPP",
+      name: t("opp"),
       path: "/workflows/opp",
       icon: Target,
     },
     {
-      name: t("executions"),
+      name: t("history"),
       path: "/executions",
       icon: mode === "adventure" ? Trophy : History,
     },
   ];
 
   // 获取当前激活的菜单项
-  const getActiveMenuItem = (items: typeof agentMenuItems) => {
+  const getActiveMenuItem = (items: typeof libraryMenuItems) => {
     return items.find(item => item.path === location.pathname);
   };
 
-  const activeAgentItem = getActiveMenuItem(agentMenuItems);
-  const activeWorkflowItem = getActiveMenuItem(workflowMenuItems);
+  const activeLibraryItem = getActiveMenuItem(libraryMenuItems);
+  const activeAutomationItem = getActiveMenuItem(automationMenuItems);
+  // 检查是否在 library 或 automation 分组的任何页面（用于弹出菜单）
+  const isInLibraryGroup = libraryMenuItems.some(item => item.path === location.pathname);
+  const isInAutomationGroup = automationMenuItems.some(item => item.path === location.pathname);
 
   // 动态更新浏览器标签栏颜色
   React.useEffect(() => {
@@ -928,7 +950,7 @@ export const Layout = () => {
                   `}
                 >
                   <div className="space-y-1">
-                    {activeBottomMenu === 'agent' && agentMenuItems.map((item, index) => (
+                    {activeBottomMenu === 'library' && libraryMenuItems.map((item, index) => (
                       <motion.div
                         key={item.path}
                         initial={{ opacity: 0, x: -10 }}
@@ -953,7 +975,7 @@ export const Layout = () => {
                       </motion.div>
                     ))}
 
-                    {activeBottomMenu === 'workflow' && workflowMenuItems.map((item, index) => (
+                    {activeBottomMenu === 'automation' && automationMenuItems.map((item, index) => (
                       <motion.div
                         key={item.path}
                         initial={{ opacity: 0, x: -10 }}
@@ -997,10 +1019,16 @@ export const Layout = () => {
           {/* 菜单按钮 */}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300 text-gray-400 hover:text-white"
+            className={`
+              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              ${isSidebarOpen
+                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                : "text-gray-400 hover:text-white"
+              }
+            `}
           >
-            <Menu size={20} />
-            <span className="text-[10px] font-medium">菜单</span>
+            <Menu size={20} className="relative z-10" />
+            <span className="text-[10px] font-medium relative z-10">菜单</span>
           </button>
 
           {/* Dashboard */}
@@ -1027,55 +1055,72 @@ export const Layout = () => {
             )}
           </NavLink>
 
-          {/* Agent 分组 */}
+          {/* Library 分组 */}
           <button
             onClick={() => {
-              setActiveBottomMenu(activeBottomMenu === 'agent' ? null : 'agent');
+              setActiveBottomMenu(activeBottomMenu === 'library' ? null : 'library');
               setShowNotifications(false);
             }}
             className={`
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
-              ${
-                activeAgentItem || activeBottomMenu === 'agent'
-                  ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                  : "text-gray-400 hover:text-white"
+              ${activeLibraryItem || activeBottomMenu === 'library'
+                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                : "text-gray-400 hover:text-white"
               }
             `}
           >
-            {activeAgentItem ? (
-              <activeAgentItem.icon size={20} className="relative z-10" />
+            {activeLibraryItem ? (
+              <activeLibraryItem.icon size={20} className="relative z-10" />
             ) : (
-              mode === "adventure" ? <Shield size={20} className="relative z-10" /> : <Users size={20} className="relative z-10" />
+              mode === "adventure" ? <BookOpen size={20} className="relative z-10" /> : <Wrench size={20} className="relative z-10" />
             )}
             <span className="text-[10px] font-medium relative z-10">
-              {activeAgentItem ? activeAgentItem.name : 'Agent'}
+              {activeLibraryItem ? activeLibraryItem.name : t("library")}
             </span>
           </button>
 
-          {/* Workflow 分组 */}
+          {/* Automation 分组 */}
           <button
             onClick={() => {
-              setActiveBottomMenu(activeBottomMenu === 'workflow' ? null : 'workflow');
+              setActiveBottomMenu(activeBottomMenu === 'automation' ? null : 'automation');
               setShowNotifications(false);
             }}
             className={`
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
-              ${
-                activeWorkflowItem || activeBottomMenu === 'workflow'
-                  ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                  : "text-gray-400 hover:text-white"
+              ${activeAutomationItem || activeBottomMenu === 'automation'
+                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                : "text-gray-400 hover:text-white"
               }
             `}
           >
-            {activeWorkflowItem ? (
-              <activeWorkflowItem.icon size={20} className="relative z-10" />
+            {activeAutomationItem ? (
+              <activeAutomationItem.icon size={20} className="relative z-10" />
             ) : (
               mode === "adventure" ? <Map size={20} className="relative z-10" /> : <GitBranch size={20} className="relative z-10" />
             )}
             <span className="text-[10px] font-medium relative z-10">
-              {activeWorkflowItem ? activeWorkflowItem.name : 'Workflow'}
+              {activeAutomationItem ? activeAutomationItem.name : t("automation")}
             </span>
           </button>
+
+          {/* Terminal 按钮 */}
+          <NavLink
+            to="/terminal"
+            onClick={() => {
+              setActiveBottomMenu(null);
+              setShowNotifications(false);
+            }}
+            className={({ isActive }) => `
+              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              ${isActive && !activeBottomMenu && !showNotifications
+                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                : "text-gray-400 hover:text-white"
+              }
+            `}
+          >
+            <Terminal size={20} className="relative z-10" />
+            <span className="text-[10px] font-medium relative z-10">终端</span>
+          </NavLink>
 
           {/* 通知按钮 */}
           <button
