@@ -31,10 +31,43 @@ async def lifespan(app: FastAPI):
     # 启动终端清理任务
     terminal.start_cleanup_task()
 
+    # 启动 Agent Session 清理任务
+    import asyncio
+    from app.core.database import get_db
+    from app.services.agent_session_service import AgentSessionService
+
+    cleanup_task = None
+
+    async def cleanup_agent_sessions():
+        """定期清理超过 30 分钟无活动的 Agent 会话"""
+        while True:
+            try:
+                await asyncio.sleep(300)  # 每 5 分钟执行一次
+                async for db in get_db():
+                    session_service = AgentSessionService(db)
+                    count = session_service.cleanup_inactive_sessions()
+                    if count > 0:
+                        logger.info(f"Cleaned up {count} inactive agent sessions")
+                    break
+            except Exception as e:
+                logger.error(f"Error cleaning up agent sessions: {e}")
+
+    cleanup_task = asyncio.create_task(cleanup_agent_sessions())
+    logger.info("Agent session cleanup task started")
+
     yield
 
     # Shutdown
     logger.info("Shutting down Claude Manager Backend...")
+
+    # 停止 Agent Session 清理任务
+    if cleanup_task:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Agent session cleanup task stopped")
 
     # 停止终端清理任务并清理所有会话
     terminal.stop_cleanup_task()

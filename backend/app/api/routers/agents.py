@@ -47,6 +47,7 @@ def get_agent_service(db: AsyncSession = Depends(get_db)) -> AgentService:
 async def test_agent_websocket(
     websocket: WebSocket,
     agent_id: int,
+    execution_id: Optional[int] = None,  # 可选：重新连接到指定的 Execution ID
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -55,48 +56,125 @@ async def test_agent_websocket(
     支持双向通信：
     - 客户端发送测试消息
     - 服务器实时返回执行日志和结果
+    - 支持后台会话驻留
+    - 支持重新连接到指定的 Execution（通过 execution_id 查询参数）
     """
     import os
     import time
     import json
     import asyncio
     from app.adapters.claude.cli_client import ClaudeCliClient
+    from app.core.logging import get_logger
+    from app.services.agent_session_service_async import AgentSessionServiceAsync
+    from app.repositories.executions_repo import ExecutionRepository
+
+    logger = get_logger(__name__)
+    logger.info(f"[WebSocket] Accepting connection for agent {agent_id}, execution_id: {execution_id}")
 
     await websocket.accept()
+    logger.info(f"[WebSocket] Connection accepted for agent {agent_id}")
 
     try:
         # 获取 Agent 信息
+        logger.info(f"[WebSocket] Getting agent service for agent {agent_id}")
         service = get_agent_service(db)
+        logger.info(f"[WebSocket] Fetching agent {agent_id} from database")
         agent = await service.get_agent(agent_id)
+        logger.info(f"[WebSocket] Agent {agent_id} fetched successfully: {agent.name}")
 
-        # 发送就绪消息
+        # 获取或创建会话
+        session_service = AgentSessionServiceAsync(db)
+        execution_repo = ExecutionRepository(db)
+
+        # 如果指定了 execution_id，尝试重新连接到该 Execution
+        if execution_id:
+            session_execution = await execution_repo.get(execution_id)
+
+            if session_execution and session_execution.agent_id == agent_id:
+                # 更新最后活动时间
+                await session_service.update_activity(session_execution.session_id)
+                session_execution_id = session_execution.id
+                is_reconnect = True
+                logger.info(f"[WebSocket] Reconnected to execution {execution_id} for agent {agent_id}")
+            else:
+                # 如果 Execution 不存在或不属于该 Agent，创建新会话
+                logger.warning(f"[WebSocket] Execution {execution_id} not found or not belongs to agent {agent_id}, creating new session")
+                active_session = await session_service.get_active_session(agent_id)
+                is_reconnect = active_session is not None
+                session_execution = await session_service.get_or_create_session(agent_id)
+                session_execution_id = session_execution.id
+        else:
+            # 先检查是否有活跃的会话
+            active_session = await session_service.get_active_session(agent_id)
+            is_reconnect = active_session is not None
+
+            # 获取或创建会话
+            session_execution = await session_service.get_or_create_session(agent_id)
+            session_execution_id = session_execution.id
+
+        logger.info(f"[WebSocket] Session {session_execution.session_id} for agent {agent_id}, is_reconnect: {is_reconnect}")
+
+        # 解析聊天历史
+        chat_history = []
+        if session_execution.chat_history:
+            try:
+                chat_history = json.loads(session_execution.chat_history)
+            except:
+                chat_history = []
+
+        # 发送就绪消息（包含会话信息和聊天历史）
+        logger.info(f"[WebSocket] Sending ready message for agent {agent_id}")
         await websocket.send_json({
             'type': 'ready',
-            'message': f'Agent "{agent.name}" ready. Send your message to start.'
+            'message': f'Agent "{agent.name}" ready. Send your message to start.',
+            'session_id': session_execution.session_id,
+            'execution_id': session_execution.id,
+            'is_reconnect': is_reconnect,  # 基于是否找到活跃会话来判断
+            'chat_history': chat_history  # 返回聊天历史
         })
+        logger.info(f"[WebSocket] Ready message sent successfully for agent {agent_id}")
 
         # 等待客户端发送测试消息
+        logger.info(f"[WebSocket] Waiting for client message for agent {agent_id}")
         while True:
+            logger.info(f"[WebSocket] Receiving text from client for agent {agent_id}")
             data = await websocket.receive_text()
+            logger.info(f"[WebSocket] Received data from client for agent {agent_id}: {data[:100]}...")
             message_data = json.loads(data)
+            logger.info(f"[WebSocket] Parsed message data for agent {agent_id}: type={message_data.get('type')}")
 
             if message_data.get('type') == 'test':
                 prompt = message_data.get('prompt', '')
 
-                # 创建 Execution 记录
-                agent_test_service = AgentTestService(db)
-                execution = await agent_test_service.create_agent_test_execution(
-                    agent_id=agent_id,
-                    test_input=prompt
-                )
-                execution_id = execution.id
-
+                # 不再创建新的 Execution，而是更新现有会话的 Execution
                 # 更新执行状态为 RUNNING
                 execution_repo = ExecutionRepository(db)
-                execution = await execution_repo.get(execution_id)
+                execution = await execution_repo.get(session_execution_id)
                 execution.status = ExecutionStatus.RUNNING
-                execution.started_at = datetime.utcnow()
+                execution.test_input = prompt
+                if not execution.started_at:
+                    execution.started_at = datetime.utcnow()
                 await db.commit()
+
+                # 添加用户消息到聊天历史
+                if execution.chat_history:
+                    try:
+                        chat_history = json.loads(execution.chat_history)
+                    except:
+                        chat_history = []
+                else:
+                    chat_history = []
+
+                user_message = {
+                    'id': f'user-{int(time.time() * 1000)}',
+                    'role': 'user',
+                    'content': prompt,
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'status': 'success'
+                }
+                chat_history.append(user_message)
+
+                execution_id = session_execution_id
 
                 # 发送开始日志
                 await websocket.send_json({
@@ -208,9 +286,20 @@ Please respond according to your role and capabilities."""
                     execution = await execution_repo.get(execution_id)
 
                     if result_data["success"]:
+                        # 添加 Agent 响应到聊天历史
+                        agent_message = {
+                            'id': f'agent-{int(time.time() * 1000)}',
+                            'role': 'agent',
+                            'content': result_data['output'],
+                            'timestamp': datetime.utcnow().isoformat(),
+                            'status': 'success'
+                        }
+                        chat_history.append(agent_message)
+
                         # 更新为成功状态
                         execution.status = ExecutionStatus.SUCCEEDED
                         execution.test_output = result_data['output']
+                        execution.chat_history = json.dumps(chat_history)
                         execution.finished_at = datetime.utcnow()
                         await db.commit()
 
@@ -224,11 +313,22 @@ Please respond according to your role and capabilities."""
                             }
                         })
                     else:
-                        # 更新为失败状态
+                        # 添加错误消息到聊天历史
                         error_msg = f"Agent 执行失败: {result_data['error']}"
+                        agent_message = {
+                            'id': f'agent-{int(time.time() * 1000)}',
+                            'role': 'agent',
+                            'content': error_msg,
+                            'timestamp': datetime.utcnow().isoformat(),
+                            'status': 'error'
+                        }
+                        chat_history.append(agent_message)
+
+                        # 更新为失败状态
                         execution.status = ExecutionStatus.FAILED
                         execution.error_message = result_data['error']
                         execution.test_output = error_msg
+                        execution.chat_history = json.dumps(chat_history)
                         execution.finished_at = datetime.utcnow()
                         await db.commit()
 
@@ -246,15 +346,16 @@ Please respond according to your role and capabilities."""
                 await websocket.send_json({'type': 'pong'})
 
     except WebSocketDisconnect:
-        pass
+        logger.info(f"WebSocket disconnected for agent {agent_id}")
     except Exception as e:
+        logger.error(f"WebSocket error for agent {agent_id}: {str(e)}", exc_info=True)
         try:
             await websocket.send_json({
                 'type': 'error',
                 'message': f'WebSocket 错误: {str(e)}'
             })
-        except:
-            pass
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {str(send_error)}")
 
 
 @router.post(
@@ -638,6 +739,68 @@ async def delete_agent(
 
     # 删除数据库记录
     await service.delete_agent(agent_id)
+
+
+@router.get(
+    "/{agent_id}/status",
+    summary="查询 Agent 运行状态"
+)
+async def get_agent_status(
+    agent_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    查询 Agent 当前运行状态
+
+    返回：
+    - status: "idle" | "running"
+    - execution_id: 当前运行的 Execution ID（如果正在运行）
+    - session_id: 会话 ID（如果有活跃会话）
+    - last_activity_at: 最后活动时间
+    """
+    from app.services.agent_session_service import AgentSessionService
+
+    session_service = AgentSessionService(db)
+    active_session = session_service.get_active_session(agent_id)
+
+    if active_session:
+        return {
+            "status": "running",
+            "execution_id": active_session.id,
+            "session_id": active_session.session_id,
+            "last_activity_at": active_session.last_activity_at.isoformat() if active_session.last_activity_at else None
+        }
+    else:
+        return {
+            "status": "idle",
+            "execution_id": None,
+            "session_id": None,
+            "last_activity_at": None
+        }
+
+
+@router.post(
+    "/{agent_id}/stop",
+    summary="停止 Agent 运行"
+)
+async def stop_agent(
+    agent_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    停止 Agent 运行
+
+    将对应的 Execution 状态更新为 cancelled
+    """
+    from app.services.agent_session_service_async import AgentSessionServiceAsync
+
+    session_service = AgentSessionServiceAsync(db)
+    success = await session_service.stop_agent_session(agent_id)
+
+    if success:
+        return {"success": True, "message": "Agent 已停止"}
+    else:
+        return {"success": False, "message": "没有找到活跃的 Agent 会话"}
 
 
 
