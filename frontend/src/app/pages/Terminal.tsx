@@ -495,13 +495,12 @@ const Terminal = () => {
             </p>
             {/* 项目路径选择器 */}
             {projectPaths.length > 0 && (
-              <div className="flex items-center gap-2 relative z-[100]">
+              <div className="flex items-center gap-2 relative z-10">
                 <FolderOpen size={14} className="text-gray-400 shrink-0" />
                 <select
                   value={selectedProjectPath}
                   onChange={(e) => handleProjectPathChange(e.target.value)}
                   className="bg-black/40 text-gray-300 text-xs px-2 py-1 rounded border border-white/10 focus:border-green-500/50 focus:outline-none min-w-0 max-w-[200px] md:max-w-none"
-                  style={{ position: 'relative', zIndex: 100 }}
                 >
                   {projectPaths.map((path) => (
                     <option key={path.id} value={path.path}>

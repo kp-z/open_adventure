@@ -40,6 +40,30 @@ import { useNotifications } from "../contexts/NotificationContext";
 const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
   const { mode } = useMode();
   const { t } = useTranslation();
+  const location = useLocation();
+  const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenus(prev => {
+      const next = new Set(prev);
+      if (next.has(menuId)) {
+        next.delete(menuId);
+      } else {
+        next.add(menuId);
+      }
+      return next;
+    });
+  };
+
+  // 检查是否在 workflow 子路径下
+  const isWorkflowPath = location.pathname.startsWith('/workflows') || location.pathname === '/executions';
+
+  // 如果在 workflow 路径下，自动展开
+  React.useEffect(() => {
+    if (isWorkflowPath && !collapsed) {
+      setExpandedMenus(prev => new Set(prev).add('workflows'));
+    }
+  }, [isWorkflowPath, collapsed]);
 
   const navItems = [
     {
@@ -66,16 +90,24 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       name: t("workflows"),
       path: "/workflows",
       icon: mode === "adventure" ? Map : GitBranch,
-    },
-    {
-      name: "OPP",
-      path: "/workflows/opp",
-      icon: Target,
-    },
-    {
-      name: t("executions"),
-      path: "/executions",
-      icon: mode === "adventure" ? Trophy : History,
+      id: 'workflows',
+      subItems: [
+        {
+          name: t("workflows"),
+          path: "/workflows",
+          icon: mode === "adventure" ? Map : GitBranch,
+        },
+        {
+          name: "OPP",
+          path: "/workflows/opp",
+          icon: Target,
+        },
+        {
+          name: t("executions"),
+          path: "/executions",
+          icon: mode === "adventure" ? Trophy : History,
+        },
+      ],
     },
     {
       name: t("terminal"),
@@ -86,30 +118,108 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
 
   return (
     <nav className={`flex flex-col gap-2 ${collapsed ? 'p-2' : 'p-4'}`}>
-      {navItems.map((item) => (
-        <NavLink
-          key={item.path}
-          to={item.path}
-          title={collapsed ? item.name : undefined}
-          className={({ isActive }) => `
-            flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
-            ${
-              isActive
-                ? mode === "adventure"
-                  ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                  : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                : "text-gray-400 hover:bg-white/5 hover:text-white"
-            }
-          `}
-        >
-          <item.icon size={20} />
-          {!collapsed && (
-            <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-              {item.name}
-            </span>
-          )}
-        </NavLink>
-      ))}
+      {navItems.map((item) => {
+        const hasSubItems = item.subItems && item.subItems.length > 0;
+        const isExpanded = expandedMenus.has(item.id || '');
+        // 父菜单按钮只在直接访问父路径时高亮，不在子路径时高亮
+        const isParentActive = location.pathname === item.path;
+        // 检查是否有任何子菜单项被激活（用于自动展开）
+        const hasActiveChild = hasSubItems && item.subItems?.some(sub => location.pathname === sub.path);
+
+        return (
+          <div key={item.path}>
+            {hasSubItems && !collapsed ? (
+              // 有子菜单的项目
+              <>
+                <button
+                  onClick={() => toggleMenu(item.id!)}
+                  className={`
+                    w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all
+                    ${
+                      isParentActive
+                        ? mode === "adventure"
+                          ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                          : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    }
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon size={20} />
+                    <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                      {item.name}
+                    </span>
+                  </div>
+                  <motion.div
+                    animate={{ rotate: isExpanded ? 90 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronRight size={16} />
+                  </motion.div>
+                </button>
+
+                {/* 子菜单 */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden ml-4 mt-1 space-y-1"
+                    >
+                      {item.subItems?.map((subItem) => (
+                        <NavLink
+                          key={subItem.path}
+                          to={subItem.path}
+                          className={({ isActive }) => `
+                            flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all
+                            ${
+                              isActive
+                                ? mode === "adventure"
+                                  ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+                                  : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                                : "text-gray-400 hover:bg-white/5 hover:text-white"
+                            }
+                          `}
+                        >
+                          <subItem.icon size={18} />
+                          <span className="font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                            {subItem.name}
+                          </span>
+                        </NavLink>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            ) : (
+              // 普通菜单项或折叠状态
+              <NavLink
+                to={item.path}
+                title={collapsed ? item.name : undefined}
+                className={({ isActive }) => `
+                  flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
+                  ${
+                    isActive
+                      ? mode === "adventure"
+                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                        : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }
+                `}
+              >
+                <item.icon size={20} />
+                {!collapsed && (
+                  <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                    {item.name}
+                  </span>
+                )}
+              </NavLink>
+            )}
+          </div>
+        );
+      })}
       <div className={`mt-auto pt-4 border-t border-white/10 ${collapsed ? 'mx-1' : ''}`}>
         <NavLink
           to="/settings"
@@ -180,6 +290,11 @@ export const Layout = () => {
       name: t("workflows"),
       path: "/workflows",
       icon: mode === "adventure" ? Map : GitBranch,
+    },
+    {
+      name: "OPP",
+      path: "/workflows/opp",
+      icon: Target,
     },
     {
       name: t("executions"),
@@ -910,7 +1025,7 @@ export const Layout = () => {
             }}
             className={({ isActive }) => `
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
-              ${isActive
+              ${isActive && !activeBottomMenu && !showNotifications
                 ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 : "text-gray-400 hover:text-white"
               }
