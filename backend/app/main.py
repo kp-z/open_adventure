@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     # 启动 Agent Session 清理任务
     import asyncio
     from app.core.database import get_db
-    from app.services.agent_session_service import AgentSessionService
+    from app.services.agent_session_service_async import AgentSessionServiceAsync
 
     cleanup_task = None
 
@@ -44,8 +44,8 @@ async def lifespan(app: FastAPI):
             try:
                 await asyncio.sleep(300)  # 每 5 分钟执行一次
                 async for db in get_db():
-                    session_service = AgentSessionService(db)
-                    count = session_service.cleanup_inactive_sessions()
+                    session_service = AgentSessionServiceAsync(db)
+                    count = await session_service.cleanup_inactive_sessions()
                     if count > 0:
                         logger.info(f"Cleaned up {count} inactive agent sessions")
                     break
@@ -90,6 +90,21 @@ app = FastAPI(
     version=settings.app_version,
     lifespan=lifespan,
 )
+
+# Request ID Middleware
+import uuid
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+        from app.core.logging import set_request_id
+        set_request_id(request_id)
+        response = await call_next(request)
+        response.headers['X-Request-ID'] = request_id
+        return response
+
+app.add_middleware(RequestIDMiddleware)
 
 # Configure CORS
 app.add_middleware(

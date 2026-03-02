@@ -69,3 +69,35 @@ class TerminalExecutionUpdate(BaseModel):
     status: Optional[ExecutionStatus] = None
     output: Optional[str] = None
     error_message: Optional[str] = None
+
+
+class ExecutionCreate(BaseModel):
+    """创建执行记录"""
+    task_id: int
+    workflow_id: int
+    execution_type: ExecutionType
+    status: ExecutionStatus
+    agent_id: Optional[int] = None
+    test_input: Optional[str] = None
+    test_output: Optional[str] = None
+    error_message: Optional[str] = None
+
+    # Terminal 相关字段
+    session_id: Optional[str] = None
+    terminal_pid: Optional[int] = None
+    terminal_cwd: Optional[str] = None
+    terminal_command: Optional[str] = None
+    terminal_output: Optional[str] = None
+
+    # Agent 相关字段
+    agent_session_id: Optional[str] = None
+
+    # 时间字段
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+    last_activity_at: Optional[datetime] = None
+
+    # 其他字段
+    is_background: Optional[bool] = False
+    meta: Optional[Dict[str, Any]] = None
+

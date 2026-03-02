@@ -103,6 +103,18 @@ class TerminalSession:
     def start(self):
         """Start a new PTY session"""
         print(f"[Terminal] Starting new PTY session...")
+
+        # 在 fork 前，设置所有非标准文件描述符为 FD_CLOEXEC
+        # 这样子进程 exec 时会自动关闭这些描述符（包括 8000 端口的 socket）
+        import resource
+        max_fd = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+        for fd in range(3, min(max_fd, 1024)):  # 从 3 开始（跳过 stdin/stdout/stderr）
+            try:
+                flags = fcntl.fcntl(fd, fcntl.F_GETFD)
+                fcntl.fcntl(fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
+            except (OSError, ValueError):
+                pass  # 忽略无效的文件描述符
+
         self.pid, self.master_fd = pty.fork()
         print(f"[Terminal] PTY forked - PID: {self.pid}, FD: {self.master_fd}")
 
@@ -379,34 +391,35 @@ async def terminal_websocket(
             task_repo = TaskRepository(db)
             execution_repo = ExecutionRepository(db)
 
-            # 创建 Task
-            from app.models.task import Task
-            task = Task(
+            # 创建 Task - 使用 Schema
+            from app.schemas.task import TaskCreate
+            task_data = TaskCreate(
                 title=f"Terminal Session: {initial_dir or 'Home'}" if initial_dir else "Terminal Session",
                 description=f"Terminal session started at {initial_dir or 'home directory'}",
                 project_path=initial_dir,
                 status=TaskStatus.RUNNING
             )
-            task = await task_repo.create(task)
+            task = await task_repo.create(task_data)
             await db.commit()
             await db.refresh(task)
 
-            # 创建 Execution
-            from app.models.task import Execution
-            execution = Execution(
+            # 创建 Execution - 使用 Schema
+            from app.schemas.executions import ExecutionCreate
+            execution_data = ExecutionCreate(
                 task_id=task.id,
                 workflow_id=0,  # Terminal 不需要 workflow
                 execution_type=ExecutionType.TERMINAL,
                 status=ExecutionStatus.RUNNING,
+                agent_id=None,
                 session_id=session_id,
                 terminal_pid=session.pid,
                 terminal_cwd=initial_dir or os.path.expanduser('~'),
-                terminal_command="shell session",  # 初始命令
+                terminal_command="shell session",
                 started_at=datetime.now(),
                 last_activity_at=datetime.now(),
                 is_background=True
             )
-            execution = await execution_repo.create(execution)
+            execution = await execution_repo.create(execution_data)
             await db.commit()
             await db.refresh(execution)
 

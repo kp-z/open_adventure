@@ -1,0 +1,26 @@
+[Unit]
+Description=Claude Manager Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=your-user
+WorkingDirectory=/path/to/claude_manager
+Environment="ENV=production"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/path/to/claude_manager/backend/venv/bin/python /path/to/claude_manager/backend/run.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/path/to/claude_manager/docs/logs/backend.log
+StandardError=append:/path/to/claude_manager/docs/logs/error.log
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
