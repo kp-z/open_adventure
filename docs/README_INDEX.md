@@ -28,7 +28,8 @@
 - `backend/` - 后端开发指南
 
 ### 🔧 technical/
-技术文档和修复记录（10 个文件）
+技术文档和修复记录（11 个文件）
+- `20260302-skill-sync-and-cli-health-fix.md` - Skills 同步失败和 CLI Status 误报修复
 - `PACKAGING_FIX_SUMMARY.md` - 打包修复总结
 - `PACKAGING_SUCCESS_REPORT.md` - 打包成功报告
 - `PACKAGING_FIX.md` - 打包修复详情

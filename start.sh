@@ -25,6 +25,16 @@ if [ "$DAEMON_MODE" = true ]; then
 fi
 echo ""
 
+# ============ 插件安装 ============
+echo "🔌 Checking Claude plugins..."
+if [ -f "$SCRIPT_DIR/scripts/install_plugins.sh" ]; then
+    bash "$SCRIPT_DIR/scripts/install_plugins.sh"
+    echo ""
+else
+    echo "⚠️  Plugin installation script not found, skipping..."
+    echo ""
+fi
+
 # 检查 backend 和 frontend 目录
 if [ ! -d "backend" ]; then
     echo "❌ backend directory not found"

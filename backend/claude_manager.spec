@@ -5,8 +5,8 @@ from pathlib import Path
 
 block_cipher = None
 
-# 项目路径
-backend_dir = Path('/Users/kp/项目/Proj/claude_manager/backend')
+# 项目路径 - 使用相对路径
+backend_dir = Path(__file__).parent.resolve()
 project_root = backend_dir.parent
 frontend_dist = project_root / 'frontend' / 'dist'
 db_template = backend_dir / 'claude_manager.db'

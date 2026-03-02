@@ -121,3 +121,95 @@ class ExecutionRepository(BaseRepository[Execution]):
             .order_by(Execution.last_activity_at.desc())
         )
         return result.scalars().all()
+
+    async def create_terminal_execution(
+        self,
+        command: str,
+        cwd: str,
+        pid: Optional[int] = None
+    ) -> Execution:
+        """
+        创建 Terminal 执行记录
+
+        Args:
+            command: 执行的命令
+            cwd: 工作目录
+            pid: 进程 ID
+
+        Returns:
+            Execution: 创建的执行记录
+        """
+        from app.models.task import ExecutionType, ExecutionStatus, Task
+        from datetime import datetime
+
+        # 创建一个虚拟 Task（Terminal 不需要真实的 Task）
+        task = Task(
+            title=f"Terminal: {command[:50]}",
+            description=f"Terminal command execution: {command}",
+            status="pending"
+        )
+        self.db.add(task)
+        await self.db.flush()
+
+        # 创建 Execution
+        execution = Execution(
+            task_id=task.id,
+            workflow_id=0,  # Terminal 不需要 workflow
+            execution_type=ExecutionType.TERMINAL,
+            status=ExecutionStatus.RUNNING,
+            terminal_command=command,
+            terminal_cwd=cwd,
+            terminal_pid=pid,
+            started_at=datetime.utcnow()
+        )
+
+        self.db.add(execution)
+        await self.db.commit()
+        await self.db.refresh(execution)
+
+        return execution
+
+    async def update_terminal_execution(
+        self,
+        execution_id: int,
+        status: Optional[Any] = None,
+        output: Optional[str] = None,
+        error_message: Optional[str] = None
+    ) -> Execution:
+        """
+        更新 Terminal 执行记录
+
+        Args:
+            execution_id: 执行 ID
+            status: 执行状态
+            output: 命令输出
+            error_message: 错误信息
+
+        Returns:
+            Execution: 更新后的执行记录
+        """
+        from datetime import datetime
+
+        execution = await self.get(execution_id)
+        if not execution:
+            raise ValueError(f"Execution {execution_id} not found")
+
+        if status is not None:
+            execution.status = status
+            if status in ["succeeded", "failed", "cancelled"]:
+                execution.finished_at = datetime.utcnow()
+
+        if output is not None:
+            # 限制输出大小（最大 10MB）
+            max_size = 10 * 1024 * 1024
+            if len(output) > max_size:
+                output = output[-max_size:] + "\n... (output truncated)"
+            execution.terminal_output = output
+
+        if error_message is not None:
+            execution.error_message = error_message
+
+        await self.db.commit()
+        await self.db.refresh(execution)
+
+        return execution

@@ -251,17 +251,31 @@ class ClaudeHealthChecker:
         cli_available = False
 
         # 检查 CLI 是否可用
-        try:
-            result = await self._run_command([self.cli_path, "--version"])
-            if result["success"]:
-                cli_available = True
-                version = result["output"].strip()
-                logger.info(f"Claude CLI available: {version}")
-            else:
-                issues.append(f"Claude CLI not available: {result['error']}")
-        except Exception as e:
-            issues.append(f"Failed to check Claude CLI: {str(e)}")
-            logger.error(f"Failed to check Claude CLI: {e}")
+        # 尝试多个可能的路径
+        cli_paths_to_try = [
+            self.cli_path,  # 配置的路径
+            "claude",  # PATH 中的命令
+            str(Path.home() / ".local" / "bin" / "claude"),  # Linux 用户安装路径
+            "/usr/local/bin/claude",  # 系统安装路径
+        ]
+
+        for cli_path in cli_paths_to_try:
+            try:
+                result = await self._run_command([cli_path, "--version"])
+                if result["success"]:
+                    cli_available = True
+                    version = result["output"].strip()
+                    logger.info(f"Claude CLI available at {cli_path}: {version}")
+                    # 更新实际可用的路径
+                    self.cli_path = cli_path
+                    break
+            except Exception as e:
+                logger.debug(f"Failed to check Claude CLI at {cli_path}: {e}")
+                continue
+
+        if not cli_available:
+            issues.append(f"Claude CLI not available. Tried paths: {', '.join(cli_paths_to_try)}")
+            logger.error(f"Claude CLI not available. Tried paths: {', '.join(cli_paths_to_try)}")
 
         # 检查配置目录
         config_dir_exists = self.config_dir.exists()

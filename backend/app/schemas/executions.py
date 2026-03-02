@@ -40,6 +40,12 @@ class ExecutionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Terminal 相关字段
+    terminal_pid: Optional[int] = None
+    terminal_command: Optional[str] = None
+    terminal_cwd: Optional[str] = None
+    terminal_output: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -49,3 +55,17 @@ class ExecutionListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class TerminalExecutionCreate(BaseModel):
+    """创建 Terminal 执行记录"""
+    command: str
+    cwd: str
+    pid: Optional[int] = None
+
+
+class TerminalExecutionUpdate(BaseModel):
+    """更新 Terminal 执行记录"""
+    status: Optional[ExecutionStatus] = None
+    output: Optional[str] = None
+    error_message: Optional[str] = None

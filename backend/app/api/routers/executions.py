@@ -12,7 +12,9 @@ from app.models.task import ExecutionType
 from app.schemas.executions import (
     ExecutionResponse,
     NodeExecutionResponse,
-    ExecutionListResponse
+    ExecutionListResponse,
+    TerminalExecutionCreate,
+    TerminalExecutionUpdate
 )
 
 router = APIRouter(prefix="/executions", tags=["executions"])
@@ -209,3 +211,96 @@ async def get_active_sessions(
     executions = await repo.get_active_sessions()
 
     return [ExecutionResponse.model_validate(e) for e in executions]
+
+
+@router.post("/terminal", response_model=ExecutionResponse)
+async def create_terminal_execution(
+    data: TerminalExecutionCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    创建 Terminal 执行记录
+
+    Args:
+        data: Terminal 执行数据
+
+    Returns:
+        ExecutionResponse: 执行记录
+    """
+    repo = ExecutionRepository(db)
+
+    # 创建执行记录
+    execution = await repo.create_terminal_execution(
+        command=data.command,
+        cwd=data.cwd,
+        pid=data.pid
+    )
+
+    return ExecutionResponse.model_validate(execution)
+
+
+@router.patch("/terminal/{execution_id}", response_model=ExecutionResponse)
+async def update_terminal_execution(
+    execution_id: int,
+    data: TerminalExecutionUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    更新 Terminal 执行记录
+
+    Args:
+        execution_id: 执行 ID
+        data: 更新数据
+
+    Returns:
+        ExecutionResponse: 更新后的执行记录
+    """
+    repo = ExecutionRepository(db)
+
+    execution = await repo.get(execution_id)
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.execution_type != ExecutionType.TERMINAL:
+        raise HTTPException(status_code=400, detail="Not a terminal execution")
+
+    # 更新执行记录
+    execution = await repo.update_terminal_execution(
+        execution_id=execution_id,
+        status=data.status,
+        output=data.output,
+        error_message=data.error_message
+    )
+
+    return ExecutionResponse.model_validate(execution)
+
+
+@router.get("/terminal/{execution_id}/output")
+async def get_terminal_output(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取 Terminal 执行的输出日志
+
+    Args:
+        execution_id: 执行 ID
+
+    Returns:
+        Dict: {"output": "命令输出内容"}
+    """
+    repo = ExecutionRepository(db)
+
+    execution = await repo.get(execution_id)
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.execution_type != ExecutionType.TERMINAL:
+        raise HTTPException(status_code=400, detail="Not a terminal execution")
+
+    return {
+        "output": execution.terminal_output or "",
+        "command": execution.terminal_command,
+        "cwd": execution.terminal_cwd,
+        "pid": execution.terminal_pid
+    }
