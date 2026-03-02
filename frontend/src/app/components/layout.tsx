@@ -910,18 +910,14 @@ export const Layout = () => {
             }}
             className={({ isActive }) => `
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
-              ${isActive ? "text-white" : "text-gray-400 hover:text-white"}
+              ${isActive
+                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                : "text-gray-400 hover:text-white"
+              }
             `}
           >
             {({ isActive }) => (
               <>
-                {isActive && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
                 {mode === "adventure" ? <Sword size={20} className="relative z-10" /> : <LayoutDashboard size={20} className="relative z-10" />}
                 <span className="text-[10px] font-medium relative z-10">{t("dashboard")}</span>
               </>
@@ -938,18 +934,11 @@ export const Layout = () => {
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
               ${
                 activeAgentItem || activeBottomMenu === 'agent'
-                  ? "text-white"
+                  ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                   : "text-gray-400 hover:text-white"
               }
             `}
           >
-            {(activeAgentItem || activeBottomMenu === 'agent') && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
             {activeAgentItem ? (
               <activeAgentItem.icon size={20} className="relative z-10" />
             ) : (
@@ -970,18 +959,11 @@ export const Layout = () => {
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
               ${
                 activeWorkflowItem || activeBottomMenu === 'workflow'
-                  ? "text-white"
+                  ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                   : "text-gray-400 hover:text-white"
               }
             `}
           >
-            {(activeWorkflowItem || activeBottomMenu === 'workflow') && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
             {activeWorkflowItem ? (
               <activeWorkflowItem.icon size={20} className="relative z-10" />
             ) : (
@@ -1000,22 +982,18 @@ export const Layout = () => {
             }}
             className={`
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
-              ${showNotifications ? "text-white" : "text-gray-400 hover:text-white"}
+              ${showNotifications
+                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                : "text-gray-400 hover:text-white"
+              }
             `}
           >
-            {showNotifications && (
-              <motion.div
-                layoutId="activeTab"
-                className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
             <Bell size={20} className="relative z-10" />
             <span className="text-[10px] font-medium relative z-10">通知</span>
 
             {/* 通知徽章 */}
             {notifications.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-[#1a1b26]">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-[#1a1b26] z-20">
                 {notifications.length > 99 ? '99+' : notifications.length}
               </span>
             )}
