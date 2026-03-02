@@ -28,7 +28,8 @@
 - `backend/` - 后端开发指南
 
 ### 🔧 technical/
-技术文档和修复记录（11 个文件）
+技术文档和修复记录（12 个文件）
+- `20260302-01-LAN-IP检测失败修复.md` - LAN IP 检测失败问题修复（v1.2.2）
 - `20260302-skill-sync-and-cli-health-fix.md` - Skills 同步失败和 CLI Status 误报修复
 - `PACKAGING_FIX_SUMMARY.md` - 打包修复总结
 - `PACKAGING_SUCCESS_REPORT.md` - 打包成功报告
@@ -88,7 +89,7 @@
 - **日志文件**: 14 个文件
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
-- **技术文档**: 10 个文件
+- **技术文档**: 12 个文件
 - **指南文档**: 8 个文件
 
 ## 🔍 快速查找

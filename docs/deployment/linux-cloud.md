@@ -102,6 +102,48 @@ curl http://localhost:8000/api/system/health/detailed
 # 浏览器打开 http://your-server-ip:3000
 ```
 
+## 网络配置说明
+
+### 前端 API 地址自动检测
+
+从 v1.2.1 版本开始，前端会自动检测 API 地址，无需手动配置 `.env.local` 文件。
+
+**自动检测逻辑**：
+- **本地开发**：如果访问地址是 `localhost` 或 `127.0.0.1`，API 地址自动设置为 `http://localhost:8000/api`
+- **云端部署**：如果访问地址是其他 IP（如 `123.45.67.89`），API 地址自动设置为 `http://123.45.67.89:8000/api`
+
+**优点**：
+- 无需手动配置环境变量
+- 自动适配本地开发和云端部署
+- 避免 IP 检测失败导致的连接问题
+
+**注意事项**：
+- `start.sh` 脚本会自动清理旧的 `.env.local` 文件（如果存在）
+- 如果需要自定义 API 地址，可以手动创建 `.env.local` 文件并设置 `VITE_API_BASE_URL`
+- 环境变量优先级高于自动检测
+
+### IP 地址显示
+
+`start.sh` 脚本会尝试检测服务器的 IP 地址并显示访问地址：
+
+**检测方法**（按优先级）：
+1. 使用 `ip` 命令（现代 Linux，推荐）
+2. 回退到 `ifconfig` 命令（旧版 Linux）
+3. 通过外部服务获取公网 IP（云端环境）
+
+**示例输出**：
+```
+✅ Network access configured (IP: 123.45.67.89)
+   Frontend will auto-detect API address
+
+🌍 Network Access:
+   Frontend: http://123.45.67.89:5173
+   Backend API: http://123.45.67.89:8000
+   (Frontend auto-detects API address)
+```
+
+**注意**：显示的 IP 地址仅用于参考，前端实际使用的 API 地址由自动检测逻辑决定。
+
 ## 远程访问配置
 
 ### 防火墙配置
