@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "Claude Manager"
     app_version: str = "0.2.0"
     debug: bool = False
+    env: str = "development"  # development, production, test
 
     # API
     api_prefix: str = "/api"
