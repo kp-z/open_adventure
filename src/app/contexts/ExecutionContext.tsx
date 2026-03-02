@@ -67,18 +67,29 @@ export const ExecutionProvider: React.FC<ExecutionProviderProps> = ({ children }
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === 'execution_update') {
+        if (message.type === 'execution_update' || message.type === 'terminal_execution_update') {
           const data = message.data;
           setExecutions(prev => {
             const updated = new Map(prev);
             const existing = prev.get(data.id);
             updated.set(data.id, { ...existing, ...data } as Execution);
-            
+
+            // 保存到 localStorage 用于页面恢复
+            if (data.session_id) {
+              const activeExecutions = JSON.parse(localStorage.getItem('active_executions') || '{}');
+              activeExecutions[data.session_id] = data.id;
+              localStorage.setItem('active_executions', JSON.stringify(activeExecutions));
+            }
+
             if (existing && existing.status !== data.status) {
+              const executionLabel = message.type === 'terminal_execution_update'
+                ? 'Terminal 执行'
+                : data.execution_type === 'agent_test' ? 'Agent 运行' : 'Workflow';
+
               if (data.status === 'succeeded') {
-                toast.success(`${data.execution_type === 'agent_test' ? 'Agent 运行' : 'Workflow'} 执行成功`);
+                toast.success(`${executionLabel} 执行成功`);
               } else if (data.status === 'failed') {
-                toast.error(`${data.execution_type === 'agent_test' ? 'Agent 运行' : 'Workflow'} 执行失败`);
+                toast.error(`${executionLabel} 执行失败`);
               }
             }
             return updated;
@@ -94,6 +105,50 @@ export const ExecutionProvider: React.FC<ExecutionProviderProps> = ({ children }
 
   useEffect(() => {
     connect();
+
+    // 页面加载时恢复活跃的执行记录
+    const restoreActiveExecutions = async () => {
+      try {
+        const activeExecutions = JSON.parse(localStorage.getItem('active_executions') || '{}');
+        const sessionIds = Object.keys(activeExecutions);
+
+        if (sessionIds.length > 0) {
+          console.log('[ExecutionContext] Restoring active executions:', sessionIds);
+
+          // 并行获取所有活跃 session 的执行记录
+          const promises = sessionIds.map(async (sessionId) => {
+            try {
+              const response = await fetch(`http://localhost:8000/api/executions/session/${sessionId}`);
+              if (response.ok) {
+                const execution = await response.json();
+                return execution;
+              }
+            } catch (error) {
+              console.error(`Failed to restore execution for session ${sessionId}:`, error);
+            }
+            return null;
+          });
+
+          const restoredExecutions = (await Promise.all(promises)).filter(e => e !== null);
+
+          if (restoredExecutions.length > 0) {
+            setExecutions(prev => {
+              const updated = new Map(prev);
+              restoredExecutions.forEach(execution => {
+                updated.set(execution.id, execution);
+              });
+              return updated;
+            });
+            console.log('[ExecutionContext] Restored', restoredExecutions.length, 'executions');
+          }
+        }
+      } catch (error) {
+        console.error('[ExecutionContext] Failed to restore active executions:', error);
+      }
+    };
+
+    restoreActiveExecutions();
+
     return () => wsRef.current?.close();
   }, []);
 

@@ -1256,6 +1256,164 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
 
           {/* 右侧 */}
           <div className="space-y-6">
+            {/* Scope 配置卡片 */}
+            <GlassCard className="p-6">
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <FolderOpen size={20} />
+                保存位置配置
+              </h3>
+
+              {/* Scope 选择 */}
+              <div className="mb-4">
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                  配置层级
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {SCOPE_OPTIONS.map(option => {
+                    const IconComp = option.icon;
+                    const isSelected = scope === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          handleScopeChange(option.value);
+                          // 切换 scope 时重置选择
+                          if (option.value === 'plugin') setSelectedPlugin('');
+                          if (option.value === 'project') setSelectedProject('');
+                        }}
+                        className={`p-4 rounded-xl border transition-all ${
+                          isSelected
+                            ? 'bg-blue-500/20 border-blue-500/50'
+                            : 'bg-white/5 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <IconComp size={20} className="mx-auto mb-2" />
+                        <p className="font-bold text-sm">{option.label}</p>
+                        <p className="text-xs text-gray-500">{option.desc}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Plugin 选择器 */}
+              {scope === 'plugin' && (
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                    选择或创建插件
+                  </label>
+
+                  {!isCreatingPlugin ? (
+                    <>
+                      <select
+                        value={selectedPlugin}
+                        onChange={(e) => setSelectedPlugin(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 mb-2"
+                      >
+                        <option value="">-- 请选择插件 --</option>
+                        {plugins.map(plugin => (
+                          <option key={plugin.name} value={plugin.name}>
+                            {plugin.name}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() => setIsCreatingPlugin(true)}
+                        className="w-full px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Plus size={16} />
+                        创建新 Plugin
+                      </button>
+                    </>
+                  ) : (
+                    <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-400 mb-1">Plugin 名称 *</label>
+                        <input
+                          type="text"
+                          value={newPluginName}
+                          onChange={(e) => setNewPluginName(e.target.value.toLowerCase())}
+                          placeholder="my-plugin"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          只能包含小写字母、数字和连字符
+                        </p>
+                      </div>
+
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-400 mb-1">描述（可选）</label>
+                        <input
+                          type="text"
+                          value={newPluginDescription}
+                          onChange={(e) => setNewPluginDescription(e.target.value)}
+                          placeholder="Plugin 功能描述"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-blue-500/50 text-sm"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setIsCreatingPlugin(false);
+                            setNewPluginName('');
+                            setNewPluginDescription('');
+                          }}
+                          className="flex-1 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-bold transition-all"
+                        >
+                          取消
+                        </button>
+                        <button
+                          onClick={handleCreatePlugin}
+                          className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-all"
+                        >
+                          创建
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Project 选择器 */}
+              {scope === 'project' && (
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                    选择项目
+                  </label>
+                  <select
+                    value={selectedProject}
+                    onChange={(e) => setSelectedProject(e.target.value)}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50"
+                  >
+                    <option value="">-- 请选择项目 --</option>
+                    {projects.map(project => (
+                      <option key={project.id} value={project.path}>
+                        {project.alias} ({project.path})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 保存路径预览 */}
+              <div className="p-3 bg-white/5 rounded-xl">
+                <p className="text-xs text-gray-400 mb-1">保存路径</p>
+                <p className="text-sm font-mono text-gray-300 break-all">
+                  {scope === 'user' && '~/.claude/agents/'}
+                  {scope === 'plugin' && selectedPlugin && `~/.claude/plugins/${selectedPlugin}/agents/`}
+                  {scope === 'plugin' && !selectedPlugin && (
+                    <span className="text-yellow-400">请先选择或创建插件</span>
+                  )}
+                  {scope === 'project' && selectedProject && `${selectedProject}/.claude/agents/`}
+                  {scope === 'project' && !selectedProject && (
+                    <span className="text-yellow-400">请先选择项目</span>
+                  )}
+                </p>
+              </div>
+            </GlassCard>
+
             {/* Skills 配置 */}
             <GlassCard className="p-6">
               <div className="flex items-center gap-2 mb-6">

@@ -11,9 +11,10 @@ interface ChatViewProps {
   agentId: number;
   agentName: string;
   onTestComplete: (result: TestResult) => void;
+  reconnectExecutionId?: string; // 可选：重新连接到指定的 Execution ID
 }
 
-export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) {
+export function ChatView({ agentId, agentName, onTestComplete, reconnectExecutionId }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -21,63 +22,101 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const reconnectAttemptsRef = useRef(0);
+  const isConnectingRef = useRef(false);
 
   const MAX_RECONNECT_ATTEMPTS = 3;
 
-  // 自动滚动到最新消息
+  // 自动滚动到最新消息（仅在有消息时）
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // 建立 WebSocket 连接
   const connectWebSocket = useCallback(() => {
+    // 防止重复连接
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('[ChatView] WebSocket already connected, skipping');
       return;
     }
 
-    const wsUrl = `ws://localhost:8000/api/agents/${agentId}/test-ws`;
+    if (isConnectingRef.current) {
+      console.log('[ChatView] WebSocket connection already in progress, skipping');
+      return;
+    }
+
+    console.log('[ChatView] Creating new WebSocket connection for agent', agentId, 'execution_id:', reconnectExecutionId);
+    isConnectingRef.current = true;
+
+    // 构建 WebSocket URL，如果有 reconnectExecutionId 则添加查询参数
+    let wsUrl = `ws://localhost:8000/api/agents/${agentId}/test-ws`;
+    if (reconnectExecutionId) {
+      wsUrl += `?execution_id=${reconnectExecutionId}`;
+    }
+
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log('[ChatView] WebSocket connected');
+      isConnectingRef.current = false;
       setIsConnected(true);
-      setReconnectAttempts(0);
+      reconnectAttemptsRef.current = 0;
     };
 
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        console.log('[ChatView] Received message:', message.type);
 
         switch (message.type) {
           case 'ready':
-            // Agent 就绪，自动发送欢迎消息
-            const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力和职责。`;
-            ws.send(JSON.stringify({
-              type: 'test',
-              prompt: welcomeMessage
-            }));
+            // 检查是否为重新连接
+            const isReconnect = message.is_reconnect || false;
+            const sessionId = message.session_id;
+            const executionId = message.execution_id;
+            const chatHistory = message.chat_history || [];
 
-            // 添加用户消息
-            const userMessage: ChatMessage = {
-              id: `user-${Date.now()}`,
-              role: 'user',
-              content: welcomeMessage,
-              timestamp: new Date().toISOString(),
-              status: 'success',
-            };
-            setMessages([userMessage]);
+            console.log('[ChatView] Ready message received:', { isReconnect, sessionId, executionId, chatHistory });
 
-            // 添加 Agent 消息占位符
-            const agentMessage: ChatMessage = {
-              id: `agent-${Date.now()}`,
-              role: 'agent',
-              content: '',
-              timestamp: new Date().toISOString(),
-              status: 'sending',
-            };
-            setMessages((prev) => [...prev, agentMessage]);
-            setIsRunning(true);
+            if (!isReconnect) {
+              // 首次连接，自动发送欢迎消息
+              const welcomeMessage = `你好！我是 ${agentName}。请介绍一下你的能力和职责。`;
+              ws.send(JSON.stringify({
+                type: 'test',
+                prompt: welcomeMessage
+              }));
+
+              // 添加用户消息
+              const userMessage: ChatMessage = {
+                id: `user-${Date.now()}`,
+                role: 'user',
+                content: welcomeMessage,
+                timestamp: new Date().toISOString(),
+                status: 'success',
+              };
+              setMessages([userMessage]);
+
+              // 添加 Agent 消息占位符
+              const agentMessage: ChatMessage = {
+                id: `agent-${Date.now()}`,
+                role: 'agent',
+                content: '',
+                timestamp: new Date().toISOString(),
+                status: 'sending',
+              };
+              setMessages((prev) => [...prev, agentMessage]);
+              setIsRunning(true);
+            } else {
+              // 重新连接到现有会话，恢复聊天历史
+              console.log('[ChatView] Reconnected to existing session:', sessionId);
+
+              // 恢复聊天历史
+              if (chatHistory.length > 0) {
+                setMessages(chatHistory);
+              }
+            }
             break;
 
           case 'log':
@@ -102,7 +141,7 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
             setMessages((prev) => {
               const lastMessage = prev[prev.length - 1];
               if (lastMessage && lastMessage.role === 'agent') {
-                return [
+                const updatedMessages = [
                   ...prev.slice(0, -1),
                   {
                     ...lastMessage,
@@ -110,22 +149,27 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
                     status: message.data.success ? 'success' : 'error',
                   },
                 ];
+
+                // 延迟调用 onTestComplete，避免在渲染过程中更新父组件状态
+                setTimeout(() => {
+                  const userMessageContent = updatedMessages[updatedMessages.length - 2]?.content || '';
+                  onTestComplete({
+                    id: `test-${Date.now()}`,
+                    input: userMessageContent,
+                    output: message.data.output,
+                    success: message.data.success,
+                    duration: message.data.duration,
+                    timestamp: new Date().toISOString(),
+                    model: message.data.model,
+                    agentId,
+                  });
+                }, 0);
+
+                return updatedMessages;
               }
               return prev;
             });
             setIsRunning(false);
-
-            // 保存到测试历史
-            onTestComplete({
-              id: `test-${Date.now()}`,
-              input: messages[messages.length - 2]?.content || '',
-              output: message.data.output,
-              success: message.data.success,
-              duration: message.data.duration,
-              timestamp: new Date().toISOString(),
-              model: message.data.model,
-              agentId,
-            });
             break;
 
           case 'error':
@@ -148,30 +192,34 @@ export function ChatView({ agentId, agentName, onTestComplete }: ChatViewProps) 
             break;
         }
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        console.error('[ChatView] Failed to parse WebSocket message:', error);
       }
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('[ChatView] WebSocket error:', error);
     };
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected');
+      console.log('[ChatView] WebSocket disconnected');
+      isConnectingRef.current = false;
       setIsConnected(false);
       wsRef.current = null;
 
       // 尝试重连
-      if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+      if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+        console.log(`[ChatView] Scheduling reconnect attempt ${reconnectAttemptsRef.current + 1}/${MAX_RECONNECT_ATTEMPTS}`);
         reconnectTimeoutRef.current = setTimeout(() => {
-          setReconnectAttempts((prev) => prev + 1);
+          reconnectAttemptsRef.current += 1;
           connectWebSocket();
         }, 2000);
+      } else {
+        console.log('[ChatView] Max reconnect attempts reached');
       }
     };
 
     wsRef.current = ws;
-  }, [agentId, agentName, reconnectAttempts, messages, onTestComplete]);
+  }, [agentId, agentName]);
 
   // 组件挂载时建立连接
   useEffect(() => {

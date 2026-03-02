@@ -376,15 +376,15 @@ const Terminal = () => {
                 `}
               >
                 <span className="truncate text-xs sm:text-sm">{terminal.title}</span>
-                <button
+                <span
                   onClick={(e) => {
                     e.stopPropagation();
                     closeTerminal(terminal.id);
                   }}
-                  className="hover:text-red-400 transition-colors shrink-0"
+                  className="hover:text-red-400 transition-colors shrink-0 cursor-pointer"
                 >
                   <X size={14} />
-                </button>
+                </span>
               </button>
             ))}
           </div>

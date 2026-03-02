@@ -47,7 +47,7 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
       fontSize: 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
-        background: '#1a1a1a',
+        background: 'transparent',
         foreground: '#ffffff',
         cursor: '#ffffff',
       },
@@ -87,15 +87,23 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
 
   // 建立 WebSocket 连接
   useEffect(() => {
-    if (!xtermRef.current || session.isConnected) return;
+    if (!xtermRef.current) return;
 
+    // 检查是否已经有连接
+    if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+      console.log('[TerminalView] WebSocket already connected, skipping');
+      return;
+    }
+
+    console.log('[TerminalView] Creating new WebSocket connection');
     const terminal = xtermRef.current;
     const wsUrl = `ws://localhost:8000/api/terminal/ws`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
+      console.log('[TerminalView] WebSocket connected');
       terminal.writeln('$ Connected to agent session');
-      setSession(prev => ({ ...prev, ws, isConnected: true }));
+      setSession({ ws, isConnected: true, isReady: false });
       setReconnectAttempts(0); // 连接成功后重置重连计数
 
       // 发送终端尺寸
@@ -110,82 +118,95 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
 
     ws.onmessage = (event) => {
       try {
-        const message = JSON.parse(event.data);
+        const data = event.data;
 
-        switch (message.type) {
-          case 'output':
-            terminal.write(message.data);
-            break;
+        // 尝试解析为 JSON（控制消息）
+        try {
+          const message = JSON.parse(data);
+          console.log('[TerminalView] Received JSON message:', message.type);
 
-          case 'ready':
-            terminal.writeln(`\r\n$ ${message.message}`);
-            terminal.writeln(`$ Agent "${agentName}" ready. Type your message and press Enter.\r\n`);
-            setSession(prev => ({ ...prev, isReady: true }));
-            break;
+          switch (message.type) {
+            case 'output':
+              terminal.write(message.data);
+              break;
 
-          case 'exit':
-            terminal.writeln(`\r\n$ Session ended (exit code: ${message.code})`);
-            setSession(prev => ({ ...prev, isReady: false }));
+            case 'ready':
+              terminal.writeln(`\r\n$ ${message.message}`);
+              terminal.writeln(`$ Agent "${agentName}" ready. Type your message and press Enter.\r\n`);
+              setSession(prev => ({ ...prev, isReady: true }));
+              break;
 
-            // 保存到测试历史
-            onTestComplete({
-              id: `test-${Date.now()}`,
-              input: 'Terminal session',
-              output: message.output || '',
-              success: message.code === 0,
-              duration: 0,
-              timestamp: new Date().toISOString(),
-              model: 'terminal',
-              agentId,
-            });
-            break;
+            case 'exit':
+              terminal.writeln(`\r\n$ Session ended (exit code: ${message.code})`);
+              setSession(prev => ({ ...prev, isReady: false }));
 
-          case 'error':
-            terminal.writeln(`\r\n\x1b[31mError: ${message.message}\x1b[0m\r\n`);
-            break;
+              // 保存到测试历史
+              onTestComplete({
+                id: `test-${Date.now()}`,
+                input: 'Terminal session',
+                output: message.output || '',
+                success: message.code === 0,
+                duration: 0,
+                timestamp: new Date().toISOString(),
+                model: 'terminal',
+                agentId,
+              });
+              break;
+
+            case 'error':
+              terminal.writeln(`\r\n\x1b[31mError: ${message.message}\x1b[0m\r\n`);
+              break;
+          }
+        } catch (parseError) {
+          // 不是 JSON，直接作为原始终端输出处理
+          terminal.write(data);
         }
       } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
+        console.error('[TerminalView] Failed to handle WebSocket message:', error);
       }
     };
 
     ws.onerror = (error) => {
       terminal.writeln('\r\n\x1b[31m$ Connection error\x1b[0m\r\n');
-      console.error('WebSocket error:', error);
+      console.error('[TerminalView] WebSocket error:', error);
     };
 
     ws.onclose = () => {
+      console.log('[TerminalView] WebSocket disconnected');
       terminal.writeln('\r\n$ Connection closed\r\n');
+      setSession({ ws: null, isConnected: false, isReady: false });
 
       // 重连逻辑
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         const nextAttempt = reconnectAttempts + 1;
         terminal.writeln(`$ Reconnecting in 2 seconds... (${nextAttempt}/${MAX_RECONNECT_ATTEMPTS})\r\n`);
+        console.log(`[TerminalView] Scheduling reconnect attempt ${nextAttempt}/${MAX_RECONNECT_ATTEMPTS}`);
 
         reconnectTimeoutRef.current = setTimeout(() => {
           setReconnectAttempts(nextAttempt);
-          setSession({ ws: null, isConnected: false, isReady: false });
         }, 2000);
       } else {
         terminal.writeln(`\x1b[31m$ Failed to reconnect after ${MAX_RECONNECT_ATTEMPTS} attempts\x1b[0m\r\n`);
         terminal.writeln('$ Please refresh the page to try again\r\n');
-        setSession({ ws: null, isConnected: false, isReady: false });
+        console.log('[TerminalView] Max reconnect attempts reached');
         setReconnectAttempts(0);
       }
     };
 
     // 处理用户输入
-    terminal.onData((data) => {
-      if (session.isReady && ws.readyState === WebSocket.OPEN) {
+    const dataHandler = (data: string) => {
+      if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'input',
           data,
         }));
       }
-    });
+    };
+    terminal.onData(dataHandler);
 
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
+      console.log('[TerminalView] Cleaning up WebSocket connection');
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }
       // 清理重连定时器
@@ -193,7 +214,7 @@ export function TerminalView({ agentId, agentName, onTestComplete }: TerminalVie
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [agentId, agentName, session.isConnected, reconnectAttempts, onTestComplete]);
+  }, [agentId, agentName, reconnectAttempts, onTestComplete]);
 
   return (
     <div className="h-[500px] bg-black/60 rounded-xl p-4">

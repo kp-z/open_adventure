@@ -249,4 +249,24 @@ export const agentsApi = {
         project_path: params.project_path
       }
     }),
+
+  /**
+   * 查询 Agent 运行状态
+   */
+  getStatus: (id: number) =>
+    apiClient.get<{
+      status: 'idle' | 'running';
+      execution_id: number | null;
+      session_id: string | null;
+      last_activity_at: string | null;
+    }>(`/agents/${id}/status`),
+
+  /**
+   * 停止 Agent 运行
+   */
+  stop: (id: number) =>
+    apiClient.post<{
+      success: boolean;
+      message: string;
+    }>(`/agents/${id}/stop`),
 };

@@ -22,6 +22,7 @@ export function WebSocketMonitor() {
   const [stats, setStats] = useState<WebSocketStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -78,15 +79,36 @@ export function WebSocketMonitor() {
 
   return (
     <GlassCard className="p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-blue-500/20 rounded-lg">
-          <Wifi className="w-5 h-5 text-blue-400" />
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-500/20 rounded-lg">
+            <Wifi className="w-5 h-5 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">WebSocket 连接监控</h3>
+            <p className="text-sm text-gray-400">实时连接状态</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-white">WebSocket 连接监控</h3>
-          <p className="text-sm text-gray-400">实时连接状态</p>
-        </div>
+        <motion.div
+          animate={{ rotate: isExpanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Activity className="w-5 h-5 text-gray-400" />
+        </motion.div>
       </div>
+
+      {isExpanded && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          className="overflow-hidden"
+        >
+          <div className="mt-6">
 
       {/* 连接数统计 */}
       <div className="grid grid-cols-2 gap-4 mb-6">
@@ -175,6 +197,9 @@ export function WebSocketMonitor() {
           </div>
         </div>
       </div>
+        </div>
+        </motion.div>
+      )}
     </GlassCard>
   );
 }

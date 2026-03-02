@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Terminal,
+  Network,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -53,7 +54,7 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
     {
       name: t("teams"),
       path: "/teams",
-      icon: mode === "adventure" ? UsersRound : UsersRound,
+      icon: mode === "adventure" ? UsersRound : Network,
     },
     {
       name: t("workflows"),
@@ -66,7 +67,7 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       icon: mode === "adventure" ? Trophy : History,
     },
     {
-      name: "Terminal",
+      name: t("terminal"),
       path: "/terminal",
       icon: Terminal,
     },

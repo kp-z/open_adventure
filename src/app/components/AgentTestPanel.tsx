@@ -37,6 +37,8 @@ import {
   Code,
   Save,
   X as XIcon,
+  Link2,
+  Square,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -67,6 +69,7 @@ interface TestResult {
   timestamp: string;
   model: string;
   agentId: number;
+  status: string; // Execution 状态：running, succeeded, failed, cancelled
 }
 
 // 模型颜色映射
@@ -158,6 +161,7 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showMarkdownView, setShowMarkdownView] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('chat');
+  const [reconnectExecutionId, setReconnectExecutionId] = useState<string | undefined>(undefined);
   const outputRef = useRef<HTMLDivElement>(null);
   const [consoleLogs, setConsoleLogs] = useState<string[]>([]);
 
@@ -213,6 +217,7 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
           timestamp: execution.created_at,
           model: 'inherit', // 可以从 execution.meta 中获取
           agentId: agent.id,
+          status: execution.status, // 保存 Execution 状态
         }));
 
         setTestHistory(history);
@@ -457,6 +462,59 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     }
   };
 
+  // 停止 Agent 运行
+  const handleStopExecution = async (executionId: string) => {
+    try {
+      const result = await agentsApi.stop(agent.id);
+      if (result.success) {
+        addNotification({
+          type: 'success',
+          message: 'Agent 已停止运行',
+        });
+        // 刷新测试历史
+        const response = await executionsApi.list({
+          execution_type: 'agent_test',
+          limit: 100,
+        });
+        const agentExecutions = response.items.filter(
+          (execution) => execution.agent_id === agent.id
+        );
+        const history: TestResult[] = agentExecutions.map((execution) => ({
+          id: execution.id.toString(),
+          input: execution.test_input || '',
+          output: execution.test_output || '',
+          success: execution.status === 'succeeded',
+          duration: execution.finished_at && execution.started_at
+            ? new Date(execution.finished_at).getTime() - new Date(execution.started_at).getTime()
+            : 0,
+          timestamp: execution.created_at,
+          model: 'inherit',
+          agentId: agent.id,
+        }));
+        setTestHistory(history);
+      } else {
+        addNotification({
+          type: 'error',
+          message: result.message || 'Agent 停止失败',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to stop agent:', error);
+      addNotification({
+        type: 'error',
+        message: 'Agent 停止失败',
+      });
+    }
+  };
+
+  // 重新连接到 Execution
+  const handleReconnectExecution = (executionId: string) => {
+    // 设置要重新连接的 Execution ID
+    setReconnectExecutionId(executionId);
+    // 切换到 ChatView 模式
+    setViewMode('chat');
+  };
+
   // 切换 Skill 选择
   const toggleSkill = (skillName: string) => {
     setSelectedSkills(prev =>
@@ -698,6 +756,7 @@ Agent 描述: ${agent.description}
                     agentId={agent.id}
                     agentName={agent.name}
                     onTestComplete={handleTestComplete}
+                    reconnectExecutionId={reconnectExecutionId}
                   />
                 </motion.div>
               ) : (
@@ -793,16 +852,35 @@ Agent 描述: ${agent.description}
                               {new Date(test.timestamp).toLocaleString()} · {test.duration.toFixed(2)}s · {test.model}
                             </span>
                           </div>
-                          <button
-                            onClick={() => handleCopyOutput(test.output, test.id)}
-                            className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
-                          >
-                            {copiedId === test.id ? (
-                              <Check size={14} className="text-green-400" />
-                            ) : (
-                              <Copy size={14} className="text-gray-400" />
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleReconnectExecution(test.id)}
+                              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                              title="重新连接"
+                            >
+                              <Link2 size={14} className="text-blue-400" />
+                            </button>
+                            {test.status === 'running' && (
+                              <button
+                                onClick={() => handleStopExecution(test.id)}
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                                title="停止运行"
+                              >
+                                <Square size={14} className="text-red-400" />
+                              </button>
                             )}
-                          </button>
+                            <button
+                              onClick={() => handleCopyOutput(test.output, test.id)}
+                              className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                              title="复制输出"
+                            >
+                              {copiedId === test.id ? (
+                                <Check size={14} className="text-green-400" />
+                              ) : (
+                                <Copy size={14} className="text-gray-400" />
+                              )}
+                            </button>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm">

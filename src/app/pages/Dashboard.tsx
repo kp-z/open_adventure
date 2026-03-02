@@ -81,8 +81,8 @@ const Dashboard = () => {
   const fetchExecutions = async () => {
     try {
       setLoadingExecutions(true);
-      // 获取最近的执行历史
-      const executionsData = await executionsApi.list({ limit: 4 });
+      // 获取最近的执行历史，最多显示3条
+      const executionsData = await executionsApi.list({ limit: 3 });
       setExecutions(executionsData.items || []);
     } catch (err) {
       console.error('Failed to fetch executions:', err);
@@ -723,12 +723,16 @@ const Dashboard = () => {
         <GlassCard className="lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Execution History</h2>
-            <button className="text-sm text-blue-400 hover:underline">View All</button>
+            <button
+              onClick={() => navigate('/executions')}
+              className="text-sm text-blue-400 hover:underline"
+            >
+              View All
+            </button>
           </div>
           <div className="space-y-4">
             {loadingExecutions ? (
               <>
-                <SkeletonListItem />
                 <SkeletonListItem />
                 <SkeletonListItem />
                 <SkeletonListItem />

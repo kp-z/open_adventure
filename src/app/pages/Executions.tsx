@@ -51,10 +51,10 @@ const Executions = () => {
   const filteredExecutions = searchQuery.trim() === ''
     ? executions
     : executions.filter(execution =>
-        execution.task?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        execution.task?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        execution.task?.project_path?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      execution.task?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      execution.task?.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      execution.task?.project_path?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -96,7 +96,7 @@ const Executions = () => {
     }
     return 'B';
   };
-  
+
   const getPriorityTag = (task: Task) => {
     const priority = task.meta?.priority;
     if (priority === 'critical') return { text: 'CRITICAL', color: 'bg-red-500' };
@@ -179,11 +179,10 @@ const Executions = () => {
                       alt="Hero"
                       className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-80"
                     />
-                    <div className={`relative z-20 w-12 h-12 rounded-full flex items-center justify-center font-black text-xl italic shadow-xl ${
-                      rating === 'S' ? 'bg-yellow-500 text-black shadow-yellow-500/30' :
+                    <div className={`relative z-20 w-12 h-12 rounded-full flex items-center justify-center font-black text-xl italic shadow-xl ${rating === 'S' ? 'bg-yellow-500 text-black shadow-yellow-500/30' :
                       rating === 'A' ? 'bg-blue-500 text-white' :
-                      rating === 'B' ? 'bg-purple-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
+                        rating === 'B' ? 'bg-purple-500 text-white' : 'bg-red-500 text-white'
+                      }`}>
                       {rating}
                     </div>
                   </div>
@@ -196,11 +195,11 @@ const Executions = () => {
                           text-[8px] font-black uppercase px-1.5 py-0.5 rounded
                           ${execution.execution_type === 'workflow' ? 'bg-blue-500' :
                             execution.execution_type === 'agent_test' ? 'bg-green-500' :
-                            'bg-purple-500'}
+                              'bg-purple-500'}
                         `}>
                           {execution.execution_type === 'workflow' ? 'WORKFLOW' :
-                           execution.execution_type === 'agent_test' ? 'AGENT' :
-                           'TEAM'}
+                            execution.execution_type === 'agent_test' ? 'AGENT' :
+                              'TEAM'}
                         </span>
                       </div>
                       <h3 className="text-xl font-black uppercase italic tracking-wider text-white mt-1">{execution.task?.title || `Execution #${execution.id}`}</h3>
@@ -237,7 +236,7 @@ const Executions = () => {
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION HISTORY</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION</h1>
           </div>
           <p className="text-sm md:text-base text-gray-400">查看所有执行历史记录（Workflow、Agent、AgentTeam）</p>
         </div>
@@ -274,9 +273,9 @@ const Executions = () => {
             `}
           >
             {type === 'all' ? 'All' :
-             type === 'workflow' ? 'Workflow' :
-             type === 'agent_test' ? 'Agent' :
-             'AgentTeam'}
+              type === 'workflow' ? 'Workflow' :
+                type === 'agent_test' ? 'Agent' :
+                  'AgentTeam'}
           </button>
         ))}
       </div>
@@ -318,11 +317,11 @@ const Executions = () => {
                         px-2 py-1 rounded text-xs font-bold
                         ${execution.execution_type === 'workflow' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
                           execution.execution_type === 'agent_test' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                          'bg-purple-500/20 text-purple-400 border border-purple-500/30'}
+                            'bg-purple-500/20 text-purple-400 border border-purple-500/30'}
                       `}>
                         {execution.execution_type === 'workflow' ? 'Workflow' :
-                         execution.execution_type === 'agent_test' ? 'Agent' :
-                         'AgentTeam'}
+                          execution.execution_type === 'agent_test' ? 'Agent' :
+                            'AgentTeam'}
                       </span>
                       {execution.workflow_id && (
                         <span className="text-[10px] text-gray-500">Workflow #{execution.workflow_id}</span>
