@@ -18,6 +18,7 @@ import {
   User,
   Menu,
   X,
+  Target,
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
@@ -65,6 +66,11 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       name: t("workflows"),
       path: "/workflows",
       icon: mode === "adventure" ? Map : GitBranch,
+    },
+    {
+      name: "OPP",
+      path: "/workflows/opp",
+      icon: Target,
     },
     {
       name: t("executions"),
@@ -809,7 +815,7 @@ export const Layout = () => {
                     opacity: { duration: 0.3 }
                   }}
                   className={`
-                    absolute bottom-20 left-0 right-0 mx-4 p-3 rounded-2xl
+                    absolute bottom-20 left-0 right-0 mx-4 p-2 rounded-2xl
                     backdrop-blur-2xl backdrop-saturate-150
                     border border-white/20 shadow-2xl
                     ${mode === "adventure"
@@ -818,28 +824,28 @@ export const Layout = () => {
                     }
                   `}
                 >
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
                     {activeBottomMenu === 'agent' && agentMenuItems.map((item, index) => (
                       <motion.div
                         key={item.path}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
                         <NavLink
                           to={item.path}
                           onClick={() => setActiveBottomMenu(null)}
                           className={({ isActive }) => `
-                            flex flex-col items-center justify-center gap-2 p-4 rounded-xl transition-all
+                            flex items-center gap-3 px-4 py-3 rounded-xl transition-all
                             ${
                               isActive
-                                ? "bg-gradient-to-br from-white/40 via-white/20 to-white/10 text-white shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                                : "bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white hover:scale-105"
+                                ? "bg-gradient-to-r from-white/40 to-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                                : "bg-white/5 text-gray-300 hover:bg-white/15 hover:text-white active:scale-[0.98]"
                             }
                           `}
                         >
-                          <item.icon size={24} />
-                          <span className="text-xs font-medium">{item.name}</span>
+                          <item.icon size={20} className="shrink-0" />
+                          <span className="text-sm font-medium">{item.name}</span>
                         </NavLink>
                       </motion.div>
                     ))}
@@ -847,24 +853,24 @@ export const Layout = () => {
                     {activeBottomMenu === 'workflow' && workflowMenuItems.map((item, index) => (
                       <motion.div
                         key={item.path}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
                         <NavLink
                           to={item.path}
                           onClick={() => setActiveBottomMenu(null)}
                           className={({ isActive }) => `
-                            flex flex-col items-center justify-center gap-2 p-4 rounded-xl transition-all
+                            flex items-center gap-3 px-4 py-3 rounded-xl transition-all
                             ${
                               isActive
-                                ? "bg-gradient-to-br from-white/40 via-white/20 to-white/10 text-white shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                                : "bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white hover:scale-105"
+                                ? "bg-gradient-to-r from-white/40 to-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.2)]"
+                                : "bg-white/5 text-gray-300 hover:bg-white/15 hover:text-white active:scale-[0.98]"
                             }
                           `}
                         >
-                          <item.icon size={24} />
-                          <span className="text-xs font-medium">{item.name}</span>
+                          <item.icon size={20} className="shrink-0" />
+                          <span className="text-sm font-medium">{item.name}</span>
                         </NavLink>
                       </motion.div>
                     ))}
@@ -897,6 +903,11 @@ export const Layout = () => {
           {/* Dashboard */}
           <NavLink
             to="/"
+            onClick={() => {
+              // 点击 Dashboard 时关闭所有二级菜单
+              setActiveBottomMenu(null);
+              setShowNotifications(false);
+            }}
             className={({ isActive }) => `
               relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
               ${isActive ? "text-white" : "text-gray-400 hover:text-white"}
