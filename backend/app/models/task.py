@@ -33,6 +33,7 @@ class ExecutionType(str, enum.Enum):
     WORKFLOW = "workflow"
     AGENT_TEST = "agent_test"
     AGENT_TEAM = "agent_team"
+    TERMINAL = "terminal"
 
 
 class Task(Base):
@@ -110,6 +111,12 @@ class Execution(Base):
     last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_background: Mapped[bool] = mapped_column(default=False, nullable=False)
     chat_history: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON 格式的聊天历史
+
+    # Terminal 相关字段
+    terminal_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)  # 进程 ID
+    terminal_command: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 执行的命令
+    terminal_cwd: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # 工作目录
+    terminal_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # 命令输出（限制大小）
 
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

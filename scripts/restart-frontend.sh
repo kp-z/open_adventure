@@ -2,8 +2,12 @@
 
 # 清理并重启前端服务
 
+# 获取脚本所在目录的父目录（项目根目录）
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
 echo "🔄 清理前端缓存..."
-cd /Users/kp/项目/Proj/claude_manager/frontend-api-integration-migration
+cd "$PROJECT_ROOT/frontend"
 
 # 停止旧进程
 pkill -f "npm run dev" 2>/dev/null

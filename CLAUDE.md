@@ -1,5 +1,11 @@
 # Claude Manager 项目上下文
 
+## 项目信息
+- **项目名称**: Claude Manager
+- **GitHub 仓库**: https://github.com/kp-z/open_adventure
+- **仓库所有者**: kp-z
+- **仓库名称**: open_adventure
+
 ## 项目概述
 Claude Manager 是一个管理 Claude AI 生态的系统，包含技能(Skills)、智能体(Agents)、队伍(AgentTeams)、工作流(Workflows)和任务(Tasks)的统一管理平台。
 

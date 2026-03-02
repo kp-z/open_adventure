@@ -17,8 +17,9 @@ class SkillRepository:
 
     async def create(self, skill_data: SkillCreate) -> Skill:
         """Create a new skill"""
-        # 只提取 Skill 模型需要的字段，排除 scripts 和 references
-        skill_dict = skill_data.model_dump(exclude={'scripts', 'references'})
+        # 只提取 Skill 模型需要的字段，排除 scripts、references 和 scope
+        # scope 是用于创建 skill 时指定保存位置的，不是 ORM 字段
+        skill_dict = skill_data.model_dump(exclude={'scripts', 'references', 'scope'})
         skill = Skill(**skill_dict)
         self.session.add(skill)
         await self.session.commit()

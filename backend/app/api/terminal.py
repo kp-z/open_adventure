@@ -41,6 +41,9 @@ class TerminalSession:
         self.auto_start_claude = auto_start_claude
         self.websocket = None  # 当前连接的 WebSocket
         self.execution_id = None  # 关联的 execution ID
+        self.claude_running = False  # 标记是否运行了 claude code
+        self.scrollback_buffer = []  # 保存终端输出历史
+        self.max_scrollback_lines = 10000  # 最大保存行数
 
     def is_process_alive(self) -> bool:
         """检查 PTY 进程是否还在运行"""
@@ -51,6 +54,50 @@ class TerminalSession:
             os.kill(self.pid, 0)
             return True
         except (OSError, ProcessLookupError):
+            return False
+
+    def check_claude_running(self) -> bool:
+        """检查是否有 claude 进程在运行"""
+        if not self.pid:
+            print(f"[Terminal] check_claude_running: No PID")
+            return False
+        try:
+            # 查找 shell 进程的所有子进程
+            import subprocess
+            result = subprocess.run(
+                ['pgrep', '-P', str(self.pid)],
+                capture_output=True,
+                text=True
+            )
+            print(f"[Terminal] pgrep result: returncode={result.returncode}, stdout={result.stdout}")
+
+            if result.returncode == 0:
+                child_pids = result.stdout.strip().split('\n')
+                print(f"[Terminal] Found child PIDs: {child_pids}")
+
+                # 检查每个子进程的命令
+                for child_pid in child_pids:
+                    if child_pid:
+                        try:
+                            cmd_result = subprocess.run(
+                                ['ps', '-p', child_pid, '-o', 'comm='],
+                                capture_output=True,
+                                text=True
+                            )
+                            print(f"[Terminal] PID {child_pid} command: {cmd_result.stdout.strip()}")
+                            if 'claude' in cmd_result.stdout.lower():
+                                print(f"[Terminal] Found claude process: PID {child_pid}")
+                                return True
+                        except Exception as e:
+                            print(f"[Terminal] Error checking PID {child_pid}: {e}")
+
+            print(f"[Terminal] No claude process found")
+            return False
+        except Exception as e:
+            print(f"[Terminal] Error in check_claude_running: {e}")
+            return False
+        except Exception as e:
+            print(f"[Terminal] Error checking claude process: {e}")
             return False
 
     def start(self):
@@ -106,6 +153,29 @@ class TerminalSession:
         if self.master_fd and self.running:
             os.write(self.master_fd, data.encode())
             self.last_activity = datetime.now()  # 更新活动时间
+
+    def save_output(self, data: bytes):
+        """保存输出到 scrollback buffer"""
+        try:
+            text = data.decode('utf-8', errors='ignore')
+            # 按行分割并保存
+            lines = text.split('\n')
+            self.scrollback_buffer.extend(lines)
+
+            # 限制 buffer 大小
+            if len(self.scrollback_buffer) > self.max_scrollback_lines:
+                self.scrollback_buffer = self.scrollback_buffer[-self.max_scrollback_lines:]
+        except Exception as e:
+            print(f"[Terminal] Error saving output: {e}")
+
+    def get_scrollback(self, lines: int = 1000) -> str:
+        """获取最近的 scrollback 内容"""
+        if not self.scrollback_buffer:
+            return ""
+
+        # 获取最近的 N 行
+        recent_lines = self.scrollback_buffer[-lines:]
+        return '\n'.join(recent_lines)
 
     def read(self, timeout: float = 0.1) -> bytes:
         """Read data from the terminal"""
@@ -208,21 +278,58 @@ async def terminal_websocket(
     # 检查是否要重新连接到已存在的 session
     if session_id and session_id in sessions:
         session = sessions[session_id]
+        print(f"[Terminal] ========== RECONNECTING TO EXISTING SESSION ==========")
         print(f"[Terminal] Reconnecting to existing session: {session_id}")
         print(f"[Terminal] Session PID: {session.pid}, Process alive: {session.is_process_alive()}")
 
         if not session.is_process_alive():
-            print(f"[Terminal] Session {session_id} process is dead, creating new session")
+            print(f"[Terminal] ❌ Session {session_id} process is dead, creating new session")
             session.close()
             del sessions[session_id]
             session_id = None  # 创建新 session
         else:
             # 重新连接到已存在的 session
+            print(f"[Terminal] ✅ Process is alive, proceeding with reconnection")
             session.websocket = websocket
             print(f"[Terminal] Successfully reconnected to session {session_id}")
 
+            # 检查是否有 claude 进程在运行
+            print(f"[Terminal] ========== CHECKING CLAUDE PROCESS ==========")
+            claude_was_running = session.check_claude_running()
+            print(f"[Terminal] Claude process running: {claude_was_running}")
+
+            # 等待前端 xterm 准备好（给 React 渲染和 xterm.open() 一些时间）
+            print(f"[Terminal] Waiting 500ms for frontend to be ready...")
+            await asyncio.sleep(0.5)
+            print(f"[Terminal] Frontend should be ready now")
+
             # 发送重连成功消息
+            print(f"[Terminal] Sending reconnection success message...")
             await websocket.send_text("\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n")
+            print(f"[Terminal] ✅ Reconnection message sent")
+
+            # 如果 claude 还在运行，发送 Ctrl+L 刷新界面
+            if claude_was_running:
+                print(f"[Terminal] ========== CLAUDE IS RUNNING - REFRESHING ==========")
+                print(f"[Terminal] Sending Ctrl+L to refresh Claude interface")
+                await asyncio.sleep(0.2)  # 等待消息显示
+                session.write('\x0c')  # Ctrl+L
+                print(f"[Terminal] ✅ Ctrl+L sent")
+                session.claude_running = True
+            else:
+                print(f"[Terminal] ========== CLAUDE NOT RUNNING - STARTING WITH -c ==========")
+                print(f"[Terminal] Claude not running, starting with 'claude -c'")
+                await asyncio.sleep(0.3)
+                print(f"[Terminal] Sending 'claude -c\\n' to PTY...")
+                session.write('claude -c\n')
+                print(f"[Terminal] ✅ 'claude -c' command sent")
+                session.claude_running = True
+
+            print(f"[Terminal] ========== RECONNECTION COMPLETE ==========")
+
+            # 重连时不需要这些变量，设置为 None
+            initial_dir = None
+            auto_start_claude = False
     else:
         session_id = None  # 创建新 session
 
@@ -288,10 +395,13 @@ async def terminal_websocket(
             from app.models.task import Execution
             execution = Execution(
                 task_id=task.id,
-                workflow_id=1,  # 使用默认 workflow ID，或者可以创建一个专门的 terminal workflow
-                execution_type=ExecutionType.AGENT_TEST,
+                workflow_id=0,  # Terminal 不需要 workflow
+                execution_type=ExecutionType.TERMINAL,
                 status=ExecutionStatus.RUNNING,
                 session_id=session_id,
+                terminal_pid=session.pid,
+                terminal_cwd=initial_dir or os.path.expanduser('~'),
+                terminal_command="shell session",  # 初始命令
                 started_at=datetime.now(),
                 last_activity_at=datetime.now(),
                 is_background=True
@@ -309,8 +419,11 @@ async def terminal_websocket(
                 "id": execution.id,
                 "task_id": task.id,
                 "session_id": session_id,
-                "execution_type": "agent_test",
+                "execution_type": "terminal",
                 "status": "running",
+                "terminal_pid": session.pid,
+                "terminal_cwd": initial_dir or os.path.expanduser('~'),
+                "terminal_command": "shell session",
                 "started_at": execution.started_at.isoformat() if execution.started_at else None,
                 "created_at": execution.created_at.isoformat(),
                 "task": {
@@ -357,6 +470,8 @@ async def terminal_websocket(
                     await asyncio.get_event_loop().run_in_executor(
                         None, session.write, 'claude\n'
                     )
+                    # 标记 claude 正在运行
+                    session.claude_running = True
                     print(f"[Terminal] Startup commands sent successfully")
                 except Exception as e:
                     print(f"[Terminal] Error sending startup commands: {e}")
@@ -365,22 +480,59 @@ async def terminal_websocket(
             asyncio.create_task(send_startup_commands())
 
         # Create tasks for reading from PTY and WebSocket
+        output_buffer = []  # 缓冲输出
+        last_update_time = datetime.now()
+
         async def read_from_pty():
             """Read output from PTY and send to WebSocket"""
+            nonlocal last_update_time
+            print(f"[Terminal] read_from_pty started for session {session_id}, session.running={session.running}")
             while session.running:
                 try:
                     data = await asyncio.get_event_loop().run_in_executor(
                         None, session.read, 0.1
                     )
                     if data:
-                        await websocket.send_text(data.decode('utf-8', errors='ignore'))
+                        # 保存到 session 的 scrollback buffer
+                        session.save_output(data)
+
+                        decoded_data = data.decode('utf-8', errors='ignore')
+                        await websocket.send_text(decoded_data)
+
+                        # 缓冲输出（限制大小）
+                        output_buffer.append(decoded_data)
+                        # 保持最近 10MB 的输出
+                        total_size = sum(len(s) for s in output_buffer)
+                        while total_size > 10 * 1024 * 1024 and len(output_buffer) > 1:
+                            removed = output_buffer.pop(0)
+                            total_size -= len(removed)
+
+                        # 每 5 秒更新一次数据库
+                        now = datetime.now()
+                        if (now - last_update_time).total_seconds() >= 5:
+                            if session.execution_id:
+                                try:
+                                    execution_repo = ExecutionRepository(db)
+                                    output_text = ''.join(output_buffer)
+                                    await execution_repo.update_terminal_execution(
+                                        execution_id=session.execution_id,
+                                        output=output_text
+                                    )
+                                    last_update_time = now
+                                except Exception as e:
+                                    print(f"[Terminal] Failed to update execution output: {e}")
+
                 except Exception as e:
-                    print(f"Error reading from PTY: {e}")
+                    print(f"[Terminal] Error reading from PTY: {e}")
+                    import traceback
+                    traceback.print_exc()
                     break
                 await asyncio.sleep(0.01)
+            print(f"[Terminal] read_from_pty exited for session {session_id}")
 
         async def read_from_websocket():
             """Read input from WebSocket and write to PTY"""
+            print(f"[Terminal] read_from_websocket started for session {session_id}")
             while session.running:
                 try:
                     message = await websocket.receive_text()
@@ -399,17 +551,23 @@ async def terminal_websocket(
                             None, session.resize, rows, cols
                         )
                 except WebSocketDisconnect:
+                    print(f"[Terminal] WebSocket disconnected in read_from_websocket for session {session_id}")
                     break
                 except Exception as e:
-                    print(f"Error reading from WebSocket: {e}")
+                    print(f"[Terminal] Error reading from WebSocket: {e}")
+                    import traceback
+                    traceback.print_exc()
                     break
+            print(f"[Terminal] read_from_websocket exited for session {session_id}")
 
         # Run both tasks concurrently
-        await asyncio.gather(
+        print(f"[Terminal] Starting read tasks for session {session_id}...")
+        results = await asyncio.gather(
             read_from_pty(),
             read_from_websocket(),
             return_exceptions=True
         )
+        print(f"[Terminal] Read tasks completed for session {session_id}, results: {results}")
 
     except WebSocketDisconnect:
         print(f"[Terminal] WebSocket disconnected: {session_id}")
@@ -426,17 +584,41 @@ async def terminal_websocket(
             print(f"[Terminal] Session {session_id} WebSocket disconnected, but session kept alive")
             print(f"[Terminal] Session PID: {session.pid}, Process alive: {session.is_process_alive()}")
 
-            # 更新执行记录的最后活动时间
+            # 保存最终输出并更新执行记录
             if session.execution_id:
                 try:
                     execution_repo = ExecutionRepository(db)
                     execution = await execution_repo.get(session.execution_id)
                     if execution:
+                        # 保存最终输出
+                        if output_buffer:
+                            output_text = ''.join(output_buffer)
+                            execution.terminal_output = output_text
+
+                        # 更新最后活动时间
                         execution.last_activity_at = datetime.now()
+
+                        # 如果进程已结束，更新状态
+                        if not session.is_process_alive():
+                            execution.status = ExecutionStatus.SUCCEEDED
+                            execution.finished_at = datetime.now()
+                            print(f"[Terminal] Process ended, marking execution {session.execution_id} as succeeded")
+
+                            # 广播执行完成
+                            ws_manager = get_connection_manager()
+                            await ws_manager.broadcast_terminal_execution_update({
+                                "id": execution.id,
+                                "session_id": session_id,
+                                "status": "succeeded",
+                                "finished_at": execution.finished_at.isoformat() if execution.finished_at else None
+                            })
+
                         await db.commit()
-                        print(f"[Terminal] Updated last_activity_at for execution {session.execution_id}")
+                        print(f"[Terminal] Updated execution {session.execution_id}")
                 except Exception as e:
-                    print(f"[Terminal] Failed to update execution last_activity_at: {e}")
+                    print(f"[Terminal] Failed to update execution: {e}")
+                    import traceback
+                    traceback.print_exc()
 
         print(f"[Terminal] Active sessions remaining: {len(sessions)}")
         try:
