@@ -273,7 +273,7 @@ const Dashboard = () => {
           <GlassCard className="md:col-span-2 lg:col-span-2 flex flex-col justify-between">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 ${
+              <div className={`w-12 h-12 rounded-xl ${
                 claudeHealth?.cli_available
                   ? 'bg-green-500/20 border border-green-500/50 text-green-500'
                   : 'bg-red-500/20 border border-red-500/50 text-red-500'
