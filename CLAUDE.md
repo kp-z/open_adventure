@@ -38,6 +38,14 @@ Claude Manager 是一个管理 Claude AI 生态的系统，包含技能(Skills)�
 - **后台执行支持**：用户可以离开页面，执行继续进行
 - **可视化监控**：Dashboard 高亮显示运行中的任务，右下角实时监控
 
+### Claude Code Plugin 自动安装
+- **内置 Marketplace**：项目包含 `marketplace/open_adventure/` 目录，存放内置的 skills
+- **首次启动自动安装**：运行 `./start.sh` 时自动检测并安装插件到 `~/.claude/plugins/open_adventure/`
+- **幂等性保证**：重复运行不会重复安装或报错
+- **自动配置**：自动更新 `~/.claude/settings.json`，将插件添加到 `enabledPlugins`
+- **已包含 Skills**：
+  - `prompt_optimizer`: 优化用户输入的 prompt，使其更清晰、具体、结构化
+
 ## 目录结构
 ```
 backend/app/
@@ -51,6 +59,14 @@ frontend/src/
 ├── app/                # 页面路由
 ├── components/         # UI 组件
 └── lib/                # API 客户端
+
+marketplace/            # 内置 Claude Code Plugins
+└── open_adventure/     # Claude Manager 官方插件
+    └── skills/         # Skills 目录
+        └── prompt_optimizer/  # Prompt 优化 skill
+
+scripts/
+└── install_plugins.sh  # 插件自动安装脚本
 ```
 
 ## 开发阶段
