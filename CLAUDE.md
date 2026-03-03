@@ -225,9 +225,41 @@ scripts/
 
 #### 4. 打包发布文件
 
-**必须同时发布 macOS 和 Linux 版本**
+**必须同时发布 macOS 和 Linux 版本的二进制包**
 
-##### macOS ARM64 版本
+##### 二进制构建（推荐）
+
+使用 PyInstaller 构建保护源码的二进制版本：
+
+**macOS ARM64 版本**：
+```bash
+cd /Users/kp/项目/Proj/claude_manager
+./scripts/build_binary.sh
+```
+
+**Linux x86_64 版本**：
+```bash
+# 在 Linux 环境中运行
+cd /path/to/claude_manager
+./scripts/build_binary.sh
+```
+
+**二进制构建特点**：
+- ✅ 源码保护：所有 Python 代码编译为字节码，无法直接查看
+- ✅ 独立运行：包含 Python 解释器和所有依赖
+- ✅ 用户友好：无需安装 Python 环境
+- ⚠️ 体积较大：约 30-40MB（压缩后）
+
+**构建产物**：
+- 压缩包位置：`docs/releases/open_adventure-v{版本号}-{平台}-{架构}.tar.gz`
+- 压缩包命名：`open_adventure-v{版本号}-macos-arm64.tar.gz`
+- 压缩包命名：`open_adventure-v{版本号}-linux-x86_64.tar.gz`
+
+##### 源码打包（可选）
+
+如果需要提供源码版本（用于开发或调试）：
+
+**macOS ARM64 版本**：
 ```bash
 cd /Users/kp/项目/Proj
 tar \
@@ -251,12 +283,12 @@ tar \
   --exclude='claude_manager/.claude' \
   --exclude='claude_manager/.figma' \
   --exclude='claude_manager/.playwright-mcp' \
-  -czf /tmp/claude-manager-v{版本号}-macos-arm64.tar.gz claude_manager/
+  -czf /tmp/open_adventure-v{版本号}-macos-arm64-source.tar.gz claude_manager/
 
-mv /tmp/claude-manager-v{版本号}-macos-arm64.tar.gz claude_manager/docs/releases/
+mv /tmp/open_adventure-v{版本号}-macos-arm64-source.tar.gz claude_manager/docs/releases/
 ```
 
-##### Linux x86_64 版本
+**Linux x86_64 版本**：
 ```bash
 cd /Users/kp/项目/Proj
 tar \
@@ -280,12 +312,12 @@ tar \
   --exclude='claude_manager/.claude' \
   --exclude='claude_manager/.figma' \
   --exclude='claude_manager/.playwright-mcp' \
-  -czf /tmp/claude-manager-v{版本号}-linux-x86_64.tar.gz claude_manager/
+  -czf /tmp/open_adventure-v{版本号}-linux-x86_64-source.tar.gz claude_manager/
 
-mv /tmp/claude-manager-v{版本号}-linux-x86_64.tar.gz claude_manager/docs/releases/
+mv /tmp/open_adventure-v{版本号}-linux-x86_64-source.tar.gz claude_manager/docs/releases/
 ```
 
-**打包规范**：
+**源码打包规范**：
 - 必须排除 `node_modules`、`venv`、`dist`、`build`、`.git`（包括子目录的 `.git`）等目录
 - **必须排除整个 `docs` 目录**（包含开发文档、设计资源、历史版本，不需要分发给用户）
 - 必须排除临时文件和缓存目录（`.claude`、`.figma`、`.playwright-mcp`、`.vite`、`__pycache__`）
