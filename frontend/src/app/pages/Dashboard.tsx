@@ -359,35 +359,37 @@ const Dashboard = () => {
                       >
                         {/* 可用模型：显示绿色高亮边框和水位线 */}
                         {isAvailable && tokenUsage ? (
-                          <div
-                            className={`
-                              w-full h-full rounded-full relative
-                              transition-all duration-300
-                              backdrop-blur-[2px]
-                              border-2
-                              active:scale-110
-                              bg-gradient-to-br from-white/8 via-white/4 to-transparent
-                              group
-                            `}
-                            style={{
-                              borderColor: 'rgba(34, 197, 94, 0.4)',
-                              boxShadow: '0 0 15px rgba(34, 197, 94, 0.4), 0 0 30px rgba(34, 197, 94, 0.2), inset 0 0 20px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
-                            }}
-                          >
-                            {/* 顶部高光 */}
-                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
+                          <>
+                            <div
+                              className={`
+                                w-full h-full rounded-full relative overflow-hidden
+                                transition-all duration-300
+                                backdrop-blur-[2px]
+                                border-2
+                                active:scale-110
+                                bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                                group
+                              `}
+                              style={{
+                                borderColor: 'rgba(34, 197, 94, 0.4)',
+                                boxShadow: '0 0 15px rgba(34, 197, 94, 0.4), 0 0 30px rgba(34, 197, 94, 0.2), inset 0 0 20px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
+                              }}
+                            >
+                              {/* 顶部高光 */}
+                              <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
 
-                            {/* 水位线 */}
-                            <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={config.size} />
+                              {/* 水位线 */}
+                              <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={config.size} />
 
-                            {/* 模型名称 - 在水位线后面 */}
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
-                              <span className="text-[7px] font-bold text-white drop-shadow-lg text-center leading-tight px-0.5">
-                                {config.name}
-                              </span>
+                              {/* 模型名称 - 在水位线后面 */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                                <span className="text-[7px] font-bold text-white drop-shadow-lg text-center leading-tight px-0.5">
+                                  {config.name}
+                                </span>
+                              </div>
                             </div>
 
-                            {/* Active 显示 token 信息 - 在气泡上方 - 只在当前选中的模型显示 */}
+                            {/* Active 显示 token 信息 - 移到气泡容器外部 */}
                             {hoveredModel === config.name && (
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                                 <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
@@ -408,7 +410,7 @@ const Dashboard = () => {
                                 </div>
                               </div>
                             )}
-                          </div>
+                          </>
                         ) : (
                           /* 不可用的模型显示原来的样式 */
                           <div
@@ -501,38 +503,40 @@ const Dashboard = () => {
                     >
                       {/* 可用模型：显示绿色高亮边框和水位线 */}
                       {isAvailable && tokenUsage ? (
-                        <div
-                          className={`
-                            w-full h-full rounded-full relative
-                            transition-all duration-300
-                            backdrop-blur-[2px]
-                            border-2
-                            hover:scale-110
-                            bg-gradient-to-br from-white/8 via-white/4 to-transparent
-                            group
-                          `}
-                          style={{
-                            borderColor: 'rgba(34, 197, 94, 0.4)',
-                            boxShadow: '0 0 20px rgba(34, 197, 94, 0.4), 0 0 40px rgba(34, 197, 94, 0.2), inset 0 0 30px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
-                          }}
-                        >
-                          {/* 顶部高光 */}
-                          <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
+                        <>
+                          <div
+                            className={`
+                              w-full h-full rounded-full relative overflow-hidden
+                              transition-all duration-300
+                              backdrop-blur-[2px]
+                              border-2
+                              hover:scale-110
+                              bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                              group
+                            `}
+                            style={{
+                              borderColor: 'rgba(34, 197, 94, 0.4)',
+                              boxShadow: '0 0 20px rgba(34, 197, 94, 0.4), 0 0 40px rgba(34, 197, 94, 0.2), inset 0 0 30px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
+                            }}
+                          >
+                            {/* 顶部高光 */}
+                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
 
-                          {/* 次级高光 */}
-                          <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
+                            {/* 次级高光 */}
+                            <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
 
-                          {/* 水位线 */}
-                          <WaterLevel percentage={tokenUsage.percentage} size={config.size} />
+                            {/* 水位线 */}
+                            <WaterLevel percentage={tokenUsage.percentage} size={config.size} />
 
-                          {/* 模型名称 - 在水位线后面 */}
-                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
-                            <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
-                              {config.name}
-                            </span>
+                            {/* 模型名称 - 在水位线后面 */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                              <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
+                                {config.name}
+                              </span>
+                            </div>
                           </div>
 
-                          {/* Hover 显示 token 信息 - 在气泡上方 - 只在当前 hover 的模型显示 */}
+                          {/* Hover 显示 token 信息 - 移到气泡容器外部 */}
                           {hoveredModel === config.name && (
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                               <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
@@ -553,7 +557,7 @@ const Dashboard = () => {
                               </div>
                             </div>
                           )}
-                        </div>
+                        </>
                       ) : (
                         /* 不可用的模型显示原来的样式 */
                         <div

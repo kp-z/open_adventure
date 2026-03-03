@@ -16,20 +16,22 @@ export const WaterLevel: React.FC<WaterLevelProps> = ({ percentage, size = 60 })
     return () => clearTimeout(timer);
   }, [percentage]);
 
-  // 计算剩余百分比（percentage 是已使用百分比）
+  // percentage 是已使用百分比，计算剩余百分比
   const remainingPercentage = 100 - animatedPercentage;
-  // 波浪线位置：从顶部开始，根据剩余百分比定位
-  const wavePosition = (remainingPercentage / 100) * size;
+  // 波浪线位置：从顶部开始，根据剩余百分比定位（剩余越多，水位越高）
+  const wavePosition = ((100 - remainingPercentage) / 100) * size;
 
   // 根据剩余百分比选择颜色
   const getColor = () => {
-    const remaining = 100 - percentage; // 计算剩余百分比
-    if (remaining >= 50) return '#22c55e'; // 草绿色 - 充足（剩余 50-100%）
-    if (remaining >= 10) return '#fbbf24'; // 淡黄色 - 中等（剩余 10-50%）
-    return '#fca5a5'; // 淡红色 - 危险（剩余 0-10%）
+    if (remainingPercentage >= 50) return 'rgba(34, 197, 94, 0.2)'; // 淡绿色 - 充足（剩余 50-100%）
+    if (remainingPercentage >= 10) return 'rgba(251, 191, 36, 0.6)'; // 黄色 - 中等（剩余 10-50%）
+    return 'rgba(239, 68, 68, 0.6)'; // 红色 - 危险（剩余 0-10%）
   };
 
   const color = getColor();
+
+  // 考虑边框宽度，clipPath 半径需要更小
+  const clipRadius = (size / 2) - 3; // 减去边框宽度和额外的安全边距
 
   return (
     <>
@@ -40,9 +42,9 @@ export const WaterLevel: React.FC<WaterLevelProps> = ({ percentage, size = 60 })
         viewBox={`0 0 ${size} ${size}`}
       >
         <defs>
-          {/* 定义圆形裁剪路径 */}
+          {/* 定义圆形裁剪路径 - 考虑边框宽度 */}
           <clipPath id={`bubble-clip-${size}`}>
-            <circle cx={size / 2} cy={size / 2} r={size / 2 - 2} />
+            <circle cx={size / 2} cy={size / 2} r={clipRadius} />
           </clipPath>
         </defs>
 
@@ -53,41 +55,43 @@ export const WaterLevel: React.FC<WaterLevelProps> = ({ percentage, size = 60 })
           width={size}
           height={size - wavePosition}
           fill={color}
-          opacity="0.1"
           clipPath={`url(#bubble-clip-${size})`}
         />
       </svg>
 
-      {/* 横向波浪线 - 第二层（增加深度感） */}
+      {/* 横向波浪线 - 使用相同的 clipPath 确保不溢出 */}
       <svg
-        className="absolute left-0 w-full transition-all duration-1000 ease-out pointer-events-none"
-        style={{
-          top: `${wavePosition}px`,
-          height: '10px',
-          transform: 'translateY(-4px)',
-          zIndex: 21
-        }}
-        viewBox="0 0 1440 320"
-        preserveAspectRatio="none"
+        className="absolute inset-0 w-full h-full transition-all duration-1000 ease-out pointer-events-none"
+        style={{ zIndex: 21 }}
+        viewBox={`0 0 ${size} ${size}`}
       >
-        <path
-          stroke={color}
-          strokeWidth="4"
-          fill="none"
-          strokeOpacity="0.5"
-          d="M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,213.3C672,224,768,224,864,213.3C960,203,1056,181,1152,181.3C1248,181,1344,203,1392,213.3L1440,224"
-        >
-          <animate
-            attributeName="d"
-            dur="4s"
-            repeatCount="indefinite"
-            values="
-              M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,213.3C672,224,768,224,864,213.3C960,203,1056,181,1152,181.3C1248,181,1344,203,1392,213.3L1440,224;
-              M0,256L48,240C96,224,192,192,288,181.3C384,171,480,181,576,197.3C672,213,768,235,864,229.3C960,224,1056,192,1152,181.3C1248,171,1344,181,1392,186.7L1440,192;
-              M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,213.3C672,224,768,224,864,213.3C960,203,1056,181,1152,181.3C1248,181,1344,203,1392,213.3L1440,224
-            "
-          />
-        </path>
+        <defs>
+          {/* 使用相同的圆形裁剪路径 */}
+          <clipPath id={`bubble-clip-wave-${size}`}>
+            <circle cx={size / 2} cy={size / 2} r={clipRadius} />
+          </clipPath>
+        </defs>
+
+        {/* 波浪线路径 - 应用 clipPath，减小波动幅度 */}
+        <g clipPath={`url(#bubble-clip-wave-${size})`}>
+          <path
+            stroke={color}
+            strokeWidth="2"
+            fill="none"
+            d={`M0,${wavePosition} Q${size * 0.25},${wavePosition - 2} ${size * 0.5},${wavePosition} T${size},${wavePosition}`}
+          >
+            <animate
+              attributeName="d"
+              dur="3s"
+              repeatCount="indefinite"
+              values={`
+                M0,${wavePosition} Q${size * 0.25},${wavePosition - 2} ${size * 0.5},${wavePosition} T${size},${wavePosition};
+                M0,${wavePosition} Q${size * 0.25},${wavePosition + 2} ${size * 0.5},${wavePosition} T${size},${wavePosition};
+                M0,${wavePosition} Q${size * 0.25},${wavePosition - 2} ${size * 0.5},${wavePosition} T${size},${wavePosition}
+              `}
+            />
+          </path>
+        </g>
       </svg>
     </>
   );
