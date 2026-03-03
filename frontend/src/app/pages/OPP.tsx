@@ -70,9 +70,18 @@ export default function OPP() {
       <div className="mb-6 sm:mb-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">OPP Command Center</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">OPP Command Center</h1>
+              <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
+                敬请期待
+              </span>
+            </div>
             <p className="text-sm sm:text-base text-gray-400 mt-1">
               AI Task Orchestration Platform - Objectives, Planning & Progress
+            </p>
+            <p className="text-xs text-orange-400 mt-1 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+              当前使用 Mock 数据展示
             </p>
           </div>
           <motion.button

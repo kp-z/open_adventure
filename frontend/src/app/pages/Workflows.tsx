@@ -64,6 +64,10 @@ const Workflows = () => {
               </span>
             </div>
             <p className="text-gray-400 font-medium">Embark on legendary automation quests and reap the rewards.</p>
+            <p className="text-xs text-orange-400 mt-1 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+              当前使用 Mock 数据展示
+            </p>
           </div>
           <ActionButton onClick={() => setIsEditorOpen(true)}>Create New Map</ActionButton>
         </header>

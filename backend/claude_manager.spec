@@ -5,8 +5,8 @@ from pathlib import Path
 
 block_cipher = None
 
-# 项目路径 - 使用相对路径
-backend_dir = Path(__file__).parent.resolve()
+# 项目路径 - 使用 SPECPATH（PyInstaller 提供的 .spec 文件所在目录）
+backend_dir = Path(SPECPATH).resolve()
 project_root = backend_dir.parent
 frontend_dist = project_root / 'frontend' / 'dist'
 db_template = backend_dir / 'claude_manager.db'
@@ -18,22 +18,7 @@ sys.path.insert(0, str(backend_dir))
 DISTPATH = str(project_root / 'dist')
 WORKPATH = str(backend_dir / 'build')
 
-# 收集 app 模块（整个目录）
-app_datas = []
-if app_dir.exists():
-    for root, dirs, files in os.walk(app_dir):
-        # 跳过 __pycache__ 和 .pyc 文件
-        dirs[:] = [d for d in dirs if d != '__pycache__']
-        for file in files:
-            if file.endswith('.py'):
-                src = Path(root) / file
-                dst = Path('app') / src.relative_to(app_dir).parent
-                app_datas.append((str(src), str(dst)))
-    print(f"✓ 收集 app 模块: {len(app_datas)} 个文件")
-else:
-    print("⚠️  警告: app 目录不存在")
-
-# 收集前端静态文件
+# 收集前端静态文件（不收集 .py 源码文件，让 PyInstaller 自动编译）
 frontend_datas = []
 if frontend_dist.exists():
     for root, dirs, files in os.walk(frontend_dist):
@@ -45,8 +30,8 @@ if frontend_dist.exists():
 else:
     print("⚠️  警告: frontend/dist 不存在")
 
-# 收集数据库模板
-datas = app_datas + frontend_datas
+# 收集数据库模板（只收集非代码的数据文件）
+datas = frontend_datas
 if db_template.exists():
     datas.append((str(db_template), '.'))
     print(f"✓ 收集数据库模板: {db_template}")
