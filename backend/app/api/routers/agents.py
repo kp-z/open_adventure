@@ -439,7 +439,7 @@ async def create_agent(
 async def list_agents(
     skip: int = Query(0, ge=0, description="跳过数量"),
     limit: int = Query(100, ge=1, le=1000, description="返回数量"),
-    scope: Optional[str] = Query(None, description="过滤作用域: builtin, user, project, plugin"),
+    scope: Optional[str] = Query(None, description="过滤作用域: builtin, user, project"),
     active_only: bool = Query(False, description="仅返回激活的（未被覆盖的）"),
     service: AgentService = Depends(get_agent_service)
 ):
@@ -477,12 +477,6 @@ async def get_agent_categories(
     for agent in agents.items:
         scope = agent.scope.value if hasattr(agent.scope, 'value') else agent.scope
         counts[scope] = counts.get(scope, 0) + 1
-
-        # Extract plugin name
-        if scope == "plugin" and agent.meta:
-            plugin_name = agent.meta.get("plugin_name", "unknown")
-            if plugin_name and plugin_name != "unknown":
-                plugins[plugin_name] = plugins.get(plugin_name, 0) + 1
 
         # Extract project name from path
         if scope == "project" and agent.meta:
@@ -1415,6 +1409,452 @@ async def agent_terminal(
 
     except Exception as e:
         print(f"[AgentTerminal] WebSocket error: {e}")
+        try:
+            await websocket.send_json({
+                'type': 'error',
+                'message': str(e)
+            })
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+@router.websocket("/{agent_id}/session-ws")
+async def unified_agent_session(
+    websocket: WebSocket,
+    agent_id: int,
+    mode: str = Query(default="chat", regex="^(chat|terminal)$"),
+    session_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    统一的 Agent 会话 WebSocket 端点
+
+    支持两种模式：
+    - chat: 对话模式，解析输出为结构化消息
+    - terminal: Terminal 模式，返回原始终端输出
+
+    参数：
+    - mode: 模式选择 (chat/terminal)
+    - session_id: 可选的会话 ID（用于恢复现有会话）
+    """
+    import json
+    import asyncio
+    from app.services.agent_process_manager import get_process_manager, ChatMessage
+    from app.core.logging import get_logger
+
+    logger = get_logger(__name__)
+    logger.info(f"[UnifiedSession] New connection for agent {agent_id}, mode={mode}, session_id={session_id}")
+
+    await websocket.accept()
+
+    try:
+        # 获取 Agent 信息
+        service = get_agent_service(db)
+        agent = await service.get_agent(agent_id)
+
+        if not agent:
+            await websocket.send_json({
+                'type': 'error',
+                'message': f'Agent {agent_id} not found'
+            })
+            await websocket.close()
+            return
+
+        # 获取进程管理器
+        process_manager = get_process_manager()
+
+        # 获取或创建进程
+        process_info = await process_manager.get_or_create_process(
+            agent_id=agent_id,
+            agent_name=agent.name,
+            db=db,
+            session_id=session_id
+        )
+
+        logger.info(f"[UnifiedSession] Process ready: PID={process_info.pid}, session={process_info.session_id}")
+
+        # 发送就绪消息
+        ready_message = {
+            'type': 'ready',
+            'message': f'Agent "{agent.name}" ready',
+            'session_id': process_info.session_id,
+            'execution_id': process_info.execution_id,
+            'is_reconnect': not process_info.is_new,
+            'mode': mode
+        }
+
+        if mode == 'chat':
+            # 对话模式：返回聊天历史
+            ready_message['chat_history'] = [
+                {
+                    'id': msg.id,
+                    'role': msg.role,
+                    'content': msg.content,
+                    'timestamp': msg.timestamp,
+                    'status': msg.status
+                }
+                for msg in process_info.chat_history
+            ]
+        else:
+            # Terminal 模式：返回原始输出
+            ready_message['raw_output'] = process_info.raw_output
+
+        await websocket.send_json(ready_message)
+
+        # 启动输出读取任务
+        async def read_output_task():
+            try:
+                async for output in process_manager.read_from_process(agent_id, db):
+                    if mode == 'chat':
+                        # 对话模式：解析为聊天消息
+                        chat_msg = process_manager.parse_chat_message(output)
+                        if chat_msg:
+                            process_info.chat_history.append(chat_msg)
+                            await websocket.send_json({
+                                'type': 'chat_message',
+                                'message': {
+                                    'id': chat_msg.id,
+                                    'role': chat_msg.role,
+                                    'content': chat_msg.content,
+                                    'timestamp': chat_msg.timestamp,
+                                    'status': chat_msg.status
+                                }
+                            })
+                    else:
+                        # Terminal 模式：直接发送原始输出
+                        await websocket.send_json({
+                            'type': 'output',
+                            'data': output
+                        })
+            except Exception as e:
+                logger.error(f"[UnifiedSession] Error reading output: {e}")
+                await websocket.send_json({
+                    'type': 'error',
+                    'message': f'Error reading output: {str(e)}'
+                })
+
+        # 启动后台读取任务
+        read_task = asyncio.create_task(read_output_task())
+
+        # 处理客户端消息
+        try:
+            while True:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+
+                if message.get('type') == 'input':
+                    # 用户输入
+                    user_input = message.get('data', '')
+
+                    # 发送到进程
+                    await process_manager.send_to_process(agent_id, user_input, db)
+
+                    # 添加到聊天历史（仅对话模式）
+                    if mode == 'chat':
+                        from datetime import datetime
+                        user_message = ChatMessage(
+                            id=f"user-{datetime.utcnow().timestamp()}",
+                            role='user',
+                            content=user_input,
+                            timestamp=datetime.utcnow().isoformat(),
+                            status='success'
+                        )
+                        process_info.chat_history.append(user_message)
+
+                elif message.get('type') == 'resize':
+                    # 终端尺寸调整（仅 Terminal 模式）
+                    if mode == 'terminal':
+                        cols = message.get('cols', 80)
+                        rows = message.get('rows', 24)
+                        # TODO: 实现终端尺寸调整
+                        logger.info(f"[UnifiedSession] Terminal resize: {cols}x{rows}")
+
+                elif message.get('type') == 'stop':
+                    # 停止进程
+                    await process_manager.stop_process(agent_id, db)
+                    await websocket.send_json({
+                        'type': 'stopped',
+                        'message': 'Process stopped'
+                    })
+                    break
+
+                elif message.get('type') == 'restart':
+                    # 重启进程
+                    process_info = await process_manager.restart_process(agent_id, agent.name, db)
+                    await websocket.send_json({
+                        'type': 'restarted',
+                        'message': 'Process restarted',
+                        'session_id': process_info.session_id
+                    })
+
+        except WebSocketDisconnect:
+            logger.info(f"[UnifiedSession] Client disconnected for agent {agent_id}")
+        finally:
+            # 取消读取任务
+            read_task.cancel()
+            try:
+                await read_task
+            except asyncio.CancelledError:
+                pass
+
+    except Exception as e:
+        logger.error(f"[UnifiedSession] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            await websocket.send_json({
+                'type': 'error',
+                'message': str(e)
+            })
+        except:
+            pass
+    finally:
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+@router.post("/{agent_id}/stop")
+async def stop_agent_process(
+    agent_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """停止 Agent 进程"""
+    from app.services.agent_process_manager import get_process_manager
+
+    process_manager = get_process_manager()
+    success = await process_manager.stop_process(agent_id, db)
+
+    if success:
+        return {"message": "Process stopped successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="Process not found")
+
+
+@router.post("/{agent_id}/restart")
+async def restart_agent_process(
+    agent_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """重启 Agent 进程"""
+    from app.services.agent_process_manager import get_process_manager
+
+    service = get_agent_service(db)
+    agent = await service.get_agent(agent_id)
+
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    process_manager = get_process_manager()
+    process_info = await process_manager.restart_process(agent_id, agent.name, db)
+
+    return {
+        "message": "Process restarted successfully",
+        "session_id": process_info.session_id,
+        "pid": process_info.pid
+    }
+
+
+@router.get("/{agent_id}/status")
+async def get_agent_process_status(agent_id: int):
+    """获取 Agent 进程状态"""
+    from app.services.agent_process_manager import get_process_manager
+
+    process_manager = get_process_manager()
+    status = await process_manager.get_process_status(agent_id)
+
+    if status:
+        return status
+    else:
+        raise HTTPException(status_code=404, detail="Process not found")
+
+
+@router.websocket("/{agent_id}/api-session-ws")
+async def api_agent_session(
+    websocket: WebSocket,
+    agent_id: int,
+    mode: str = Query(default="api", regex="^(chat|api)$"),
+    session_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    新的 Agent 会话 WebSocket 端点（使用统一模型 API 接口）
+
+    使用新的模型提供商接口层，支持多种模型提供商：
+    - chat: 使用 claude -p --agent <agent_name> 进行对话
+    - api: 使用 Anthropic API 直接调用
+
+    参数：
+    - mode: 模式选择 (chat/api)
+    - session_id: 可选的会话 ID（用于恢复现有会话）
+    """
+    import json
+    from app.adapters.models import ModelProviderFactory
+    from app.core.logging import get_logger
+
+    logger = get_logger(__name__)
+    logger.info(f"[ApiSession] New connection for agent {agent_id}, mode={mode}, session_id={session_id}")
+
+    await websocket.accept()
+
+    try:
+        # 获取 Agent 信息
+        service = get_agent_service(db)
+        agent = await service.get_agent(agent_id)
+
+        if not agent:
+            await websocket.send_json({
+                'type': 'error',
+                'message': f'Agent {agent_id} not found'
+            })
+            await websocket.close()
+            return
+
+        # 根据模式选择提供商
+        if mode == 'chat':
+            # chat 模式：使用 claude -p --agent <agent_name>
+            provider_type = 'claude_cli_noninteractive'
+            provider_config = {'cli_path': settings.claude_cli_path}
+        else:
+            # api 模式：使用 Anthropic API
+            provider_type = settings.default_model_provider
+            provider_config = {}
+
+            if provider_type == 'anthropic':
+                if settings.anthropic_api_key:
+                    provider_config['api_key'] = settings.anthropic_api_key
+                else:
+                    logger.warning("Anthropic API key not configured, falling back to Claude CLI")
+                    provider_type = 'claude_cli_noninteractive'
+                    provider_config['cli_path'] = settings.claude_cli_path
+
+        logger.info(f"Using provider: {provider_type}")
+
+        try:
+            provider = ModelProviderFactory.create_provider(
+                provider_type=provider_type,
+                config=provider_config
+            )
+        except Exception as e:
+            logger.error(f"Failed to create provider: {e}")
+            await websocket.send_json({
+                'type': 'error',
+                'message': f'Failed to create model provider: {str(e)}'
+            })
+            await websocket.close()
+            return
+
+        # 创建会话
+        try:
+            session_id = await provider.create_session(
+                agent_id=agent_id,
+                agent_config={
+                    'system_prompt': agent.system_prompt,
+                    'model': agent.model,
+                    'tools': agent.tools,
+                },
+                session_id=session_id
+            )
+        except Exception as e:
+            logger.error(f"Failed to create session: {e}")
+            await websocket.send_json({
+                'type': 'error',
+                'message': f'Failed to create session: {str(e)}'
+            })
+            await websocket.close()
+            return
+
+        # 发送就绪消息
+        await websocket.send_json({
+            'type': 'ready',
+            'session_id': session_id,
+            'provider': provider_type,
+            'mode': mode,
+            'message': f'Agent "{agent.name}" ready (using {provider_type})'
+        })
+
+        # 处理客户端消息
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
+
+                if message.get('type') == 'input':
+                    user_input = message.get('data', '')
+                    logger.info(f"[ApiSession] Received input: {user_input[:50]}...")
+                    logger.info(f"[ApiSession] Full input length: {len(user_input)} bytes")
+
+                    # 发送到模型提供商，流式返回
+                    try:
+                        logger.info(f"[ApiSession] Calling provider.send_message...")
+                        message_count = 0
+                        async for response_msg in provider.send_message(
+                            session_id=session_id,
+                            message=user_input,
+                            context={
+                                'model': agent.model,
+                                'agent_name': agent.name
+                            }
+                        ):
+                            message_count += 1
+                            logger.info(f"[ApiSession] Received message {message_count} from provider, is_chunk={response_msg.metadata.get('is_chunk', False)}")
+
+                            # 发送流式响应
+                            await websocket.send_json({
+                                'type': 'chat_message',
+                                'message': {
+                                    'id': f"msg-{datetime.utcnow().timestamp()}",
+                                    'role': response_msg.role,
+                                    'content': response_msg.content,
+                                    'timestamp': response_msg.timestamp,
+                                    'status': 'success',
+                                    'is_chunk': response_msg.metadata.get('is_chunk', False)
+                                }
+                            })
+                            logger.info(f"[ApiSession] Sent message {message_count} to WebSocket")
+
+                        logger.info(f"[ApiSession] Finished sending all messages, total: {message_count}")
+                    except Exception as e:
+                        logger.error(f"Error sending message: {e}")
+                        logger.exception(e)
+                        await websocket.send_json({
+                            'type': 'error',
+                            'message': f'Error: {str(e)}'
+                        })
+
+                elif message.get('type') == 'stop':
+                    logger.info(f"[ApiSession] Stop requested for session {session_id}")
+                    await provider.close_session(session_id)
+                    break
+
+                elif message.get('type') == 'get_history':
+                    # 获取会话历史
+                    history = await provider.get_session_history(session_id)
+                    await websocket.send_json({
+                        'type': 'history',
+                        'messages': [msg.to_dict() for msg in history]
+                    })
+
+            except WebSocketDisconnect:
+                logger.info(f"[ApiSession] Client disconnected for agent {agent_id}")
+                break
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON: {e}")
+                await websocket.send_json({
+                    'type': 'error',
+                    'message': 'Invalid JSON format'
+                })
+
+    except Exception as e:
+        logger.error(f"[ApiSession] Error: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             await websocket.send_json({
                 'type': 'error',

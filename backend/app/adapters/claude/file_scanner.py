@@ -6,6 +6,7 @@ Claude File Scanner
 import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 from app.config.settings import settings
 from app.core.logging import get_logger
@@ -81,6 +82,9 @@ class ClaudeFileScanner:
         # 步骤 4: 标记重复的技能
         skills = self._mark_duplicate_skills(skills)
 
+        # 步骤 5: 自动评估所有 skills 的质量
+        skills = await self._evaluate_skills_quality(skills)
+
         logger.info(f"Total skills: {len(skills)}")
         return skills
 
@@ -149,7 +153,8 @@ class ClaudeFileScanner:
     async def _scan_skills_in_dir(
         self,
         directory: Path,
-        source: str
+        source: str,
+        recursive: bool = True
     ) -> List[Dict[str, Any]]:
         """
         扫描指定目录中的技能
@@ -157,6 +162,7 @@ class ClaudeFileScanner:
         Args:
             directory: 目录路径
             source: 来源标识（user/global/plugin/project）
+            recursive: 是否递归扫描子目录（默认 True）
 
         Returns:
             List[Dict]: 技能列表
@@ -164,13 +170,38 @@ class ClaudeFileScanner:
         skills = []
 
         try:
-            for skill_dir in directory.iterdir():
-                if not skill_dir.is_dir():
-                    continue
+            if recursive:
+                # 递归扫描：查找所有包含 skill 定义文件的目录
+                # 支持大小写：skill.md, SKILL.md, skill.yaml, skill.json 等
+                skill_files = []
+                for pattern in ["skill.md", "SKILL.md", "skill.yaml", "skill.json"]:
+                    skill_files.extend(directory.rglob(pattern))
 
-                skill_data = await self._parse_skill(skill_dir, source)
-                if skill_data:
-                    skills.append(skill_data)
+                # 去重：同一个目录只处理一次
+                processed_dirs = set()
+                for skill_file in skill_files:
+                    skill_dir = skill_file.parent
+                    if not skill_dir.is_dir():
+                        continue
+
+                    # 避免重复扫描同一个目录
+                    skill_dir_str = str(skill_dir)
+                    if skill_dir_str in processed_dirs:
+                        continue
+                    processed_dirs.add(skill_dir_str)
+
+                    skill_data = await self._parse_skill(skill_dir, source)
+                    if skill_data:
+                        skills.append(skill_data)
+            else:
+                # 非递归：只扫描直接子目录
+                for skill_dir in directory.iterdir():
+                    if not skill_dir.is_dir():
+                        continue
+
+                    skill_data = await self._parse_skill(skill_dir, source)
+                    if skill_data:
+                        skills.append(skill_data)
 
         except Exception as e:
             logger.error(f"Error scanning skills in {directory}: {e}")
@@ -287,6 +318,10 @@ class ClaudeFileScanner:
         """
         扫描项目路径中的技能
 
+        扫描路径包括：
+        1. .claude/skills/ (项目技能)
+        2. .claude/plugins/*/skills/ (项目插件技能)
+
         Args:
             project_path: 项目根路径
             recursive: 是否递归扫描子目录
@@ -299,7 +334,7 @@ class ClaudeFileScanner:
 
         try:
             if recursive:
-                # 递归查找所有 .claude/skills 目录
+                # 步骤 1: 递归查找所有 .claude/skills 目录
                 for skills_dir in project_path.rglob(".claude/skills"):
                     if not skills_dir.is_dir():
                         continue
@@ -323,6 +358,39 @@ class ClaudeFileScanner:
                         skill["meta"]["project_path"] = str(project_path)
                         skill["meta"]["relative_path"] = str(rel_path)
                         skills.append(skill)
+
+                # 步骤 2: 递归查找所有 .claude/plugins/*/skills 目录
+                plugins_base = project_path / ".claude" / "plugins"
+                if plugins_base.exists() and plugins_base.is_dir():
+                    for plugin_dir in plugins_base.iterdir():
+                        if not plugin_dir.is_dir():
+                            continue
+
+                        plugin_skills_dir = plugin_dir / "skills"
+                        if not plugin_skills_dir.exists() or not plugin_skills_dir.is_dir():
+                            continue
+
+                        # 跳过空目录
+                        if not any(plugin_skills_dir.iterdir()):
+                            continue
+
+                        plugin_name = plugin_dir.name
+                        rel_path = plugin_skills_dir.relative_to(project_path)
+
+                        plugin_skills = await self._scan_skills_in_dir(
+                            plugin_skills_dir,
+                            source="project"
+                        )
+
+                        # 在 meta 中记录项目和插件信息
+                        for skill in plugin_skills:
+                            skill["meta"]["project_alias"] = alias
+                            skill["meta"]["project_path"] = str(project_path)
+                            skill["meta"]["relative_path"] = str(rel_path)
+                            skill["meta"]["plugin_name"] = plugin_name
+                            skill["meta"]["is_project_plugin"] = True
+                            skills.append(skill)
+
             else:
                 # 只扫描根目录的 .claude/skills
                 skills_dir = project_path / ".claude" / "skills"
@@ -1047,3 +1115,39 @@ class ClaudeFileScanner:
         except Exception as e:
             logger.error(f"Error parsing agent team {team_file}: {e}")
             return None
+
+    async def _evaluate_skills_quality(self, skills: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        自动评估所有 skills 的质量
+
+        Args:
+            skills: 技能列表
+
+        Returns:
+            List[Dict]: 添加了质量评估结果的技能列表
+        """
+        from app.services.skill_quality_service import SkillQualityService
+
+        quality_service = SkillQualityService()
+
+        for skill in skills:
+            if skill.get("meta", {}).get("path"):
+                try:
+                    skill_path = Path(skill["meta"]["path"])
+                    evaluation = await quality_service.evaluate_skill(
+                        skill_path,
+                        skill
+                    )
+
+                    # 添加质量评估结果到 skill 数据
+                    skill["quality_score"] = evaluation["score"]
+                    skill["quality_grade"] = evaluation["grade"]
+                    skill["quality_evaluation"] = evaluation
+                    skill["evaluated_at"] = datetime.now().isoformat()
+
+                    logger.debug(f"Skill '{skill['name']}' evaluated: {evaluation['grade']} ({evaluation['score']}/100)")
+                except Exception as e:
+                    logger.warning(f"Failed to evaluate skill '{skill['name']}': {e}")
+                    # 评估失败不影响 skill 同步
+
+        return skills

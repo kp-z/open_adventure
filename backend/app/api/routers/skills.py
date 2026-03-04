@@ -5,7 +5,7 @@ import subprocess
 import asyncio
 import json
 import re
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 from fastapi import APIRouter, Depends, Query, status, HTTPException
 from fastapi.responses import StreamingResponse
@@ -19,6 +19,8 @@ from app.schemas.skill import SkillCreate, SkillUpdate, SkillResponse, SkillList
 from app.models.skill import SkillSource
 from app.config.settings import settings
 from app.core.logging import get_logger
+from app.core.tag_definitions import TAG_DEFINITIONS, validate_tags
+from app.services.tag_classifier import TagClassifier
 
 logger = get_logger(__name__)
 
@@ -72,7 +74,7 @@ class SaveSkillRequest(BaseModel):
     scripts: List[SkillFileItem] = Field(default_factory=list, description="脚本文件列表")
     references: List[SkillFileItem] = Field(default_factory=list, description="参考文件列表")
     assets: List[SkillFileItem] = Field(default_factory=list, description="资源文件列表")
-    scope: Optional[str] = Field('user', description="保存位置：user, project, plugin")
+    scope: Optional[str] = Field('user', description="保存位置：user, project")
     plugin_name: Optional[str] = Field(None, description="Plugin 名称（scope=plugin 时必填）")
     project_path: Optional[str] = Field(None, description="项目路径（scope=project 时必填）")
 
@@ -575,7 +577,7 @@ async def save_skill_to_global(
     """
     将编辑好的 Skill 内容保存到指定目录。
 
-    - 支持 user/plugin/project scope
+    - 支持 user/project scope
     - 创建技能目录
     - 写入 SKILL.md 和可选的 scripts/references/assets
     - 自动同步到数据库（直接操作 repository，不触发文件系统同步）
@@ -674,9 +676,7 @@ async def save_skill_to_global(
             "path": str(skills_dir),
             "skill_md_path": str(skill_md_path),
         }
-        if scope == 'plugin':
-            meta["plugin_name"] = plugin_name
-        elif scope == 'project':
+        if scope == 'project':
             meta["project_path"] = project_path
 
         if request.scripts:
@@ -828,6 +828,41 @@ async def get_skill_content(
     )
 
 
+
+@router.get(
+    "/categories-semantic",
+    summary="获取语义化分类统计"
+)
+async def get_semantic_categories(
+    service: SkillService = Depends(get_skill_service)
+):
+    """
+    返回语义化分类统计
+
+    统计所有标签的 Skill 数量（不再限制 category: 前缀）
+    """
+    skills = await service.list_skills(skip=0, limit=10000)
+
+    # 统计所有标签
+    tag_counts = {}
+
+    for skill in skills.items:
+        tags = skill.tags or []
+        for tag in tags:
+            # 统计所有标签，不再限制 category: 前缀
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+
+    return {
+        "categories": tag_counts,
+        "total_skills": skills.total,
+        "classified_skills": len([
+            skill for skill in skills.items
+            if skill.tags and len(skill.tags) > 0
+        ])
+    }
+
+
+
 @router.get(
     "/{skill_id}",
     response_model=SkillResponse,
@@ -866,3 +901,423 @@ async def delete_skill(
 ):
     """Delete a skill"""
     await service.delete_skill(skill_id)
+
+
+# ============ Skill 分类相关 API ============
+
+class ClassifyRequest(BaseModel):
+    """单个 Skill 分类请求"""
+    skill_id: int
+
+
+class ClassifyBatchRequest(BaseModel):
+    """批量 Skill 分类请求"""
+    skill_ids: List[int]
+
+
+class ClassifyResponse(BaseModel):
+    """分类响应"""
+    skill_id: int
+    skill_name: str
+    categories: List[str]
+    success: bool
+    error: Optional[str] = None
+
+
+class ClassifyBatchResponse(BaseModel):
+    """批量分类响应"""
+    results: List[ClassifyResponse]
+    total: int
+    success_count: int
+    failed_count: int
+
+
+@router.post(
+    "/classify",
+    response_model=ClassifyResponse,
+    summary="对单个 Skill 进行分类"
+)
+async def classify_skill(
+    request: ClassifyRequest,
+    service: SkillService = Depends(get_skill_service)
+):
+    """
+    使用 skill_classifier 对指定 Skill 进行分类
+
+    - 调用 Claude CLI 执行 skill_classifier
+    - 解析分类结果
+    - 更新 Skill 的 tags 字段（添加 category: 前缀的标签）
+    """
+    try:
+        # 获取 Skill 信息
+        skill = await service.get_skill(request.skill_id)
+
+        # 构建分类 prompt
+        skill_info = {
+            "name": skill.name,
+            "description": skill.description,
+            "tags": skill.tags or []
+        }
+
+        prompt = f"""使用 skill_classifier 对以下 Skill 进行分类：
+
+Skill 信息：
+{json.dumps(skill_info, ensure_ascii=False, indent=2)}
+
+请返回分类标签列表，格式为 JSON 数组，例如：
+["category:code-generation", "category:ai-enhancement"]
+
+只返回 JSON 数组，不要添加其他说明。"""
+
+        # 调用 Claude CLI
+        cli_path = settings.claude_cli_path
+        cmd = [
+            cli_path,
+            "-p", prompt,
+            "--output-format", "text",
+            "--disable-slash-commands",
+            "--setting-sources", "user"
+        ]
+
+        logger.info(f"Classifying skill: {skill.name}")
+
+        # 清除环境变量
+        import os
+        env = os.environ.copy()
+        env.pop('CLAUDECODE', None)
+        env.pop('CLAUDE_CODE', None)
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=60
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            raise HTTPException(
+                status_code=504,
+                detail="分类超时"
+            )
+
+        if process.returncode != 0:
+            error_msg = stderr.decode("utf-8") if stderr else "未知错误"
+            logger.error(f"Claude CLI error: {error_msg}")
+            return ClassifyResponse(
+                skill_id=skill.id,
+                skill_name=skill.name,
+                categories=[],
+                success=False,
+                error=f"分类失败: {error_msg}"
+            )
+
+        output = stdout.decode("utf-8")
+        logger.info(f"Classification output: {output[:500]}")
+
+        # 解析分类结果
+        categories = []
+
+        # 尝试从输出中提取 JSON 数组
+        json_match = re.search(r'\[[\s\S]*?\]', output)
+        if json_match:
+            try:
+                categories = json.loads(json_match.group(0))
+                # 确保所有标签都有 category: 前缀
+                categories = [
+                    cat if cat.startswith("category:") else f"category:{cat}"
+                    for cat in categories
+                ]
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse categories JSON: {json_match.group(0)}")
+
+        # 如果解析失败，使用默认分类
+        if not categories:
+            categories = ["category:utility"]
+            logger.warning(f"No categories found, using default: {categories}")
+
+        # 更新 Skill 的 tags
+        current_tags = skill.tags or []
+        # 移除旧的 category: 标签
+        non_category_tags = [tag for tag in current_tags if not tag.startswith("category:")]
+        # 添加新的分类标签
+        new_tags = non_category_tags + categories
+
+        # 更新数据库
+        skill_update = SkillUpdate(tags=new_tags)
+        await service.update_skill(skill.id, skill_update)
+
+        logger.info(f"Skill {skill.name} classified with categories: {categories}")
+
+        return ClassifyResponse(
+            skill_id=skill.id,
+            skill_name=skill.name,
+            categories=categories,
+            success=True
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error classifying skill: {e}")
+        return ClassifyResponse(
+            skill_id=request.skill_id,
+            skill_name="",
+            categories=[],
+            success=False,
+            error=str(e)
+        )
+
+
+@router.post(
+    "/classify-batch",
+    response_model=ClassifyBatchResponse,
+    summary="批量对 Skills 进行分类"
+)
+async def classify_skills_batch(
+    request: ClassifyBatchRequest,
+    service: SkillService = Depends(get_skill_service)
+):
+    """
+    批量分类多个 Skills
+
+    - 对每个 Skill 调用分类逻辑
+    - 返回所有分类结果
+    """
+    results = []
+    success_count = 0
+    failed_count = 0
+
+    for skill_id in request.skill_ids:
+        classify_request = ClassifyRequest(skill_id=skill_id)
+        result = await classify_skill(classify_request, service)
+        results.append(result)
+
+        if result.success:
+            success_count += 1
+        else:
+            failed_count += 1
+
+    return ClassifyBatchResponse(
+        results=results,
+        total=len(request.skill_ids),
+        success_count=success_count,
+        failed_count=failed_count
+    )
+
+
+# ============ 新标签系统 API ============
+
+@router.get(
+    "/tags/definitions",
+    summary="获取所有标签定义"
+)
+async def get_tag_definitions():
+    """
+    获取所有标签维度和标签值定义
+
+    返回格式：
+    {
+        "工具": ["bash", "git", ...],
+        "API": ["GitHub-API", ...],
+        ...
+    }
+    """
+    return {dim.value: tags for dim, tags in TAG_DEFINITIONS.items()}
+
+
+class TagSuggestRequest(BaseModel):
+    """标签推荐请求"""
+    name: str
+    description: str
+    meta: Optional[Dict[str, Any]] = None
+
+
+@router.post(
+    "/tags/suggest",
+    summary="根据 Skill 数据推荐标签"
+)
+async def suggest_tags(request: TagSuggestRequest):
+    """
+    根据 Skill 的名称、描述、meta 信息推荐标签
+
+    返回推荐的标签列表（最多 10 个）
+    """
+    classifier = TagClassifier()
+    suggested_tags = classifier.suggest_tags({
+        "name": request.name,
+        "description": request.description,
+        "meta": request.meta or {}
+    })
+    return {"suggested_tags": suggested_tags}
+
+
+class TagValidateRequest(BaseModel):
+    """标签验证请求"""
+    tags: List[str]
+
+
+@router.post(
+    "/tags/validate",
+    summary="验证标签列表"
+)
+async def validate_tags_endpoint(request: TagValidateRequest):
+    """
+    验证标签列表是否符合规范
+
+    返回：
+    {
+        "valid": true/false,
+        "error": "错误信息（如果有）"
+    }
+    """
+    is_valid, error = validate_tags(request.tags)
+    return {"valid": is_valid, "error": error}
+
+
+# ============ Skill 质量评估 API ============
+
+@router.post(
+    "/{skill_id}/evaluate",
+    summary="手动触发 Skill 质量评估"
+)
+async def evaluate_skill_quality(
+    skill_id: int,
+    service: SkillService = Depends(get_skill_service)
+):
+    """
+    手动触发单个 Skill 的质量评估
+
+    返回评估结果，包括：
+    - score: 总分 (0-100)
+    - grade: 等级 (A/B/C/D/F)
+    - dimensions: 各维度评分详情
+    - strengths: 优点列表
+    - weaknesses: 不足列表
+    - suggestions: 改进建议列表
+    """
+    from app.services.skill_quality_service import SkillQualityService
+    from datetime import datetime
+
+    # 获取 skill
+    skill = await service.get_skill(skill_id)
+
+    # 检查是否有路径信息
+    if not skill.meta or not skill.meta.get("path"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Skill 缺少路径信息，无法评估"
+        )
+
+    # 执行评估
+    quality_service = SkillQualityService()
+    skill_path = Path(skill.meta["path"])
+
+    try:
+        evaluation = await quality_service.evaluate_skill(
+            skill_path,
+            {
+                "name": skill.name,
+                "description": skill.description,
+                "tags": skill.tags
+            }
+        )
+
+        # 更新数据库中的评估结果
+        from app.schemas.skill import SkillUpdate
+        await service.repository.update(skill_id, SkillUpdate(
+            quality_score=evaluation["score"],
+            quality_grade=evaluation["grade"],
+            quality_evaluation=evaluation,
+            evaluated_at=datetime.now()
+        ))
+
+        return evaluation
+
+    except Exception as e:
+        logger.error(f"评估 skill {skill_id} 失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"评估失败: {str(e)}"
+        )
+
+
+@router.get(
+    "/quality/statistics",
+    summary="获取所有 Skills 的质量统计"
+)
+async def get_quality_statistics(
+    service: SkillService = Depends(get_skill_service)
+):
+    """
+    获取所有 Skills 的质量统计信息
+
+    返回：
+    - total: 总 skill 数量
+    - evaluated: 已评估的 skill 数量
+    - grade_distribution: 等级分布 (A/B/C/D/F 各有多少个)
+    - average_score: 平均分数
+    - top_skills: 评分最高的 5 个 skills
+    - bottom_skills: 评分最低的 5 个 skills
+    """
+    # 获取所有 skills
+    skills_response = await service.list_skills(skip=0, limit=10000)
+    skills = skills_response.items
+
+    # 统计数据
+    total = len(skills)
+    evaluated = sum(1 for s in skills if s.quality_score is not None)
+
+    # 等级分布
+    grade_distribution = {"A": 0, "B": 0, "C": 0, "D": 0, "F": 0}
+    scores = []
+
+    for skill in skills:
+        if skill.quality_grade:
+            grade_distribution[skill.quality_grade] = grade_distribution.get(skill.quality_grade, 0) + 1
+        if skill.quality_score is not None:
+            scores.append(skill.quality_score)
+
+    # 平均分数
+    average_score = sum(scores) / len(scores) if scores else 0
+
+    # 排序获取 top 和 bottom skills
+    evaluated_skills = [s for s in skills if s.quality_score is not None]
+    evaluated_skills.sort(key=lambda s: s.quality_score, reverse=True)
+
+    top_skills = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "score": s.quality_score,
+            "grade": s.quality_grade
+        }
+        for s in evaluated_skills[:5]
+    ]
+
+    bottom_skills = [
+        {
+            "id": s.id,
+            "name": s.name,
+            "score": s.quality_score,
+            "grade": s.quality_grade
+        }
+        for s in evaluated_skills[-5:]
+    ]
+
+    return {
+        "total": total,
+        "evaluated": evaluated,
+        "grade_distribution": grade_distribution,
+        "average_score": round(average_score, 2),
+        "top_skills": top_skills,
+        "bottom_skills": bottom_skills
+    }
+
+

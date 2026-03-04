@@ -50,6 +50,7 @@ import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ChatView } from './agent-test/ChatView';
 import { TerminalView } from './agent-test/TerminalView';
+import { ApiChatView } from './agent-test/ApiChatView';
 import type { ViewMode } from './agent-test/types';
 import 'highlight.js/styles/github-dark.css';
 import '../../styles/markdown.css';
@@ -303,6 +304,21 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     } else {
       setViewMode(newMode);
     }
+  };
+
+  // 停止 Agent 进程
+  // 停止 Agent 进程
+  const handleStopAgent = async () => {
+    // 在新的 API 模式下,我们需要关闭 WebSocket 连接
+    // 这个功能由 ApiChatView 组件内部处理
+    // 这里我们可以刷新页面来重置状态
+    window.location.reload();
+  };
+
+  // 重启 Agent 进程
+  const handleRestartAgent = async () => {
+    // 在新的 API 模式下,重启就是刷新页面
+    window.location.reload();
   };
 
   // 滚动到输出区域
@@ -718,6 +734,7 @@ Agent 描述: ${agent.description}
                 测试控制台
               </h3>
               <div className="flex items-center gap-2">
+                {/* 视图模式切换 */}
                 <button
                   onClick={() => handleModeSwitch('chat')}
                   className={`p-2 rounded-lg transition-all ${
@@ -725,55 +742,55 @@ Agent 描述: ${agent.description}
                       ? 'bg-blue-500/20 text-blue-400'
                       : 'bg-white/5 text-gray-400 hover:bg-white/10'
                   }`}
-                  title="对话框模式"
+                  title="对话模式 (claude -p --agent)"
                 >
                   <MessageSquare size={16} />
                 </button>
+
+                {/* 分隔线 */}
+                <div className="w-px h-6 bg-white/10" />
+
+                {/* 进程控制按钮 */}
                 <button
-                  onClick={() => handleModeSwitch('terminal')}
-                  className={`p-2 rounded-lg transition-all ${
-                    viewMode === 'terminal'
-                      ? 'bg-green-500/20 text-green-400'
-                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
-                  }`}
-                  title="终端模式"
+                  onClick={handleStopAgent}
+                  className="p-2 rounded-lg bg-white/5 text-red-400 hover:bg-red-500/20 transition-all"
+                  title="停止 Agent"
                 >
-                  <Terminal size={16} />
+                  <Square size={16} />
+                </button>
+                <button
+                  onClick={handleRestartAgent}
+                  className="p-2 rounded-lg bg-white/5 text-yellow-400 hover:bg-yellow-500/20 transition-all"
+                  title="重启 Agent"
+                >
+                  <RotateCcw size={16} />
                 </button>
               </div>
             </div>
 
             <AnimatePresence mode="wait">
-              {viewMode === 'chat' ? (
-                <motion.div
-                  key="chat"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <ChatView
-                    agentId={agent.id}
-                    agentName={agent.name}
-                    onTestComplete={handleTestComplete}
-                    reconnectExecutionId={reconnectExecutionId}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="terminal"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <TerminalView
-                    agentId={agent.id}
-                    agentName={agent.name}
-                    onTestComplete={handleTestComplete}
-                  />
-                </motion.div>
-              )}
+              <motion.div
+                key="chat"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ApiChatView
+                  agentId={agent.id}
+                  agentName={agent.name}
+                  mode="chat"
+                  onSessionReady={(sessionId) => {
+                    console.log('[AgentTestPanel] Chat session ready:', sessionId);
+                  }}
+                  onError={(error) => {
+                    addNotification({
+                      type: 'error',
+                      message: `Chat session error: ${error}`,
+                    });
+                  }}
+                />
+              </motion.div>
             </AnimatePresence>
           </GlassCard>
 

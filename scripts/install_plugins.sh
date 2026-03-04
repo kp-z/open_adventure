@@ -7,20 +7,20 @@ set -e
 
 PLUGIN_NAME="open_adventure"
 USER_PLUGIN_DIR="$HOME/.claude/plugins/$PLUGIN_NAME"
-MARKETPLACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/marketplace/$PLUGIN_NAME"
+MARKETPLACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.claude/plugins/marketplace-plugins/$PLUGIN_NAME"
 SETTINGS_FILE="$HOME/.claude/settings.json"
 
 echo "🔧 检查 Claude Manager 插件安装状态..."
 
-# 检查 marketplace 目录是否存在
-if [ ! -d "$MARKETPLACE_DIR" ]; then
-    echo "❌ 错误: Marketplace 目录不存在: $MARKETPLACE_DIR"
-    exit 1
-fi
-
 # 检查用户插件目录是否已存在
 if [ -d "$USER_PLUGIN_DIR" ]; then
     echo "✅ 插件已安装: $USER_PLUGIN_DIR"
+    exit 0
+fi
+
+# 检查 marketplace 目录是否存在
+if [ ! -d "$MARKETPLACE_DIR" ]; then
+    echo "⚠️  Marketplace 目录不存在，跳过插件安装"
     exit 0
 fi
 

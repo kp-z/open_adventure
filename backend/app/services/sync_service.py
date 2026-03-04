@@ -16,6 +16,7 @@ from app.repositories.project_path_repository import ProjectPathRepository
 from app.schemas.skill import SkillCreate
 from app.schemas.agent import AgentCreate
 from app.schemas.agent_team import AgentTeamCreate
+from app.services.tag_classifier import TagClassifier
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -108,25 +109,47 @@ class SyncService:
 
             # 步骤 2: 创建或更新 skills
             # 使用路径作为唯一标识，支持同名 skill 在不同位置
+            classifier = TagClassifier()
+
             for skill_data in scanned_skills:
                 try:
                     # 获取 skill 的路径作为唯一标识
                     skill_path = skill_data.get("meta", {}).get("path", "")
-                    
+
                     # 按路径查找是否已存在
                     existing = None
                     if skill_path:
                         existing = await self.skill_repo.get_by_path(skill_path)
 
+                    # 只有当 SKILL.md 中没有标签时，才使用分类器生成标签
+                    if not skill_data.get("tags"):
+                        suggested_tags = classifier.suggest_tags({
+                            "name": skill_data["name"],
+                            "description": skill_data.get("description", ""),
+                            "meta": skill_data.get("meta", {})
+                        })
+                        skill_data["tags"] = suggested_tags
+                        logger.info(f"Auto-generated tags for {skill_data['name']}: {suggested_tags}")
+                    else:
+                        # 如果 SKILL.md 中有标签，清除所有旧的 category: 标签
+                        clean_tags = [tag for tag in skill_data["tags"] if not tag.startswith("category:")]
+                        skill_data["tags"] = clean_tags
+                        logger.info(f"Using existing tags for {skill_data['name']}: {clean_tags}")
+
                     if existing:
-                        # 更新现有技能
+                        # 更新现有技能（包括质量评估数据）
                         from app.schemas.skill import SkillUpdate
                         skill_update = SkillUpdate(
                             description=skill_data["description"],
                             type=skill_data["type"],
                             tags=skill_data["tags"],
                             source=skill_data["source"],
-                            meta=skill_data["meta"]
+                            meta=skill_data["meta"],
+                            # 添加质量评估字段
+                            quality_score=skill_data.get("quality_score"),
+                            quality_grade=skill_data.get("quality_grade"),
+                            quality_evaluation=skill_data.get("quality_evaluation"),
+                            evaluated_at=skill_data.get("evaluated_at")
                         )
                         await self.skill_repo.update(existing.id, skill_update)
                         updated += 1

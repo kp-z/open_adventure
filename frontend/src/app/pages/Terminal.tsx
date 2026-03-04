@@ -350,8 +350,8 @@ const Terminal = () => {
   const handleCloseAllAndRestart = async () => {
     // 关闭所有终端
     await cleanupAll();
-    // 重启一个新终端
-    createTerminal(selectedProjectPath);
+    // 重启一个新终端（使用默认路径，用户可以通过 + 按钮选择项目）
+    createTerminal();
   };
 
   const handleFocusTerminal = () => {
@@ -467,10 +467,13 @@ const Terminal = () => {
       {/* Header */}
       <header className="flex justify-between items-start gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SHELL</h1>
-          <div className="flex items-center gap-3 mt-2">
-            <p className="text-sm md:text-base text-gray-400">
-              <span className="text-green-500">{terminals.length} terminal{terminals.length > 1 ? 's' : ''}</span> active
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">TERMINAL</h1>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
+            多标签终端，支持分屏和项目路径快速切换
+          </p>
+          <div className="flex items-center gap-3 mt-1">
+            <p className="text-xs text-gray-500">
+              <span className="text-green-500">{terminals.length} 个终端</span>正在运行
             </p>
           </div>
         </div>

@@ -13,6 +13,7 @@ from app.models.team_message import TeamMessage
 from app.models.team_task import TeamTask
 from app.models.team_state import TeamState
 from app.models.project_path import ProjectPath
+from app.models.plugin import Plugin, PluginStatus
 
 __all__ = [
     "Skill",
@@ -28,5 +29,7 @@ __all__ = [
     "TeamMessage",
     "TeamTask",
     "TeamState",
-    "ProjectPath"
+    "ProjectPath",
+    "Plugin",
+    "PluginStatus"
 ]

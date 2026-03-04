@@ -116,8 +116,8 @@ class AgentCreate(BaseModel):
     memory: Optional[str] = Field(None)
     background: bool = Field(False)
     isolation: Optional[str] = Field(None)
-    scope: Literal["user", "project", "plugin"] = Field("user", description="创建位置：user, project 或 plugin")
-    meta: Optional[dict] = Field(None, description="元数据，plugin scope 需包含 plugin_name，project scope 需包含 project_path")
+    scope: Literal["user", "project"] = Field("user", description="创建位置：user 或 project")
+    meta: Optional[dict] = Field(None, description="元数据，project scope 需包含 project_path")
 
 
 class AgentUpdate(BaseModel):
@@ -180,7 +180,7 @@ class AgentGenerateRequest(BaseModel):
     参考 /agents 命令的 "Generate with Claude" 功能
     """
     prompt: str = Field(..., min_length=10, max_length=2000, description="描述子代理的用途和行为")
-    scope: Literal["user", "project", "plugin"] = Field("user", description="创建位置：user, project 或 plugin")
+    scope: Literal["user", "project"] = Field("user", description="创建位置：user 或 project")
     model: Optional[str] = Field("sonnet", description="使用的模型")
     tools_preset: Optional[str] = Field(
         None,

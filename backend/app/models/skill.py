@@ -3,7 +3,7 @@ Skill Model
 """
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Boolean, JSON, DateTime, Enum as SQLEnum
+from sqlalchemy import String, Boolean, JSON, DateTime, Integer, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 import enum
 
@@ -37,6 +37,12 @@ class Skill(Base):
     )
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    # 质量评估字段
+    quality_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0-100
+    quality_grade: Mapped[Optional[str]] = mapped_column(String(2), nullable=True)  # A/B/C/D/F
+    quality_evaluation: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # 详细评估结果
+    evaluated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

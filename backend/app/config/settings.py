@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     claude_skills_dir: Path = Path.home() / ".claude" / "skills"
     claude_plugins_dir: Path = Path.home() / ".claude" / "plugins"
 
+    # Model Provider Configuration
+    default_model_provider: str = "anthropic"  # 默认使用 Anthropic API
+    openai_api_key: Optional[str] = None  # 未来扩展用
+
     # 项目路径配置（用于扫描项目级 agents）
     # 可以通过环境变量 PROJECT_PATH 设置
     project_path: Optional[str] = None

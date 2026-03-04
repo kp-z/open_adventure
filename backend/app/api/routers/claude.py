@@ -61,9 +61,152 @@ async def sync_claude_data(session: AsyncSession = Depends(get_db)):
 
 @router.post("/sync/skills")
 async def sync_skills(session: AsyncSession = Depends(get_db)):
-    """仅同步技能"""
+    """仅同步技能，并自动分类"""
+    import re
+    import asyncio
+    import os
+    from app.repositories.skill_repository import SkillRepository
+    from app.services.skill_service import SkillService
+    from app.schemas.skill import SkillUpdate
+    from app.core.logging import get_logger
+
+    logger = get_logger(__name__)
+
     sync_service = SyncService(session)
     result = await sync_service.sync_skills()
+
+    # 同步完成后，自动对所有未分类的 Skills 进行批量分类
+    try:
+        repository = SkillRepository(session)
+        service = SkillService(repository)
+
+        # 获取所有 Skills
+        skills_response = await service.list_skills(skip=0, limit=10000)
+        skills = skills_response.items
+
+        # 筛选出未分类的 Skills（没有 category: 标签）
+        unclassified_skills = [
+            skill for skill in skills
+            if not any(tag.startswith("category:") for tag in (skill.tags or []))
+        ]
+
+        if unclassified_skills:
+            logger.info(f"Found {len(unclassified_skills)} unclassified skills, starting batch classification...")
+
+            # 构建批量分类 prompt
+            skills_info = []
+            for skill in unclassified_skills:
+                skills_info.append({
+                    "id": skill.id,
+                    "name": skill.name,
+                    "description": skill.description
+                })
+
+            prompt = f"""使用 skill_classifier 对以下 {len(unclassified_skills)} 个 Skills 进行批量分类。
+
+Skills 列表：
+{json.dumps(skills_info, ensure_ascii=False, indent=2)}
+
+请为每个 Skill 返回分类标签列表，格式为 JSON 对象，例如：
+{{
+  "1": ["category:data-processing", "category:automation"],
+  "2": ["category:debugging"],
+  "3": ["category:ai-enhancement"]
+}}
+
+只返回 JSON 对象，不要添加其他说明。"""
+
+            # 调用 Claude CLI
+            cli_path = settings.claude_cli_path
+            cmd = [
+                cli_path,
+                "-p", prompt,
+                "--output-format", "text",
+                "--disable-slash-commands",
+                "--setting-sources", "user"
+            ]
+
+            logger.info(f"Calling Claude CLI for batch classification...")
+
+            # 清除环境变量
+            env = os.environ.copy()
+            env.pop('CLAUDECODE', None)
+            env.pop('CLAUDE_CODE', None)
+
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env
+            )
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=180  # 3分钟超时
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+                logger.warning("Batch classification timeout")
+                return result
+
+            if process.returncode != 0:
+                error_msg = stderr.decode("utf-8") if stderr else "未知错误"
+                logger.error(f"Claude CLI error: {error_msg}")
+                return result
+
+            output = stdout.decode("utf-8")
+            logger.info(f"Batch classification output length: {len(output)} chars")
+
+            # 解析分类结果
+            classifications = {}
+
+            # 尝试从输出中提取 JSON 对象
+            json_match = re.search(r'\{[\s\S]*?\}', output)
+            if json_match:
+                try:
+                    classifications = json.loads(json_match.group(0))
+                    logger.info(f"Parsed classifications for {len(classifications)} skills")
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to parse classifications JSON")
+
+            # 更新每个 Skill 的 tags
+            classified_count = 0
+            for skill in unclassified_skills:
+                skill_id_str = str(skill.id)
+                if skill_id_str in classifications:
+                    categories = classifications[skill_id_str]
+
+                    # 确保所有标签都有 category: 前缀
+                    categories = [
+                        cat if cat.startswith("category:") else f"category:{cat}"
+                        for cat in categories
+                    ]
+
+                    # 更新 Skill 的 tags
+                    current_tags = skill.tags or []
+                    # 移除旧的 category: 标签
+                    non_category_tags = [tag for tag in current_tags if not tag.startswith("category:")]
+                    # 添加新的分类标签
+                    new_tags = non_category_tags + categories
+
+                    # 更新数据库
+                    skill_update = SkillUpdate(tags=new_tags)
+                    await service.update_skill(skill.id, skill_update)
+                    classified_count += 1
+                    logger.info(f"Classified skill {skill.name} with categories: {categories}")
+
+            logger.info(f"Batch classification completed: {classified_count}/{len(unclassified_skills)} skills classified")
+            result["classified_skills"] = classified_count
+        else:
+            logger.info("All skills are already classified")
+            result["classified_skills"] = 0
+
+    except Exception as e:
+        logger.error(f"Error during batch classification: {e}")
+        # 分类失败不影响同步结果
+
     return result
 
 

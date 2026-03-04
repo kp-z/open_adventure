@@ -34,9 +34,14 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { CategoryFilter, type CategoryType } from '../components/CategoryFilter';
+import { TagFilter } from '../components/TagFilter';
 import { motion, AnimatePresence } from 'motion/react';
 import { SkillEditor } from '../components/SkillEditor';
+import { TagBadge } from '../components/TagBadge';
+import { QualityBadge } from '../components/QualityBadge';
+import { SkillQualityDialog } from '../components/SkillQualityDialog';
 import { getSkillIcon } from '../lib/skill-icons';
+import { getCategoryConfig } from '../../lib/category-icons';
 import { skillsApi, claudeApi, transformSkillsToUI, type UISkill } from '@/lib/api';
 import {
   AlertDialog,
@@ -88,15 +93,24 @@ const Skills = () => {
 
   // ========== 分类数据 ==========
   const [categories, setCategories] = useState<{
-    counts: { builtin: number; user: number; project: number; plugin: number };
-    plugins: Array<{ id: string; name: string; count: number }>;
+    counts: { builtin: number; user: number; project: number };
     projects: Array<{ id: string; name: string; count: number }>;
+  } | null>(null);
+
+  // ========== 语义化分类数据 ==========
+  const [semanticCategories, setSemanticCategories] = useState<{
+    categories: Record<string, number>;
+    total_skills: number;
+    classified_skills: number;
   } | null>(null);
 
   // ========== UI 交互状态 ==========
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const [selectedSubCategories, setSelectedSubCategories] = useState<string[]>([]);
+  const [selectedSemanticCategories, setSelectedSemanticCategories] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isTagFilterExpanded, setIsTagFilterExpanded] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [initialEditorMode, setInitialEditorMode] = useState<'ai' | 'manual'>('ai');
   const [editingSkillId, setEditingSkillId] = useState<number | undefined>(undefined);
@@ -106,6 +120,10 @@ const Skills = () => {
   const [skillToDelete, setSkillToDelete] = useState<{ id: number; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);  // 当前打开的菜单ID
+
+  // ========== 质量评估详情弹窗状态 ==========
+  const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
+  const [selectedSkillForQuality, setSelectedSkillForQuality] = useState<UISkill | null>(null);
 
   // ========== 获取技能列表 ==========
   const fetchSkills = useCallback(async () => {
@@ -133,9 +151,51 @@ const Skills = () => {
   const fetchCategories = useCallback(async () => {
     try {
       const data = await skillsApi.getCategories();
-      setCategories(data);
+
+      // 将 plugin scope 的 skill 重新分类到 user 或 project
+      // 需要获取所有 skills 来重新统计
+      const allSkillsResponse = await skillsApi.list({ limit: 1000 });
+      const allSkills = allSkillsResponse.items;
+
+      let userCount = data.counts.user || 0;
+      let projectCount = data.counts.project || 0;
+
+      // 遍历所有 plugin scope 的 skills,根据路径重新分类
+      allSkills.forEach(skill => {
+        if (skill.source === 'plugin') {
+          const path = (skill as any).meta?.path || '';
+          // 判断是否在用户主目录下
+          const isUserPlugin = path.startsWith('/Users/') && path.includes('/.claude/plugins/') && !path.includes('/项目/') && !path.includes('/Proj/');
+
+          if (isUserPlugin) {
+            userCount++;
+          } else {
+            projectCount++;
+          }
+        }
+      });
+
+      const transformedData = {
+        counts: {
+          builtin: data.counts.builtin,
+          user: userCount,
+          project: projectCount
+        },
+        projects: data.projects
+      };
+      setCategories(transformedData);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
+    }
+  }, []);
+
+  // ========== 获取语义化分类数据 ==========
+  const fetchSemanticCategories = useCallback(async () => {
+    try {
+      const data = await skillsApi.getSemanticCategories();
+      setSemanticCategories(data);
+    } catch (err) {
+      console.error('Failed to fetch semantic categories:', err);
     }
   }, []);
 
@@ -143,7 +203,8 @@ const Skills = () => {
   useEffect(() => {
     fetchSkills();
     fetchCategories();
-  }, [fetchSkills, fetchCategories]);
+    fetchSemanticCategories();
+  }, [fetchSkills, fetchCategories, fetchSemanticCategories]);
 
   // ========== 检测 URL 参数，自动打开创建表单 ==========
   useEffect(() => {
@@ -170,6 +231,7 @@ const Skills = () => {
       await claudeApi.syncSkills();
       await fetchSkills();
       await fetchCategories();
+      await fetchSemanticCategories();
 
       updateNotification(notificationId, {
         type: 'success',
@@ -249,7 +311,12 @@ const Skills = () => {
   const handleSkillSaved = async () => {
     setIsCreating(false);
     setEditingSkillId(undefined);
-    await fetchSkills();
+    // 强制刷新所有数据
+    await Promise.all([
+      fetchSkills(),
+      fetchCategories(),
+      fetchSemanticCategories()
+    ]);
   };
 
   // ========== 点击卡片进入编辑 ==========
@@ -303,16 +370,15 @@ const Skills = () => {
       if (selectedCategory !== 'all') {
         // Map source to category
         let source = s.source.toLowerCase();
+
+        // 将 global 映射到 builtin
         if (source === 'global') source = 'builtin';
 
         matchesCategory = source === selectedCategory;
 
         // Sub-category filter (multi-select)
         if (matchesCategory && selectedSubCategories.length > 0) {
-          if (selectedCategory === 'plugin') {
-            const pluginName = (s as any).pluginNamespace || (s as any).meta?.plugin_name;
-            matchesCategory = selectedSubCategories.includes(pluginName);
-          } else if (selectedCategory === 'project') {
+          if (selectedCategory === 'project') {
             const path = (s as any).meta?.path || '';
             const projectName = path.split('/.claude/')[0].split('/').pop();
             matchesCategory = selectedSubCategories.includes(projectName);
@@ -320,7 +386,18 @@ const Skills = () => {
         }
       }
 
-      return matchesSearch && matchesCategory;
+      // Semantic category filter (multi-select)
+      let matchesSemanticCategory = true;
+      if (selectedSemanticCategories.length > 0) {
+        const skillTags = (s._raw as any).tags || [];
+
+        // 如果 Skill 有任何一个选中的标签，就显示
+        matchesSemanticCategory = selectedSemanticCategories.some(selectedTag =>
+          Array.isArray(skillTags) && skillTags.includes(selectedTag)
+        );
+      }
+
+      return matchesSearch && matchesCategory && matchesSemanticCategory;
     })
     .sort((a, b) => {
       // 置顶的排在前面
@@ -608,8 +685,12 @@ const Skills = () => {
     <div className="space-y-4 md:space-y-8">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SKILLS MANAGEMENT</h1>
-          <p className="text-sm md:text-base text-gray-400">{t('skillsDesc' as any)}</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SKILLS</h1>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
+            {mode === 'adventure'
+              ? '收集和强化技能宝珠，赋予英雄强大能力'
+              : '创建和管理可复用的 AI 技能模块，扩展系统能力'}
+          </p>
         </div>
         <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
@@ -650,11 +731,110 @@ const Skills = () => {
           selectedSubCategories={selectedSubCategories}
           counts={categories.counts}
           projectSubCategories={categories.projects}
-          pluginSubCategories={categories.plugins}
+          pluginSubCategories={[]}
           onCategoryChange={setSelectedCategory}
           onSubCategoriesChange={setSelectedSubCategories}
         />
       )}
+
+      {/* Semantic Category Filter */}
+      {semanticCategories && Object.keys(semanticCategories.categories).length > 0 && (() => {
+        // 根据当前选中的 Scope 动态计算每个分类的数量
+        const filteredCategoryCounts: Record<string, number> = {};
+
+        skills.forEach(skill => {
+          // 检查是否匹配当前选中的 Scope
+          let matchesScope = true;
+          if (selectedCategory !== 'all') {
+            let source = skill.source.toLowerCase();
+            if (source === 'global') source = 'builtin';
+            matchesScope = source === selectedCategory;
+
+            // Sub-category filter
+            if (matchesScope && selectedSubCategories.length > 0) {
+              if (selectedCategory === 'plugin') {
+                const pluginName = (skill as any).pluginNamespace || (skill as any).meta?.plugin_name;
+                matchesScope = selectedSubCategories.includes(pluginName);
+              } else if (selectedCategory === 'project') {
+                const path = (skill as any).meta?.path || '';
+                const projectName = path.split('/.claude/')[0].split('/').pop();
+                matchesScope = selectedSubCategories.includes(projectName);
+              }
+            }
+          }
+
+          if (matchesScope) {
+            // 统计该 Skill 的所有标签（不再限制 category: 前缀）
+            const skillTags = (skill._raw as any).tags || [];
+            if (Array.isArray(skillTags)) {
+              skillTags.forEach((tag: string) => {
+                // 统计所有标签，不再限制 category: 前缀
+                filteredCategoryCounts[tag] = (filteredCategoryCounts[tag] || 0) + 1;
+              });
+            }
+          }
+        });
+
+        return (
+          <div className="space-y-2">
+            <button
+              onClick={() => setIsTagFilterExpanded(!isTagFilterExpanded)}
+              className="w-full flex items-center justify-between text-sm font-bold text-gray-400 uppercase tracking-wider hover:text-gray-300 transition-colors"
+            >
+              <span>按 TAG 分类</span>
+              <motion.div
+                animate={{ rotate: isTagFilterExpanded ? 180 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Filter size={14} />
+              </motion.div>
+            </button>
+
+            <AnimatePresence>
+              {isTagFilterExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(filteredCategoryCounts)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([tagName, count]) => {
+                        const isSelected = selectedSemanticCategories.includes(tagName);
+
+                        return (
+                          <button
+                            key={tagName}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedSemanticCategories(
+                                  selectedSemanticCategories.filter(c => c !== tagName)
+                                );
+                              } else {
+                                setSelectedSemanticCategories([...selectedSemanticCategories, tagName]);
+                              }
+                            }}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+                              isSelected
+                                ? 'bg-blue-500/20 border-2 border-blue-500 text-blue-400'
+                                : 'bg-white/5 border border-white/10 hover:bg-white/10 text-gray-400'
+                            }`}
+                          >
+                            <span>{tagName}</span>
+                            <span className="text-[10px] opacity-60">({count})</span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })()}
 
       {/* Search */}
       <div className="relative">
@@ -680,7 +860,7 @@ const Skills = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
             >
-              <GlassCard 
+              <GlassCard
                 className="h-full flex flex-col group cursor-pointer hover:border-blue-500/50 transition-colors"
                 onClick={() => handleEditSkill(skill.id)}
               >
@@ -803,6 +983,30 @@ const Skills = () => {
                 </div>
 
                 <h3 className="text-lg font-bold mb-1">{skill.name[lang]}</h3>
+
+                {/* 质量评分 - 简洁一行 */}
+                {(skill._raw as any)?.quality_grade && (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedSkillForQuality(skill);
+                      setQualityDialogOpen(true);
+                    }}
+                    className="text-xs text-gray-400 mb-2 cursor-pointer hover:text-gray-300 transition-colors flex items-center gap-1.5"
+                  >
+                    <span>质量评分:</span>
+                    <span className={`font-medium ${
+                      (skill._raw as any).quality_grade === 'A' ? 'text-green-400' :
+                      (skill._raw as any).quality_grade === 'B' ? 'text-blue-400' :
+                      (skill._raw as any).quality_grade === 'C' ? 'text-yellow-400' :
+                      (skill._raw as any).quality_grade === 'D' ? 'text-orange-400' :
+                      'text-red-400'
+                    }`}>
+                      {(skill._raw as any).quality_grade} ({(skill._raw as any).quality_score}/100)
+                    </span>
+                  </div>
+                )}
+
                 { (skill as any).projectName && (
                   <p className="text-[10px] text-green-500 font-bold uppercase mb-2 flex items-center gap-1 opacity-70">
                     <BookOpen size={10} /> {(skill as any).projectName}
@@ -815,11 +1019,33 @@ const Skills = () => {
                 )}
                 {/* 显示完整 description */}
                 <p className="text-xs text-gray-400 line-clamp-3 mb-4">{skill.desc[lang] || (skill._raw as any)?.description || '无描述'}</p>
-                
+
                 <div className="flex flex-wrap gap-2 mb-6 mt-auto">
-                  {skill.tags[lang].map(t => (
-                    <span key={t} className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">{t}</span>
-                  ))}
+                  {/* 分类标签 */}
+                  {((skill._raw as any)?.tags || [])
+                    .filter((tag: string) => tag.startsWith('category:'))
+                    .map((tag: string) => {
+                      const categoryId = tag.replace('category:', '');
+                      const config = getCategoryConfig(categoryId);
+                      if (!config) return null;
+                      const Icon = config.icon;
+                      return (
+                        <span
+                          key={tag}
+                          className={`text-[10px] font-bold px-2 py-1 rounded border flex items-center gap-1 ${config.color} bg-current/10 border-current/30`}
+                          title={config.description}
+                        >
+                          <Icon size={10} />
+                          {config.name}
+                        </span>
+                      );
+                    })}
+                  {/* 普通标签 */}
+                  {skill.tags[lang]
+                    .filter(t => !t.startsWith('category:'))
+                    .map(t => (
+                      <span key={t} className="text-[10px] text-gray-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">{t}</span>
+                    ))}
                 </div>
 
                 <div className="flex justify-between items-center pt-4 border-t border-white/5">
@@ -881,6 +1107,18 @@ const Skills = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 质量评估详情弹窗 */}
+      {qualityDialogOpen && selectedSkillForQuality && (selectedSkillForQuality._raw as any)?.quality_evaluation && (
+        <SkillQualityDialog
+          skillName={selectedSkillForQuality.name[lang]}
+          evaluation={(selectedSkillForQuality._raw as any).quality_evaluation}
+          onClose={() => {
+            setQualityDialogOpen(false);
+            setSelectedSkillForQuality(null);
+          }}
+        />
+      )}
     </div>
   );
 };

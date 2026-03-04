@@ -37,13 +37,26 @@ import { ActionButton } from "./ui-shared";
 import { useExecutionContext } from "../contexts/ExecutionContext";
 import { useNotifications } from "../contexts/NotificationContext";
 
-const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
+const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
   const { mode } = useMode();
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
+  const [collapsedMenuOpen, setCollapsedMenuOpen] = React.useState<string | null>(null);
 
   const toggleMenu = (menuId: string) => {
+    // 如果是折叠状态，先展开侧边栏，然后展开该菜单
+    if (collapsed && onExpandSidebar) {
+      onExpandSidebar();
+      // 展开侧边栏后，自动展开该菜单
+      setTimeout(() => {
+        setExpandedMenus(prev => new Set(prev).add(menuId));
+      }, 50);
+      return;
+    }
+
+    // 正常展开/折叠菜单
     setExpandedMenus(prev => {
       const next = new Set(prev);
       if (next.has(menuId)) {
@@ -53,6 +66,10 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
       }
       return next;
     });
+  };
+
+  const toggleCollapsedMenu = (menuId: string) => {
+    setCollapsedMenuOpen(prev => prev === menuId ? null : menuId);
   };
 
   // 自动展开逻辑
@@ -219,27 +236,94 @@ const Navigation = ({ collapsed = false }: { collapsed?: boolean }) => {
               </>
             ) : (
               // 普通菜单项或折叠状态
-              <NavLink
-                to={item.path}
-                title={collapsed ? item.name : undefined}
-                className={({ isActive }) => `
-                  flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
-                  ${
-                    isActive
-                      ? mode === "adventure"
-                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                        : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                      : "text-gray-400 hover:bg-white/5 hover:text-white"
-                  }
-                `}
-              >
-                <item.icon size={20} />
-                {!collapsed && (
-                  <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                    {item.name}
-                  </span>
+              <div className="relative">
+                {hasSubItems && collapsed ? (
+                  // 折叠状态下有子菜单的项目
+                  <>
+                    <button
+                      onClick={() => toggleCollapsedMenu(item.id!)}
+                      title={item.name}
+                      className={`
+                        w-full flex items-center justify-center px-3 py-3 rounded-xl transition-all
+                        ${
+                          hasActiveChild
+                            ? mode === "adventure"
+                              ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                              : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                        }
+                      `}
+                    >
+                      <item.icon size={20} />
+                    </button>
+
+                    {/* 浮动子菜单 */}
+                    <AnimatePresence>
+                      {collapsedMenuOpen === item.id && (
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -10 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute left-full top-0 ml-2 min-w-[200px] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden"
+                          onMouseLeave={() => setCollapsedMenuOpen(null)}
+                        >
+                          <div className="p-2 space-y-1">
+                            <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10">
+                              {item.name}
+                            </div>
+                            {item.subItems?.map((subItem) => (
+                              <NavLink
+                                key={subItem.path}
+                                to={subItem.path}
+                                onClick={() => setCollapsedMenuOpen(null)}
+                                className={({ isActive }) => `
+                                  flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
+                                  ${
+                                    isActive
+                                      ? mode === "adventure"
+                                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+                                        : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                  }
+                                `}
+                              >
+                                <subItem.icon size={18} />
+                                <span className="font-medium text-sm whitespace-nowrap">
+                                  {subItem.name}
+                                </span>
+                              </NavLink>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                ) : (
+                  // 普通菜单项（无子菜单）
+                  <NavLink
+                    to={item.path}
+                    title={collapsed ? item.name : undefined}
+                    className={({ isActive }) => `
+                      flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
+                      ${
+                        isActive
+                          ? mode === "adventure"
+                            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
+                            : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                          : "text-gray-400 hover:bg-white/5 hover:text-white"
+                      }
+                    `}
+                  >
+                    <item.icon size={20} />
+                    {!collapsed && (
+                      <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                        {item.name}
+                      </span>
+                    )}
+                  </NavLink>
                 )}
-              </NavLink>
+              </div>
             )}
           </div>
         );
@@ -527,7 +611,7 @@ export const Layout = () => {
           )}
         </button>
 
-        <Navigation collapsed={!isSidebarOpen} />
+        <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />
       </aside>
 
       {/* 移动端抽屉侧边栏 - 仅在 <md 显示 */}

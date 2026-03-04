@@ -5,12 +5,17 @@ import os
 import shutil
 from pathlib import Path
 from typing import Optional
+from datetime import datetime
+import logging
 
 from app.repositories.skill_repository import SkillRepository
 from app.schemas.skill import SkillCreate, SkillUpdate, SkillResponse, SkillListResponse
 from app.models.skill import SkillSource
 from app.core.exceptions import NotFoundException, ConflictException
 from app.adapters.claude import ClaudeAdapter
+from app.services.skill_quality_service import SkillQualityService
+
+logger = logging.getLogger(__name__)
 
 
 class SkillService:
@@ -130,6 +135,27 @@ class SkillService:
                 skill.meta = {}
             skill.meta["path"] = str(skill_dir)
             await self.repository.update(skill.id, SkillUpdate(meta=skill.meta))
+
+            # 自动评估 skill 质量
+            try:
+                quality_service = SkillQualityService()
+                evaluation = await quality_service.evaluate_skill(
+                    skill_dir,
+                    skill_data.model_dump()
+                )
+
+                # 更新质量评估结果
+                await self.repository.update(skill.id, SkillUpdate(
+                    quality_score=evaluation["score"],
+                    quality_grade=evaluation["grade"],
+                    quality_evaluation=evaluation,
+                    evaluated_at=datetime.now()
+                ))
+
+                logger.info(f"Skill '{skill_data.name}' evaluated: {evaluation['grade']} ({evaluation['score']}/100)")
+            except Exception as e:
+                logger.warning(f"Failed to evaluate skill quality: {e}")
+                # 评估失败不影响 skill 创建
 
         except Exception as e:
             # If filesystem sync fails, rollback database creation

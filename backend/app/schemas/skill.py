@@ -17,14 +17,14 @@ class SkillBase(BaseModel):
     tags: list[str] = Field(default_factory=list)
     source: SkillSource = Field(default=SkillSource.GLOBAL)
     enabled: bool = Field(default=True)
-    meta: Optional[dict] = Field(default=None, description="元数据，plugin scope 需包含 plugin_name，project scope 需包含 project_path")
+    meta: Optional[dict] = Field(default=None, description="元数据，project scope 需包含 project_path")
 
 
 class SkillCreate(SkillBase):
     """Schema for creating a skill"""
     references: Optional[dict[str, str]] = Field(default=None, description="Reference files (filename: content)")
     scripts: Optional[dict[str, str]] = Field(default=None, description="Script files (filename: content)")
-    scope: Literal["user", "project", "plugin"] = Field("user", description="创建位置：user, project 或 plugin")
+    scope: Literal["user", "project"] = Field("user", description="创建位置：user 或 project")
 
 
 class SkillUpdate(BaseModel):
@@ -38,6 +38,11 @@ class SkillUpdate(BaseModel):
     enabled: Optional[bool] = None
     meta: Optional[dict] = None
     scope: Optional[Literal["user", "project", "plugin"]] = None
+    # 质量评估字段
+    quality_score: Optional[int] = Field(None, ge=0, le=100)
+    quality_grade: Optional[str] = Field(None, pattern="^[ABCDF]$")
+    quality_evaluation: Optional[dict] = None
+    evaluated_at: Optional[datetime] = None
 
 
 class SkillResponse(SkillBase):
@@ -45,6 +50,11 @@ class SkillResponse(SkillBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    # 质量评估字段
+    quality_score: Optional[int] = None
+    quality_grade: Optional[str] = None
+    quality_evaluation: Optional[dict] = None
+    evaluated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

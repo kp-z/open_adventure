@@ -241,12 +241,12 @@ const Teams = () => {
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">AGENT TEAMS</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">TEAMS</h1>
             <span className="px-2 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-lg text-xs font-bold text-yellow-400 whitespace-nowrap">
               敬请期待
             </span>
           </div>
-          <p className="text-sm md:text-base text-gray-400">Manage collaborative groups of AI agents for complex tasks.</p>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">组建多智能体协作团队，分工合作完成复杂任务</p>
         </div>
         <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
