@@ -140,7 +140,7 @@ const Workflows = () => {
               敬请期待
             </span>
           </div>
-          <p className="text-sm md:text-base text-gray-400">Design and manage complex multi-agent automation chains.</p>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">可视化编排 AI 工作流，自动化执行多步骤任务</p>
         </div>
         <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton variant="secondary" className="md:px-4 px-2 py-2 text-sm min-w-0">

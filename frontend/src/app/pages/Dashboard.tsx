@@ -24,6 +24,7 @@ import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { ClaudeConfigEditor } from '../components/ClaudeConfigEditor';
 import { LoadingSpinner, SkeletonCard, SkeletonListItem } from '../components/LoadingSpinner';
 import { WaterLevel } from '../components/WaterLevel';
+import { MarketplaceCard } from '../components/MarketplaceCard';
 import { getAvatarById } from '../lib/avatars';
 import {
   BarChart,
@@ -170,9 +171,9 @@ const Dashboard = () => {
       <div className="space-y-6 md:space-y-8">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-600 uppercase">
-            {t("baseTitle")}
+            指挥中心
           </h1>
-          <p className="text-sm md:text-base text-gray-400 font-medium">{t("baseDesc")}</p>
+          <p className="text-sm md:text-base text-gray-400 font-medium line-clamp-1 md:line-clamp-none">统领全局，掌控资源，见证每一场胜利</p>
         </header>
 
         {/* Level Stats - 响应式网格 */}
@@ -240,8 +241,8 @@ const Dashboard = () => {
     <div className="space-y-8">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SYSTEM OVERVIEW</h1>
-          <p className="text-sm md:text-base text-gray-400">{t("overviewDesc")}</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">DASHBOARD</h1>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">实时监控系统状态、资源使用和执行历史</p>
         </div>
         <div className="flex md:flex-row flex-col gap-2 shrink-0">
           <ActionButton
@@ -826,6 +827,11 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Marketplace Card - 响应式跨列：中等屏幕和桌面端占 2 列 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
+        <MarketplaceCard />
       </div>
 
       {/* Config Editor Modal */}

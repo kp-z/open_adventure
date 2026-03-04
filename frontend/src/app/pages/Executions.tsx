@@ -238,9 +238,9 @@ const Executions = () => {
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTION</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">EXECUTIONS</h1>
           </div>
-          <p className="text-sm md:text-base text-gray-400">查看所有执行历史记录（Workflow、Agent、AgentTeam）</p>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">实时监控和回放所有 AI 任务的执行过程</p>
         </div>
       </header>
 

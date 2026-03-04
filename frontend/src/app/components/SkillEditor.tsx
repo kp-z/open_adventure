@@ -30,6 +30,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { GlassCard, GameCard, ActionButton } from './ui-shared';
+import { TagSelector } from './TagSelector';
 import { cn } from '../lib/utils';
 import { skillsApi, pluginsApi, projectPathsApi, type ClaudeGenerateResponse, type SkillFileItem, type SaveSkillRequest, type SkillContentResponse, type Plugin, type ProjectPath } from '@/lib/api';
 
@@ -412,6 +413,24 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
 
       if (response.success) {
         console.log('[SkillEditor] Skill saved successfully to:', response.saved_path);
+
+        // 自动对新创建的 Skill 进行分类
+        try {
+          // 获取刚保存的 Skill（通过名称查找）
+          const skillsResponse = await skillsApi.list({ limit: 1000 });
+          const savedSkill = skillsResponse.items.find(s => s.name === skillName);
+
+          if (savedSkill) {
+            console.log('[SkillEditor] Auto-classifying skill:', savedSkill.id);
+            // 调用分类 API（不等待结果，后台执行）
+            skillsApi.classify(savedSkill.id).catch(err => {
+              console.warn('[SkillEditor] Auto-classification failed:', err);
+            });
+          }
+        } catch (err) {
+          console.warn('[SkillEditor] Failed to auto-classify skill:', err);
+        }
+
         setSaveSuccess(true);
         setTimeout(() => {
           onBack();  // 返回技能列表
@@ -449,56 +468,57 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-20">
+    <div className="max-w-7xl mx-auto pb-20 px-4 md:px-0">
       {/* 头部 */}
-      <div className="flex items-center gap-4 mb-8">
-        <div className="flex items-center gap-4 flex-1">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-purple-500/20 border border-purple-500/30">
-            <Sparkles size={28} className="text-purple-400" />
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 flex-1 w-full md:w-auto">
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center bg-purple-500/20 border border-purple-500/30">
+            <Sparkles size={24} className="text-purple-400 md:hidden" />
+            <Sparkles size={28} className="text-purple-400 hidden md:block" />
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate">
               {editingSkillId ? '编辑技能' : '创建新技能'}
             </h1>
-            <p className="text-gray-400 mt-1">
+            <p className="text-gray-400 mt-1 text-sm md:text-base truncate">
               {editingSkillId ? (skillPath || `~/.claude/skills/${generatedSkillName}`) : '配置你的 AI 技能'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           {/* 模式切换 */}
-          <div className="flex bg-white/5 rounded-xl p-1">
+          <div className="flex bg-white/5 rounded-xl p-1 flex-1 md:flex-initial">
             <button
               onClick={() => setEditorMode('visual')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editorMode === 'visual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-2 flex-1 md:flex-initial justify-center ${editorMode === 'visual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
-              <Settings size={16} />
-              可视化
+              <Settings size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">可视化</span>
             </button>
             <button
               onClick={() => setEditorMode('manual')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editorMode === 'manual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-2 flex-1 md:flex-initial justify-center ${editorMode === 'manual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
-              <Code2 size={16} />
-              源码
+              <Code2 size={14} className="md:w-4 md:h-4" />
+              <span className="hidden sm:inline">源码</span>
             </button>
           </div>
 
           <button
             onClick={handleSave}
             disabled={isSaving || saveSuccess}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all shadow-lg"
+            className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all shadow-lg text-sm md:text-base"
           >
             {isSaving ? (
               <>
-                <Loader2 size={20} className="animate-spin" />
-                保存中...
+                <Loader2 size={16} className="animate-spin md:w-5 md:h-5" />
+                <span className="hidden sm:inline">保存中...</span>
               </>
             ) : saveSuccess ? (
               <>
-                <CheckCircle2 size={20} />
-                已保存
+                <CheckCircle2 size={16} className="md:w-5 md:h-5" />
+                <span className="hidden sm:inline">已保存</span>
               </>
             ) : (
               <>
@@ -510,20 +530,20 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
         </div>
       </div>
 
-      {/* 左右两栏布局 */}
-      <div className="flex gap-6">
+      {/* 左右两栏布局 - 移动端单列，桌面端双列 */}
+      <div className="flex flex-col lg:flex-row gap-6">
         {/* 左侧主内容区 */}
         <div className="flex-1 min-w-0">
           {/* AI 助手卡片 - 在可视化模式显示 */}
           {editorMode === 'visual' && (
-            <GlassCard className="p-6 border-2 border-purple-500/30 mb-8">
+            <GlassCard className="p-4 md:p-6 border-2 border-purple-500/30 mb-6 md:mb-8">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <Sparkles className="text-purple-400" size={20} />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                  <Sparkles className="text-purple-400" size={16} />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-bold">AI 助手</h3>
-                  <p className="text-xs text-gray-400">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm md:text-base">AI 助手</h3>
+                  <p className="text-xs text-gray-400 hidden sm:block">
                     描述你的技能，让 AI 帮你生成完整的 Skill 结构
                   </p>
                 </div>
@@ -531,36 +551,36 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
 
               {/* 生成中提示 */}
               {isGenerating && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 mb-4">
-                  <Loader2 size={20} className="animate-spin" />
-                  <span className="text-sm flex-1">
-                    AI 正在生成技能结构... 你可以返回列表查看其他内容，生成状态会在右下角通知中显示
+                <div className="flex items-center gap-3 p-3 md:p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 mb-4">
+                  <Loader2 size={16} className="animate-spin md:w-5 md:h-5 flex-shrink-0" />
+                  <span className="text-xs md:text-sm flex-1">
+                    AI 正在生成技能结构...
                   </span>
                 </div>
               )}
 
               {/* 错误提示 */}
               {generateError && (
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 mb-4">
-                  <AlertCircle size={20} />
-                  <span className="text-sm flex-1">{generateError}</span>
+                <div className="flex items-center gap-3 p-3 md:p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 mb-4">
+                  <AlertCircle size={16} className="flex-shrink-0 md:w-5 md:h-5" />
+                  <span className="text-xs md:text-sm flex-1">{generateError}</span>
                   <button
                     onClick={() => setGenerateError(null)}
-                    className="text-red-400 hover:text-red-300"
+                    className="text-red-400 hover:text-red-300 flex-shrink-0"
                   >
-                    <X size={16} />
+                    <X size={14} className="md:w-4 md:h-4" />
                   </button>
                 </div>
               )}
 
-              <div className="flex gap-3 mb-4">
+              <div className="flex flex-col sm:flex-row gap-3 mb-4">
                 <input
                   type="text"
                   placeholder="例如：'一个能够总结技术博客并生成周报的技能'"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && prompt.trim() && !isGenerating && handleGenerate()}
-                  className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
+                  className="flex-1 px-3 md:px-4 py-2 md:py-3 bg-white/5 border border-white/10 rounded-xl text-sm md:text-base text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
                   disabled={isGenerating}
                 />
                 <button
@@ -1096,20 +1116,20 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
       </div>
     </div>
 
-    {/* 右侧配置区 */}
-    <div className="w-96 shrink-0">
-      <GlassCard className="p-6 sticky top-8">
-        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-          <FolderOpen size={20} />
-          保存位置配置
+    {/* 右侧配置区 - 移动端全宽，桌面端固定宽度 */}
+    <div className="w-full lg:w-80 shrink-0">
+      <GlassCard className="p-4 md:p-5 sticky top-8">
+        <h3 className="text-base md:text-lg font-bold mb-3 md:mb-4 flex items-center gap-2">
+          <FolderOpen size={18} className="md:w-5 md:h-5" />
+          保存位置
         </h3>
 
         {/* Scope 选择 */}
-        <div className="mb-4">
+        <div className="mb-3 md:mb-4">
           <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
             配置层级
           </label>
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-3 lg:grid-cols-1 gap-2 md:gap-3">
             {[
               { value: 'user', label: '用户级', desc: '所有项目可用', icon: User },
               { value: 'plugin', label: '插件级', desc: '插件内可用', icon: Package },
@@ -1125,15 +1145,15 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                     if (option.value === 'plugin') setSelectedPlugin('');
                     if (option.value === 'project') setSelectedProject('');
                   }}
-                  className={`p-4 rounded-xl border transition-all ${
+                  className={`p-3 md:p-4 rounded-xl border transition-all ${
                     isSelected
                       ? 'bg-blue-500/20 border-blue-500/50'
                       : 'bg-white/5 border-white/10 hover:border-white/20'
                   }`}
                 >
-                  <IconComp size={20} className="mx-auto mb-2" />
-                  <p className="font-bold text-sm">{option.label}</p>
-                  <p className="text-xs text-gray-500">{option.desc}</p>
+                  <IconComp size={16} className="mx-auto mb-1 md:mb-2 md:w-5 md:h-5" />
+                  <p className="font-bold text-xs md:text-sm">{option.label}</p>
+                  <p className="text-[10px] md:text-xs text-gray-500 hidden lg:block">{option.desc}</p>
                 </button>
               );
             })}
@@ -1142,7 +1162,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
 
         {/* Plugin 选择器 */}
         {scope === 'plugin' && (
-          <div className="mb-4">
+          <div className="mb-3 md:mb-4">
             <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
               选择或创建插件
             </label>
@@ -1152,7 +1172,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                 <select
                   value={selectedPlugin}
                   onChange={(e) => setSelectedPlugin(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 mb-2"
+                  className="w-full px-3 md:px-4 py-2 md:py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500/50 mb-2 text-sm"
                 >
                   <option value="">-- 请选择插件 --</option>
                   {plugins.map(plugin => (
@@ -1164,14 +1184,14 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
 
                 <button
                   onClick={() => setIsCreatingPlugin(true)}
-                  className="w-full px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl text-sm font-bold text-green-400 transition-all flex items-center justify-center gap-2"
+                  className="w-full px-3 md:px-4 py-2 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl text-xs md:text-sm font-bold text-green-400 transition-all flex items-center justify-center gap-2"
                 >
-                  <Plus size={16} />
+                  <Plus size={14} className="md:w-4 md:h-4" />
                   创建新 Plugin
                 </button>
               </>
             ) : (
-              <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+              <div className="p-3 md:p-4 bg-white/5 border border-white/10 rounded-xl">
                 <div className="mb-3">
                   <label className="block text-xs text-gray-400 mb-1">Plugin 名称 *</label>
                   <input

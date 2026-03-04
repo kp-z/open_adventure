@@ -3,13 +3,12 @@ import { ChevronDown, Box, User, FolderGit2, Puzzle } from 'lucide-react';
 import { GlassCard } from './ui-shared';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export type CategoryType = 'all' | 'user' | 'plugin' | 'project' | 'builtin';
+export type CategoryType = 'all' | 'user' | 'project' | 'builtin';
 
 interface CategoryCounts {
   builtin: number;
   user: number;
   project: number;
-  plugin: number;
 }
 
 interface SubCategory {
@@ -39,7 +38,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
 }) => {
   const [expandedCategory, setExpandedCategory] = useState<CategoryType | null>(null);
 
-  const totalCount = counts.builtin + counts.user + counts.project + counts.plugin;
+  const totalCount = counts.builtin + counts.user + counts.project;
 
   const categories = [
     {
@@ -57,15 +56,6 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
       count: counts.user,
       color: 'green',
       hasSubCategories: false,
-    },
-    {
-      type: 'plugin' as CategoryType,
-      label: 'Plugin',
-      icon: Puzzle,
-      count: counts.plugin,
-      color: 'orange',
-      hasSubCategories: true,
-      subCategories: pluginSubCategories,
     },
     {
       type: 'project' as CategoryType,
@@ -116,7 +106,7 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   return (
     <div className="space-y-3 md:space-y-4">
       {/* Main Categories - 移动端极简图标模式，桌面端完整卡片 */}
-      <div className="grid grid-cols-5 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
+      <div className="grid grid-cols-4 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         {categories.map((category) => {
           const Icon = category.icon;
           const isSelected = selectedCategory === category.type;

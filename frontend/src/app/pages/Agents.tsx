@@ -137,8 +137,7 @@ const Agents = () => {
 
   // 分类数据
   const [categories, setCategories] = useState<{
-    counts: { builtin: number; user: number; project: number; plugin: number };
-    plugins: Array<{ id: string; name: string; count: number }>;
+    counts: { builtin: number; user: number; project: number };
     projects: Array<{ id: string; name: string; count: number }>;
   } | null>(null);
 
@@ -192,7 +191,39 @@ const Agents = () => {
   const fetchCategories = useCallback(async () => {
     try {
       const data = await agentsApi.getCategories();
-      setCategories(data);
+
+      // 将 plugin scope 的 agent 重新分类到 user 或 project
+      // 需要获取所有 agents 来重新统计
+      const allAgentsResponse = await agentsApi.list({ limit: 1000 });
+      const allAgents = allAgentsResponse.items;
+
+      let userCount = data.counts.user || 0;
+      let projectCount = data.counts.project || 0;
+
+      // 遍历所有 plugin scope 的 agents,根据路径重新分类
+      allAgents.forEach(agent => {
+        if (agent.scope === 'plugin') {
+          const path = agent.meta?.path || '';
+          // 判断是否在用户主目录下
+          const isUserPlugin = path.startsWith('/Users/') && path.includes('/.claude/plugins/') && !path.includes('/项目/') && !path.includes('/Proj/');
+
+          if (isUserPlugin) {
+            userCount++;
+          } else {
+            projectCount++;
+          }
+        }
+      });
+
+      const transformedData = {
+        counts: {
+          builtin: data.counts.builtin,
+          user: userCount,
+          project: projectCount
+        },
+        projects: data.projects
+      };
+      setCategories(transformedData);
     } catch (err) {
       console.error('Failed to fetch categories:', err);
     }
@@ -310,19 +341,27 @@ const Agents = () => {
     .filter(agent => {
       // Category filter
       if (selectedCategory !== 'all') {
-        const scope = agent.scope.toLowerCase();
+        let scope = agent.scope.toLowerCase();
+
+        // 将 plugin scope 重新分类到 user 或 project
+        if (scope === 'plugin') {
+          const path = agent.meta?.path || '';
+          // 如果路径包含用户主目录的 .claude/plugins,归入 user
+          // 如果路径包含项目目录的 .claude/plugins,归入 project
+          if (path.includes('/.claude/plugins/') && !path.includes('/项目/') && !path.includes('/Proj/')) {
+            scope = 'user';
+          } else {
+            scope = 'project';
+          }
+        }
+
         if (scope !== selectedCategory) {
           return false;
         }
 
         // Sub-category filter (multi-select)
         if (selectedSubCategories.length > 0) {
-          if (selectedCategory === 'plugin') {
-            const pluginName = agent.meta?.plugin_name;
-            if (!pluginName || !selectedSubCategories.includes(pluginName)) {
-              return false;
-            }
-          } else if (selectedCategory === 'project') {
+          if (selectedCategory === 'project') {
             const path = agent.meta?.path || '';
             const parts = path.split('/');
             const claudeIndex = parts.indexOf('.claude');
@@ -419,12 +458,12 @@ const Agents = () => {
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
-            AGENTS MANAGEMENT
+            AGENTS
           </h1>
-          <p className="text-sm md:text-base text-gray-400">
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
             {mode === 'adventure'
-              ? '召唤和管理你的 AI 英雄'
-              : '管理 Claude Code 子代理（Subagents）'}
+              ? '召唤和管理你的 AI 英雄，组建最强战队'
+              : '创建和配置专属 AI 助手，赋予不同能力和权限'}
           </p>
         </div>
 
@@ -494,7 +533,6 @@ const Agents = () => {
           selectedSubCategories={selectedSubCategories}
           counts={categories.counts}
           projectSubCategories={categories.projects}
-          pluginSubCategories={categories.plugins}
           onCategoryChange={setSelectedCategory}
           onSubCategoriesChange={setSelectedSubCategories}
         />

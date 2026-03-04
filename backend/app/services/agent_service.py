@@ -33,20 +33,7 @@ class AgentService:
         同时创建文件和数据库记录
         """
         # 确定保存路径
-        if agent_data.scope == "plugin":
-            # Plugin 级需要在 meta 中指定 plugin 名称
-            plugin_name = agent_data.meta.get("plugin_name") if agent_data.meta else None
-            if not plugin_name:
-                raise ConflictException("Plugin scope 需要在 meta 中指定 plugin_name")
-
-            # Plugin agents 直接保存在 plugin 根目录的 agents/ 下
-            agents_dir = Path.home() / ".claude" / "plugins" / plugin_name / "agents"
-
-            # 验证 plugin 是否存在
-            if not agents_dir.parent.exists():
-                raise NotFoundException(f"Plugin '{plugin_name}' 不存在")
-
-        elif agent_data.scope == "project":
+        if agent_data.scope == "project":
             # 项目级需要在 meta 中指定项目路径
             project_path = agent_data.meta.get("project_path") if agent_data.meta else None
             if not project_path:
@@ -205,17 +192,7 @@ class AgentService:
                 raise ConflictException(f"无法找到原文件路径: {old_path}")
 
             # 确定新路径
-            if agent_data.scope == "plugin":
-                plugin_name = agent_data.meta.get("plugin_name") if agent_data.meta else None
-                if not plugin_name:
-                    raise ConflictException("Plugin scope 需要在 meta 中指定 plugin_name")
-                new_dir = Path.home() / ".claude" / "plugins" / plugin_name / "agents"
-
-                # 验证 plugin 是否存在
-                if not new_dir.parent.exists():
-                    raise NotFoundException(f"Plugin '{plugin_name}' 不存在")
-
-            elif agent_data.scope == "project":
+            if agent_data.scope == "project":
                 project_path = agent_data.meta.get("project_path") if agent_data.meta else None
                 if not project_path:
                     raise ConflictException("Project scope 需要在 meta 中指定 project_path")
@@ -326,19 +303,6 @@ class AgentService:
 
         # 获取所有 agents
         all_agents, _ = await self.repository.get_all(skip=0, limit=10000)
-
-        # 统计插件子分类
-        plugin_counts: Dict[str, int] = {}
-        for agent in all_agents:
-            if agent.scope == "plugin" and agent.meta:
-                plugin_name = agent.meta.get("plugin_name")
-                if plugin_name:
-                    plugin_counts[plugin_name] = plugin_counts.get(plugin_name, 0) + 1
-
-        plugins = [
-            {"id": name, "name": name, "count": count}
-            for name, count in sorted(plugin_counts.items())
-        ]
 
         # 统计项目子分类
         project_counts: Dict[str, int] = {}

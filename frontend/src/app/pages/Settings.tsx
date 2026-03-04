@@ -31,7 +31,7 @@ const Settings = () => {
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <header>
         <h1 className="text-3xl font-bold tracking-tight uppercase">SETTINGS</h1>
-        <p className="text-gray-400">{t("advDesc")}</p>
+        <p className="text-gray-400 line-clamp-1 md:line-clamp-none">个性化配置界面、语言、集成和数据管理</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
