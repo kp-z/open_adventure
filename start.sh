@@ -104,6 +104,48 @@ if [ -f "$BACKEND_PID_FILE" ]; then
     rm -f "$BACKEND_PID_FILE"
 fi
 
+# 强制清理后端进程的函数
+cleanup_backend() {
+    echo "Cleaning up backend processes..."
+
+    # 方法1: 通过端口查找并杀死进程
+    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo "  - Killing processes on port 8000..."
+        lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+    fi
+
+    # 方法2: 通过进程名查找并杀死
+    echo "  - Killing uvicorn processes..."
+    pkill -9 -f "uvicorn.*app.main:app" 2>/dev/null || true
+    pkill -9 -f "uvicorn.*app:app" 2>/dev/null || true
+
+    # 方法3: 查找 Python 进程中包含 run.py 的
+    echo "  - Killing Python backend processes..."
+    pkill -9 -f "python.*run\.py" 2>/dev/null || true
+    pkill -9 -f "python3.*run\.py" 2>/dev/null || true
+
+    # 方法4: 查找所有监听 8000 端口的 Python 进程
+    pgrep -f "python.*8000" | xargs kill -9 2>/dev/null || true
+
+    # 等待进程完全退出
+    sleep 2
+
+    # 最终验证
+    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo "  ⚠️  Warning: Port 8000 still occupied after cleanup"
+        # 最后一次尝试：直接杀死所有占用端口的进程
+        lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+        sleep 1
+
+        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+            return 1
+        fi
+    fi
+
+    echo "  ✅ Backend cleanup completed"
+    return 0
+}
+
 # 检查端口占用
 echo "Checking port availability..."
 if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -113,15 +155,10 @@ if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     echo "Do you want to stop the existing process? [y/N]"
     read -r response
     if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        echo "Stopping existing backend processes..."
-        # 强制清理所有占用端口 8000 的进程
-        lsof -ti :8000 | xargs kill -9 2>/dev/null || true
-        sleep 2
-
-        # 验证端口是否已释放
-        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        if ! cleanup_backend; then
             echo "❌ Failed to release port 8000"
-            echo "Please manually stop the processes and try again"
+            echo "Please manually stop the processes and try again:"
+            echo "  sudo lsof -ti :8000 | xargs kill -9"
             exit 1
         fi
         echo "✅ Port 8000 released"
