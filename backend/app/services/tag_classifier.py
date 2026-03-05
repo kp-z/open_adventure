@@ -17,39 +17,41 @@ class TagClassifier:
         """构建关键词到标签的映射"""
         return {
             # 工具类关键词
-            "bash": ["bash"],
-            "shell": ["bash"],
-            "command": ["bash"],
-            "git": ["git"],
-            "commit": ["git"],
-            "push": ["git"],
-            "file": ["文件读写"],
-            "read": ["文件读写"],
-            "write": ["文件读写"],
-            "search": ["代码搜索"],
-            "grep": ["代码搜索"],
-            "find": ["代码搜索"],
-            "web": ["网络请求"],
-            "http": ["网络请求"],
-            "api": ["网络请求"],
-            "browser": ["浏览器"],
-            "playwright": ["浏览器"],
-            "figma": ["Figma"],
-            "ai": ["AI增强"],
-            "prompt": ["AI增强"],
-            "optimize": ["AI增强"],
+            "bash": ["命令"],
+            "shell": ["命令"],
+            "command": ["命令"],
+            "git": ["命令"],
+            "commit": ["命令"],
+            "push": ["命令"],
+            "file": ["文件"],
+            "read": ["文件"],
+            "write": ["文件"],
+            "search": ["搜索"],
+            "grep": ["搜索"],
+            "find": ["搜索"],
+            "web": ["网络"],
+            "http": ["网络"],
+            "browser": ["浏览"],
+            "playwright": ["浏览"],
+            "figma": ["设计"],
+            "ai": ["增强"],
+            "prompt": ["增强"],
+            "optimize": ["增强"],
 
             # API 类关键词
-            "github": ["GitHub-API"],
-            "claude": ["Claude-API"],
+            "github": ["外部", "读接口"],
+            "claude": ["外部", "读接口"],
+            "api": ["外部", "读接口"],
+            "delete api": ["删接口"],
+            "update api": ["写接口"],
 
             # 危险性关键词
             "read-only": ["安全"],
             "safe": ["安全"],
-            "delete": ["高风险"],
-            "remove": ["高风险"],
-            "force": ["极高风险"],
-            "destructive": ["极高风险"],
+            "delete": ["高险"],
+            "remove": ["高险"],
+            "force": ["极险"],
+            "destructive": ["极险"],
 
             # 阶段关键词
             "plan": ["规划"],
@@ -57,28 +59,43 @@ class TagClassifier:
             "develop": ["开发"],
             "code": ["开发"],
             "test": ["测试"],
-            "review": ["审查"],
-            "deploy": ["部署"],
+            "review": ["评审"],
+            "deploy": ["发布"],
             "monitor": ["运维"],
             "maintain": ["运维"],
 
             # 链路关键词
             "instant": ["即时"],
-            "quick": ["短链路"],
-            "fast": ["短链路"],
-            "long": ["长链路"],
-            "interactive": ["交互式"],
+            "quick": ["短链"],
+            "fast": ["短链"],
+            "long": ["长链"],
+            "interactive": ["交互"],
 
             # 功能关键词
-            "generate": ["代码生成"],
-            "create": ["代码生成"],
-            "analyze": ["代码分析"],
-            "document": ["文档处理"],
+            "generate": ["生成"],
+            "create": ["生成"],
+            "analyze": ["分析"],
+            "document": ["文档"],
             "refactor": ["重构"],
             "debug": ["调试"],
-            "data": ["数据处理"],
-            "automate": ["自动化"],
-            "automation": ["自动化"],
+            "data": ["分析"],
+            "automate": ["自动"],
+            "automation": ["自动"],
+
+            # 技术栈关键词
+            "frontend": ["前端"],
+            "ui": ["前端"],
+            "react": ["React"],
+            "vue": ["Vue"],
+            "backend": ["后端"],
+            "node": ["Node"],
+            "fullstack": ["全栈"],
+            "full-stack": ["全栈"],
+            "database": ["数据库"],
+            "sql": ["数据库"],
+            "k8s": ["云原生"],
+            "kubernetes": ["云原生"],
+            "cloud": ["云原生"],
         }
 
     def suggest_tags(self, skill_data: Dict[str, Any]) -> List[str]:
@@ -117,13 +134,21 @@ class TagClassifier:
         if not has_phase_tag:
             suggested_tags.add("开发")
 
-        # 如果没有匹配到链路标签，默认为"短链路"
+        # 如果没有匹配到链路标签，默认为"短链"
         has_chain_tag = any(
             tag in suggested_tags
             for tag in TAG_DEFINITIONS[TagDimension.CHAIN]
         )
         if not has_chain_tag:
-            suggested_tags.add("短链路")
+            suggested_tags.add("短链")
+
+        # 技术栈维度：若未识别，给一个兜底
+        has_tech_stack_tag = any(
+            tag in suggested_tags
+            for tag in TAG_DEFINITIONS[TagDimension.TECH_STACK]
+        )
+        if not has_tech_stack_tag:
+            suggested_tags.add("全栈")
 
         # 限制标签数量为 10
         return list(suggested_tags)[:10]

@@ -55,7 +55,8 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
       icon: User,
       count: counts.user,
       color: 'green',
-      hasSubCategories: false,
+      hasSubCategories: true,
+      subCategories: pluginSubCategories,
     },
     {
       type: 'project' as CategoryType,

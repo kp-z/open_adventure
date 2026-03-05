@@ -102,6 +102,10 @@ class AgentService:
         if agent_data.skills:
             frontmatter["skills"] = agent_data.skills
 
+        excluded_skills = (agent_data.meta or {}).get("exclude_skills", [])
+        if excluded_skills:
+            frontmatter["exclude"] = excluded_skills
+
         if agent_data.mcp_servers:
             frontmatter["mcpServers"] = agent_data.mcp_servers
 

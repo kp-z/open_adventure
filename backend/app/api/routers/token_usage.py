@@ -3,6 +3,7 @@ Token Usage API Router
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
 from app.services.token_usage_service import TokenUsageService
 from app.core.logging import get_logger
@@ -19,6 +20,8 @@ class TokenUsageResponse(BaseModel):
     remaining: int
     percentage: float
     last_updated: str
+    warning: Optional[str] = None
+    source: Optional[str] = None
 
 
 @router.get("", response_model=TokenUsageResponse)

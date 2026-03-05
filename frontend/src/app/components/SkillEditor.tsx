@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   Sparkles,
@@ -24,7 +24,8 @@ import {
   Loader2,
   Wand2,
   User,
-  Package
+  Package,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useMode } from '../contexts/ModeContext';
@@ -34,15 +35,20 @@ import { TagSelector } from './TagSelector';
 import { cn } from '../lib/utils';
 import { skillsApi, pluginsApi, projectPathsApi, type ClaudeGenerateResponse, type SkillFileItem, type SaveSkillRequest, type SkillContentResponse, type Plugin, type ProjectPath } from '@/lib/api';
 
-// 预设推荐
-const PRESET_RECOMMENDATIONS = [
-  { title: "代码审查助手", desc: "审查代码质量、安全漏洞和最佳实践", icon: "🔍" },
-  { title: "测试生成器", desc: "自动生成单元测试和集成测试", icon: "🧪" },
-  { title: "文档生成器", desc: "从代码注释生成 API 文档", icon: "📚" },
-  { title: "重构助手", desc: "识别代码异味并建议重构方案", icon: "🔧" },
-  { title: "性能分析器", desc: "分析代码性能瓶颈并提供优化建议", icon: "⚡" },
-  { title: "依赖管理器", desc: "管理和更新项目依赖", icon: "📦" }
-];
+const SKILL_ICON_ASSET_NAME = '__skill_icon__.json';
+const MAX_ICON_SIZE = 1024 * 1024;
+const ALLOWED_ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'];
+const ALLOWED_ICON_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp', '.svg', '.ico'];
+
+const isValidIconFile = (file: File): boolean => {
+  const lowerName = file.name.toLowerCase();
+  return ALLOWED_ICON_TYPES.includes(file.type) || ALLOWED_ICON_EXTENSIONS.some(ext => lowerName.endsWith(ext));
+};
+
+const getMimeTypeFromDataUrl = (dataUrl: string): string => {
+  const match = dataUrl.match(/^data:(.*?);base64,/);
+  return match?.[1] || 'application/octet-stream';
+};
 
 // 智能推荐（基于用户输入）
 const getSmartRecommendations = (input: string): string[] => {
@@ -90,12 +96,15 @@ interface SkillEditorProps {
 export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: SkillEditorProps) => {
   const { mode } = useMode();
   const { addNotification, updateNotification } = useNotifications();
+  const iconInputRef = useRef<HTMLInputElement | null>(null);
+
   const [editorMode, setEditorMode] = useState<'visual' | 'manual'>(editingSkillId ? 'visual' : 'visual');
+  const [isMobileEditor, setIsMobileEditor] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string>('SKILL.md');
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  
+
   const [skillData, setSkillData] = useState<SkillStructure>({
     'SKILL.md': '# New Skill\n\nDescribe your skill here...',
     'scripts': [],
@@ -113,6 +122,9 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   const [isLoadingSkill, setIsLoadingSkill] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(true);  // 显示推荐
   const [smartRecommendations, setSmartRecommendations] = useState<string[]>([]);  // 智能推荐
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [iconPreview, setIconPreview] = useState<string>('');
+  const [iconFileName, setIconFileName] = useState<string>('');
 
   // Scope 相关状态
   const [scope, setScope] = useState<'user' | 'project' | 'plugin'>('user');
@@ -121,10 +133,13 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [projects, setProjects] = useState<ProjectPath[]>([]);
   const [isCreatingPlugin, setIsCreatingPlugin] = useState(false);
+  const [showLocationConfigInManual, setShowLocationConfigInManual] = useState(false);
   const [newPluginName, setNewPluginName] = useState('');
   const [newPluginDescription, setNewPluginDescription] = useState('');
 
-  // 加载现有技能数据
+  const visibleAssets = skillData.assets.filter(asset => asset.name !== SKILL_ICON_ASSET_NAME);
+
+
   useEffect(() => {
     if (editingSkillId) {
       setIsLoadingSkill(true);
@@ -133,6 +148,23 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
           console.log('[SkillEditor] Loaded skill content:', content);
           setGeneratedSkillName(content.name);
           setSkillPath(content.path);  // 设置实际路径
+
+          const iconAsset = content.assets.find((a: SkillFileItem) => a.name === SKILL_ICON_ASSET_NAME);
+          if (iconAsset) {
+            try {
+              const parsedIcon = JSON.parse(iconAsset.content) as { fileName?: string; dataUrl?: string };
+              setIconFileName(parsedIcon.fileName || 'skill-icon');
+              setIconPreview(parsedIcon.dataUrl || '');
+            } catch (err) {
+              console.warn('[SkillEditor] Failed to parse icon asset:', err);
+              setIconFileName('');
+              setIconPreview('');
+            }
+          } else {
+            setIconFileName('');
+            setIconPreview('');
+          }
+
           setSkillData({
             'SKILL.md': content.skill_md || '# New Skill\n\nDescribe your skill here...',
             'scripts': content.scripts.map((s: SkillFileItem) => ({
@@ -145,11 +177,13 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
               content: r.content,
               type: r.name.endsWith('.json') ? 'json' : 'md' as const
             })),
-            'assets': content.assets.map((a: SkillFileItem) => ({
-              name: a.name,
-              content: a.content,
-              type: 'asset' as const
-            }))
+            'assets': content.assets
+              .filter((a: SkillFileItem) => a.name !== SKILL_ICON_ASSET_NAME)
+              .map((a: SkillFileItem) => ({
+                name: a.name,
+                content: a.content,
+                type: 'asset' as const
+              }))
           });
         })
         .catch((err: Error) => {
@@ -161,6 +195,28 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
         });
     }
   }, [editingSkillId]);
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobileEditor(mobile);
+    };
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isMobileEditor && editorMode === 'manual') {
+      setEditorMode('visual');
+      addNotification({
+        type: 'info',
+        title: '移动端提示',
+        message: '移动端暂不支持源码模式，已切换到可视化模式。'
+      });
+    }
+  }, [isMobileEditor, editorMode, addNotification]);
 
   // 当生成完成时切换到编辑模式
   useEffect(() => {
@@ -184,8 +240,16 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
 
   // 加载 plugins 和 projects 列表
   useEffect(() => {
-    pluginsApi.list().then(setPlugins).catch(console.error);
-    projectPathsApi.listProjectPaths().then(data => setProjects(data.items)).catch(console.error);
+    pluginsApi.list()
+      .then((data: any) => {
+        const pluginItems = Array.isArray(data) ? data : (data?.items || []);
+        setPlugins(pluginItems);
+      })
+      .catch(console.error);
+
+    projectPathsApi.listProjectPaths()
+      .then(data => setProjects(data.items))
+      .catch(console.error);
   }, []);
 
   // 创建新 Plugin
@@ -206,7 +270,10 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
         description: newPluginDescription || undefined
       });
 
-      const updatedPlugins = await pluginsApi.list();
+      const updatedPluginsResponse = await pluginsApi.list();
+      const updatedPlugins = Array.isArray(updatedPluginsResponse)
+        ? updatedPluginsResponse
+        : (updatedPluginsResponse as any)?.items || [];
       setPlugins(updatedPlugins);
       setSelectedPlugin(newPlugin.name);
       setIsCreatingPlugin(false);
@@ -222,6 +289,70 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
       console.error('Failed to create plugin:', err);
       setGenerateError(err instanceof Error ? err.message : 'Plugin 创建失败');
     }
+  };
+
+  const readFileAsDataUrl = (file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('读取图标文件失败'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleApplyIconFile = async (file: File) => {
+    if (!isValidIconFile(file)) {
+      addNotification({
+        type: 'error',
+        title: '图标格式不支持',
+        message: '仅支持 png/jpg/jpeg/webp/svg/ico 格式'
+      });
+      return;
+    }
+
+    if (file.size > MAX_ICON_SIZE) {
+      addNotification({
+        type: 'error',
+        title: '图标文件过大',
+        message: '图标大小不能超过 1MB'
+      });
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setIconPreview(dataUrl);
+      setIconFileName(file.name);
+      setIsDragOver(false);
+    } catch (err) {
+      console.error('[SkillEditor] Failed to read icon file:', err);
+      addNotification({
+        type: 'error',
+        title: '图标上传失败',
+        message: err instanceof Error ? err.message : '读取图标文件失败'
+      });
+    }
+  };
+
+  const handleIconInputChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await handleApplyIconFile(file);
+    event.target.value = '';
+  };
+
+  const handleIconDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    await handleApplyIconFile(file);
+  };
+
+  const handleClearIcon = () => {
+    setIconPreview('');
+    setIconFileName('');
+    setIsDragOver(false);
   };
 
   const steps = [
@@ -381,6 +512,23 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
       }
 
       // 构建保存请求
+      const iconAsset: SkillFile | null = iconPreview
+        ? {
+            name: SKILL_ICON_ASSET_NAME,
+            content: JSON.stringify({
+              fileName: iconFileName || 'skill-icon',
+              mimeType: getMimeTypeFromDataUrl(iconPreview),
+              dataUrl: iconPreview
+            }),
+            type: 'asset'
+          }
+        : null;
+
+      const assetsToSave = [
+        ...skillData.assets.filter(asset => asset.name !== SKILL_ICON_ASSET_NAME),
+        ...(iconAsset ? [iconAsset] : [])
+      ];
+
       const saveRequest: SaveSkillRequest = {
         name: skillName,
         skill_md: skillMdContent,
@@ -394,7 +542,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
           content: r.content,
           type: r.type
         })),
-        assets: skillData.assets.map(a => ({
+        assets: assetsToSave.map(a => ({
           name: a.name,
           content: a.content,
           type: a.type
@@ -425,10 +573,20 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
             // 调用分类 API（不等待结果，后台执行）
             skillsApi.classify(savedSkill.id).catch(err => {
               console.warn('[SkillEditor] Auto-classification failed:', err);
+              addNotification({
+                type: 'warning',
+                title: '自动分类失败',
+                message: 'Skill 已保存成功，但自动分类失败，可稍后在技能列表手动触发分类。'
+              });
             });
           }
         } catch (err) {
           console.warn('[SkillEditor] Failed to auto-classify skill:', err);
+          addNotification({
+            type: 'warning',
+            title: '自动分类失败',
+            message: 'Skill 已保存成功，但自动分类失败，可稍后在技能列表手动触发分类。'
+          });
         }
 
         setSaveSuccess(true);
@@ -498,7 +656,9 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
             </button>
             <button
               onClick={() => setEditorMode('manual')}
-              className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-2 flex-1 md:flex-initial justify-center ${editorMode === 'manual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              disabled={isMobileEditor}
+              title={isMobileEditor ? '移动端暂不支持源码模式' : '切换到源码模式'}
+              className={`px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all flex items-center gap-2 flex-1 md:flex-initial justify-center ${editorMode === 'manual' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-white'} ${isMobileEditor ? 'opacity-50 cursor-not-allowed hover:text-gray-400' : ''}`}
             >
               <Code2 size={14} className="md:w-4 md:h-4" />
               <span className="hidden sm:inline">源码</span>
@@ -534,7 +694,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
       <div className="flex flex-col lg:flex-row gap-6">
         {/* 左侧主内容区 */}
         <div className="flex-1 min-w-0">
-          {/* AI 助手卡片 - 在可视化模式显示 */}
+          {/* Skill 生成卡片 - 在可视化模式显示 */}
           {editorMode === 'visual' && (
             <GlassCard className="p-4 md:p-6 border-2 border-purple-500/30 mb-6 md:mb-8">
               <div className="flex items-center gap-3 mb-4">
@@ -542,7 +702,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                   <Sparkles className="text-purple-400" size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-sm md:text-base">AI 助手</h3>
+                  <h3 className="font-bold text-sm md:text-base">Skill生成</h3>
                   <p className="text-xs text-gray-400 hidden sm:block">
                     描述你的技能，让 AI 帮你生成完整的 Skill 结构
                   </p>
@@ -573,82 +733,63 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <input
-                  type="text"
-                  placeholder="例如：'一个能够总结技术博客并生成周报的技能'"
+              <div className="flex flex-col gap-3 mb-4">
+                <textarea
+                  placeholder="例如：一个能够总结技术博客并生成周报的技能\n支持抓取链接、提炼重点并输出周报 Markdown"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && prompt.trim() && !isGenerating && handleGenerate()}
-                  className="flex-1 px-3 md:px-4 py-2 md:py-3 bg-white/5 border border-white/10 rounded-xl text-sm md:text-base text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all"
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && prompt.trim() && !isGenerating) {
+                      e.preventDefault();
+                      handleGenerate();
+                    }
+                  }}
+                  rows={4}
+                  className="w-full px-3 md:px-4 py-2 md:py-3 bg-white/5 border border-white/10 rounded-xl text-sm md:text-base text-white placeholder-gray-500 focus:outline-none focus:border-purple-500/50 transition-all resize-y min-h-[110px]"
                   disabled={isGenerating}
                 />
-                <button
-                  onClick={handleGenerate}
-                  disabled={isGenerating || !prompt.trim()}
-                  className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all"
-                >
-                  {isGenerating ? (
-                    <Loader2 size={20} className="animate-spin" />
-                  ) : (
-                    <Wand2 size={20} />
-                  )}
-                  生成
-                </button>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11px] text-gray-500">快捷键：Ctrl/Cmd + Enter 生成，Enter 换行</p>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isGenerating || !prompt.trim()}
+                    className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all"
+                  >
+                    {isGenerating ? (
+                      <Loader2 size={20} className="animate-spin" />
+                    ) : (
+                      <Wand2 size={20} />
+                    )}
+                    生成
+                  </button>
+                </div>
               </div>
 
               {/* 推荐区域 */}
-              {showRecommendations && (
-                <div className="space-y-4">
-                  {/* 智能推荐 */}
-                  {smartRecommendations.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2">
-                          <Sparkles size={14} />
-                          智能推荐
-                        </h4>
-                      </div>
-                      <div className="space-y-2">
-                        {smartRecommendations.map((rec, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setPrompt(rec)}
-                            className="w-full p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-all text-left group"
-                          >
-                            <p className="text-xs text-gray-300 group-hover:text-blue-300">{rec}</p>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 预设推荐 */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-gray-400">预设模板</h4>
+              {showRecommendations && smartRecommendations.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2">
+                      <Sparkles size={14} />
+                      智能推荐
+                    </h4>
+                    <button
+                      onClick={() => setShowRecommendations(false)}
+                      className="text-xs text-gray-500 hover:text-gray-300"
+                    >
+                      隐藏
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {smartRecommendations.map((rec, i) => (
                       <button
-                        onClick={() => setShowRecommendations(false)}
-                        className="text-xs text-gray-500 hover:text-gray-300"
+                        key={i}
+                        onClick={() => setPrompt(rec)}
+                        className="w-full p-3 rounded-xl border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-all text-left group"
                       >
-                        隐藏
+                        <p className="text-xs text-gray-300 group-hover:text-blue-300">{rec}</p>
                       </button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {PRESET_RECOMMENDATIONS.map((preset, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setPrompt(`创建一个${preset.title}：${preset.desc}`)}
-                          className="p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 transition-all text-left group"
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-lg">{preset.icon}</span>
-                            <p className="text-xs font-bold text-gray-400 group-hover:text-blue-400">{preset.title}</p>
-                          </div>
-                          <p className="text-[10px] text-gray-500 line-clamp-2">{preset.desc}</p>
-                        </button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -706,6 +847,68 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                       rows={6}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-purple-500/50 resize-none transition-all"
                     />
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* 图标上传卡片 */}
+              <GlassCard className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Upload size={18} className="text-cyan-400" />
+                  <h3 className="font-bold">图标上传</h3>
+                  <span className="text-xs text-gray-500">png/jpg/jpeg/webp/svg/ico，≤ 1MB</span>
+                </div>
+
+                <input
+                  ref={iconInputRef}
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,.svg,.ico,image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon"
+                  className="hidden"
+                  onChange={handleIconInputChange}
+                />
+
+                <div
+                  onClick={() => iconInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                  }}
+                  onDrop={handleIconDrop}
+                  className={cn(
+                    "rounded-xl border-2 border-dashed p-5 transition-all cursor-pointer",
+                    isDragOver ? "border-cyan-400 bg-cyan-500/10" : "border-white/15 bg-white/5 hover:bg-white/10"
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-black/30 border border-white/10 flex items-center justify-center overflow-hidden">
+                      {iconPreview ? (
+                        <img src={iconPreview} alt="Skill icon preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <ImageIcon size={20} className="text-gray-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white">点击或拖拽上传图标</p>
+                      <p className="text-xs text-gray-400 mt-1 truncate">
+                        {iconFileName || '未选择图标文件'}
+                      </p>
+                    </div>
+                    {iconPreview && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearIcon();
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-all"
+                      >
+                        清除
+                      </button>
+                    )}
                   </div>
                 </div>
               </GlassCard>
@@ -862,7 +1065,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                   <button
                     onClick={() => {
                       const newAsset: SkillFile = {
-                        name: `asset-${skillData.assets.length + 1}.txt`,
+                        name: `asset-${visibleAssets.length + 1}.txt`,
                         content: '',
                         type: 'asset'
                       };
@@ -876,13 +1079,13 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                 </div>
 
                 <div className="space-y-3">
-                  {skillData.assets.length === 0 ? (
+                  {visibleAssets.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <p className="text-sm">暂无资源文件</p>
                     </div>
                   ) : (
-                    skillData.assets.map((asset, index) => (
-                      <div key={index} className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                    visibleAssets.map((asset) => (
+                      <div key={asset.name} className="p-4 bg-white/5 border border-white/10 rounded-xl">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <ImageIcon size={16} className="text-orange-400" />
@@ -890,17 +1093,20 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                               type="text"
                               value={asset.name}
                               onChange={(e) => {
-                                const newAssets = [...skillData.assets];
-                                newAssets[index].name = e.target.value;
-                                setSkillData({ ...skillData, assets: newAssets });
+                                setSkillData(prev => ({
+                                  ...prev,
+                                  assets: prev.assets.map(item => item.name === asset.name ? { ...item, name: e.target.value } : item)
+                                }));
                               }}
                               className="bg-transparent text-sm font-medium focus:outline-none"
                             />
                           </div>
                           <button
                             onClick={() => {
-                              const newAssets = skillData.assets.filter((_, i) => i !== index);
-                              setSkillData({ ...skillData, assets: newAssets });
+                              setSkillData(prev => ({
+                                ...prev,
+                                assets: prev.assets.filter(item => item.name !== asset.name)
+                              }));
                             }}
                             className="text-red-400 hover:text-red-300"
                           >
@@ -926,8 +1132,123 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                 <div className="w-64 border-r shrink-0 flex flex-col border-white/5 overflow-hidden">
                   <div className="p-4 flex items-center justify-between border-b border-white/5">
                     <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Explorer</span>
-                    <Plus size={14} className="text-gray-500 hover:text-white cursor-pointer" />
+                    <Plus
+                      size={14}
+                      className="text-gray-500 hover:text-white cursor-pointer"
+                      onClick={() => setShowLocationConfigInManual(prev => !prev)}
+                      title="配置保存位置"
+                    />
                   </div>
+
+                  {showLocationConfigInManual && (
+                    <div className="m-2 p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-blue-300">保存位置</p>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-300 mb-1">配置层级</label>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { value: 'user', label: '用户级' },
+                            { value: 'plugin', label: '插件级' },
+                            { value: 'project', label: '项目级' }
+                          ].map(option => (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                setScope(option.value as 'user' | 'project' | 'plugin');
+                                if (option.value !== 'plugin') setIsCreatingPlugin(false);
+                              }}
+                              className={cn(
+                                'px-2 py-1 rounded text-[10px] font-bold transition-all',
+                                scope === option.value
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                              )}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {scope === 'plugin' && (
+                        <div className="space-y-2">
+                          {!isCreatingPlugin ? (
+                            <>
+                              <select
+                                value={selectedPlugin}
+                                onChange={(e) => setSelectedPlugin(e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white/10 border border-white/20 rounded text-[11px]"
+                              >
+                                <option value="">-- 选择插件 --</option>
+                                {Array.isArray(plugins) && plugins.map(plugin => (
+                                  <option key={plugin.name} value={plugin.name}>
+                                    {plugin.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => setIsCreatingPlugin(true)}
+                                className="w-full px-2 py-1.5 rounded bg-green-500/20 border border-green-500/40 text-green-300 text-[10px] font-bold"
+                              >
+                                创建新 Plugin
+                              </button>
+                            </>
+                          ) : (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={newPluginName}
+                                onChange={(e) => setNewPluginName(e.target.value.toLowerCase())}
+                                placeholder="my-plugin"
+                                className="w-full px-2 py-1.5 bg-white/10 border border-white/20 rounded text-[11px]"
+                              />
+                              <input
+                                type="text"
+                                value={newPluginDescription}
+                                onChange={(e) => setNewPluginDescription(e.target.value)}
+                                placeholder="Plugin 描述（可选）"
+                                className="w-full px-2 py-1.5 bg-white/10 border border-white/20 rounded text-[11px]"
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => {
+                                    setIsCreatingPlugin(false);
+                                    setNewPluginName('');
+                                    setNewPluginDescription('');
+                                  }}
+                                  className="px-2 py-1 rounded bg-white/10 text-gray-300 text-[10px]"
+                                >
+                                  取消
+                                </button>
+                                <button
+                                  onClick={handleCreatePlugin}
+                                  className="px-2 py-1 rounded bg-green-600 text-white text-[10px]"
+                                >
+                                  创建
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {scope === 'project' && (
+                        <select
+                          value={selectedProject}
+                          onChange={(e) => setSelectedProject(e.target.value)}
+                          className="w-full px-2 py-1.5 bg-white/10 border border-white/20 rounded text-[11px]"
+                        >
+                          <option value="">-- 选择项目 --</option>
+                          {projects.map(project => (
+                            <option key={project.id} value={project.path}>
+                              {project.alias || project.path}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
                     {/* Root Files */}
@@ -1117,6 +1438,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
     </div>
 
     {/* 右侧配置区 - 移动端全宽，桌面端固定宽度 */}
+    {editorMode !== 'manual' && (
     <div className="w-full lg:w-80 shrink-0">
       <GlassCard className="p-4 md:p-5 sticky top-8">
         <h3 className="text-base md:text-lg font-bold mb-3 md:mb-4 flex items-center gap-2">
@@ -1278,6 +1600,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
         </div>
       </GlassCard>
     </div>
+    )}
   </div>
 </div>
   );

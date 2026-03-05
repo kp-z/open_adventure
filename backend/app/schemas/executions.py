@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, ConfigDict
 
 from app.models.task import ExecutionStatus, ExecutionType
+from app.schemas.task import TaskResponse
 
 
 class NodeExecutionResponse(BaseModel):
@@ -40,11 +41,13 @@ class ExecutionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    # Terminal 相关字段
+    # Session / Terminal 相关字段
+    session_id: Optional[str] = None
     terminal_pid: Optional[int] = None
     terminal_command: Optional[str] = None
     terminal_cwd: Optional[str] = None
     terminal_output: Optional[str] = None
+    task: Optional[TaskResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
 

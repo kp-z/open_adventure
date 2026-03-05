@@ -123,7 +123,7 @@ async def list_executions(
     if execution_type is not None:
         filters["execution_type"] = execution_type
 
-    executions = await repo.list(skip=skip, limit=limit, filters=filters)
+    executions = await repo.list_for_history(skip=skip, limit=limit, filters=filters)
     total = await repo.count(filters=filters)
 
     return ExecutionListResponse(
@@ -132,6 +132,27 @@ async def list_executions(
         skip=skip,
         limit=limit
     )
+
+
+@router.get("/cards/history", response_model=List[ExecutionResponse])
+async def get_history_card_executions(
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取 Dashboard 历史卡片数据
+
+    排序规则：running 优先，其次 terminal 优先，最后按更新时间倒序。
+
+    Args:
+        limit: 返回记录数
+
+    Returns:
+        List[ExecutionResponse]: 卡片展示用执行记录
+    """
+    repo = ExecutionRepository(db)
+    executions = await repo.get_history_card_executions(limit=limit)
+    return [ExecutionResponse.model_validate(e) for e in executions]
 
 
 @router.post("/workflows/{workflow_id}/validate")

@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     # 启动终端清理任务
     terminal.start_cleanup_task()
+    await terminal.reconcile_orphan_terminal_executions()
 
     # 启动 Agent Session 清理任务
     import asyncio
@@ -109,8 +110,8 @@ app.add_middleware(RequestIDMiddleware)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 开发环境允许所有来源
-    allow_credentials=False,  # 使用通配符时必须设为 False
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,  # 与现有行为保持一致
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -137,6 +138,7 @@ app.include_router(plugins.router, prefix=f"{settings.api_prefix}")
 app.include_router(settings_router.router, prefix=f"{settings.api_prefix}")
 app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
+app.include_router(processes.router, prefix=f"{settings.api_prefix}")
 app.include_router(websocket.router, prefix=f"{settings.api_prefix}/ws")
 
 

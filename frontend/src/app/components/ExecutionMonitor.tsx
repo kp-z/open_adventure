@@ -24,10 +24,10 @@ export const ExecutionMonitor: React.FC = () => {
   if (runningExecutions.length === 0 || isMobile) return null;
 
   const handleExecutionClick = (execution: any) => {
-    if (execution.execution_type === 'agent_test') {
-      navigate('/agents');
+    if (execution.execution_type === 'terminal') {
+      navigate('/terminal');
     } else {
-      navigate('/workflows');
+      navigate('/history');
     }
     setExpanded(false);
   };
@@ -71,7 +71,13 @@ export const ExecutionMonitor: React.FC = () => {
                   <div className="flex items-center gap-2 mb-1">
                     <Loader size={14} className="animate-spin text-blue-400" />
                     <p className="text-xs font-medium truncate">
-                      {execution.execution_type === 'agent_test' ? `Agent 运行 #${execution.agent_id}` : `Workflow #${execution.workflow_id}`}
+                      {execution.execution_type === 'terminal'
+                        ? `Terminal #${execution.id}`
+                        : execution.execution_type === 'agent_test'
+                          ? `Agent 运行 #${execution.agent_id}`
+                          : execution.execution_type === 'agent_team'
+                            ? `AgentTeam #${execution.id}`
+                            : `Workflow #${execution.workflow_id}`}
                     </p>
                   </div>
                   <p className="text-[10px] text-gray-500">

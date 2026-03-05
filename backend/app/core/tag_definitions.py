@@ -9,39 +9,40 @@ from enum import Enum
 class TagDimension(str, Enum):
     """标签维度"""
     TOOL = "工具"
-    API = "API"
-    RISK = "危险性"
+    API = "接口"
+    RISK = "风险"
     PHASE = "阶段"
     CHAIN = "链路"
     FUNCTION = "功能"
     SCOPE = "范围"
+    TECH_STACK = "技术栈"
 
 
-# 标签定义
+# 标签定义：固定维度 + 固定标签
 TAG_DEFINITIONS: Dict[TagDimension, List[str]] = {
     TagDimension.TOOL: [
-        "bash", "git", "文件读写", "代码搜索",
-        "网络请求", "浏览器", "Figma", "AI增强"
+        "命令", "文件", "搜索", "网络", "浏览", "设计", "增强"
     ],
     TagDimension.API: [
-        "GitHub-API", "Claude-API", "外部API",
-        "只读API", "写入API", "删除API"
+        "读接口", "写接口", "删接口", "外部"
     ],
     TagDimension.RISK: [
-        "安全", "低风险", "中风险", "高风险", "极高风险"
+        "安全", "低险", "中险", "高险", "极险"
     ],
     TagDimension.PHASE: [
-        "规划", "开发", "测试", "审查", "部署", "运维"
+        "规划", "开发", "测试", "评审", "发布", "运维"
     ],
     TagDimension.CHAIN: [
-        "即时", "短链路", "中链路", "长链路", "交互式"
+        "即时", "短链", "中链", "长链", "交互"
     ],
     TagDimension.FUNCTION: [
-        "代码生成", "代码分析", "文档处理", "测试工具",
-        "重构", "调试", "数据处理", "自动化", "部署发布", "监控"
+        "生成", "分析", "文档", "调试", "重构", "自动", "部署", "监控"
     ],
     TagDimension.SCOPE: [
-        "本地", "项目级", "仓库级", "需要网络", "外部依赖"
+        "本地", "项目", "仓库", "联网", "依赖"
+    ],
+    TagDimension.TECH_STACK: [
+        "前端", "后端", "全栈", "React", "Vue", "Node", "数据库", "云原生"
     ]
 }
 
@@ -53,12 +54,13 @@ for tags in TAG_DEFINITIONS.values():
 # 标签优先级规则
 TAG_PRIORITY_RULES = {
     TagDimension.TOOL: {"max": 3, "required": True},
-    TagDimension.API: {"max": 3, "required": False},
+    TagDimension.API: {"max": 2, "required": False},
     TagDimension.RISK: {"max": 1, "required": True},
     TagDimension.PHASE: {"max": 1, "required": True},
     TagDimension.CHAIN: {"max": 1, "required": True},
     TagDimension.FUNCTION: {"max": 2, "required": False},
-    TagDimension.SCOPE: {"max": 2, "required": False}
+    TagDimension.SCOPE: {"max": 2, "required": False},
+    TagDimension.TECH_STACK: {"max": 2, "required": False},
 }
 
 
@@ -111,3 +113,4 @@ def get_tag_dimension(tag: str) -> TagDimension | None:
         if tag in dim_tags:
             return dim
     return None
+

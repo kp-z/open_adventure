@@ -51,12 +51,13 @@ export const TagFilter: React.FC<TagFilterProps> = ({
   const getDimensionColor = (dimension: string) => {
     const colors: Record<string, string> = {
       '工具': 'blue',
-      'API': 'purple',
-      '危险性': 'green',
+      '接口': 'purple',
+      '风险': 'green',
       '阶段': 'yellow',
       '链路': 'pink',
       '功能': 'indigo',
       '范围': 'orange',
+      '技术栈': 'teal',
     };
     return colors[dimension] || 'gray';
   };

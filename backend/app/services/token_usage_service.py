@@ -1,107 +1,160 @@
 """
-Token Usage Service - 查询 Claude token 使用情况
+Token Usage Service - 查询 Claude token 使用情况（基于 Claude 会话真实 usage 字段）
 """
-import os
 import json
-from typing import Optional, Dict, Any
+from collections import deque
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+from app.config.settings import settings
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class TokenUsageService:
     """Token 使用情况服务"""
 
     def __init__(self):
-        self.history_file = os.path.expanduser("~/.claude/history.jsonl")
+        self.projects_dir = Path.home() / ".claude" / "projects"
+        self.settings_file = settings.claude_config_dir / "settings.json"
 
     def get_token_usage(self) -> Dict[str, Any]:
         """
-        获取 token 使用情况
+        获取 token 使用情况（真实数据优先）
 
-        Returns:
-            {
-                "used": int,           # 已使用的 token 数
-                "total": int,          # 总配额
-                "remaining": int,      # 剩余 token 数
-                "percentage": float,   # 使用百分比 (0-100)
-                "last_updated": str    # 最后更新时间
-            }
+        数据来源：~/.claude/projects 下最近会话 JSONL 的 message.usage。
+        若无法获取真实数据，返回 0 并附带 warning。
         """
-        try:
-            # 从历史记录中读取最新的 token 使用情况
-            if not os.path.exists(self.history_file):
-                return self._get_default_usage()
+        latest_usage = self._get_latest_usage_from_sessions()
+        if latest_usage is None:
+            warning = "无法从 Claude 会话中获取真实 token usage，已回退为 0"
+            logger.warning(warning)
+            return self._zero_usage(warning)
 
-            # 读取最后几行，查找 token usage 信息
-            with open(self.history_file, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+        used = latest_usage.get("used")
+        total = latest_usage.get("total")
 
-            # 从后往前查找最新的 token usage
-            for line in reversed(lines[-100:]):  # 只检查最后100行
-                try:
-                    data = json.loads(line)
-                    # 查找包含 token usage 的消息
-                    if 'messages' in data:
-                        for msg in reversed(data['messages']):
-                            if 'content' in msg and isinstance(msg['content'], str):
-                                # 查找 token usage 信息
-                                if 'Token usage:' in msg['content']:
-                                    return self._parse_token_usage(msg['content'])
-                except (json.JSONDecodeError, KeyError):
-                    continue
+        if not isinstance(used, int) or not isinstance(total, int) or total <= 0:
+            warning = "解析到 usage 但上下文窗口大小不可判定，已回退为 0"
+            logger.warning(warning)
+            return self._zero_usage(warning)
 
-            return self._get_default_usage()
-
-        except Exception as e:
-            print(f"Error reading token usage: {e}")
-            return self._get_default_usage()
-
-    def _parse_token_usage(self, content: str) -> Dict[str, Any]:
-        """
-        解析 token usage 字符串
-        例如: "Token usage: 121802/200000; 78198 remaining"
-        """
-        try:
-            # 提取数字
-            import re
-            match = re.search(r'Token usage: (\d+)/(\d+); (\d+) remaining', content)
-            if match:
-                used = int(match.group(1))
-                total = int(match.group(2))
-                remaining = int(match.group(3))
-                percentage = (used / total * 100) if total > 0 else 0
-
-                # 如果 percentage 为 0，使用测试数据
-                if percentage == 0:
-                    used = 105809
-                    total = 200000
-                    remaining = total - used
-                    percentage = (used / total * 100)
-
-                return {
-                    "used": used,
-                    "total": total,
-                    "remaining": remaining,
-                    "percentage": round(percentage, 2),
-                    "last_updated": datetime.now().isoformat()
-                }
-        except Exception as e:
-            print(f"Error parsing token usage: {e}")
-
-        return self._get_default_usage()
-
-    def _get_default_usage(self) -> Dict[str, Any]:
-        """返回默认的使用情况（无数据时）"""
-        # 使用当前会话的实际 token 使用情况作为测试数据
-        # 当前使用了约 104801 tokens
-        used = 104801
-        total = 200000
-        remaining = total - used
-        percentage = (used / total * 100) if total > 0 else 0
+        remaining = max(total - used, 0)
+        percentage = (used / total * 100) if total > 0 else 0.0
 
         return {
             "used": used,
             "total": total,
             "remaining": remaining,
             "percentage": round(percentage, 2),
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.now().isoformat(),
+            "warning": None,
+            "source": latest_usage.get("source", "claude_session_usage")
+        }
+
+    def _get_latest_usage_from_sessions(self) -> Optional[Dict[str, Any]]:
+        """从最近更新的 Claude 会话文件中提取最新 usage。"""
+        if not self.projects_dir.exists():
+            return None
+
+        session_files = list(self.projects_dir.rglob("*.jsonl"))
+        if not session_files:
+            return None
+
+        session_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+
+        for file_path in session_files[:30]:
+            usage = self._extract_latest_usage_from_file(file_path)
+            if usage is not None:
+                usage["source"] = str(file_path)
+                return usage
+
+        return None
+
+    def _extract_latest_usage_from_file(self, file_path: Path) -> Optional[Dict[str, Any]]:
+        """从单个 JSONL 会话文件中提取最新 assistant usage。"""
+        recent_lines: deque[str] = deque(maxlen=400)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    recent_lines.append(line)
+        except Exception as e:
+            logger.debug(f"读取会话文件失败 {file_path}: {e}")
+            return None
+
+        for line in reversed(recent_lines):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            if record.get("type") != "assistant":
+                continue
+
+            message = record.get("message")
+            if not isinstance(message, dict):
+                continue
+
+            usage = message.get("usage")
+            if not isinstance(usage, dict):
+                continue
+
+            input_tokens = usage.get("input_tokens")
+            cache_creation_input_tokens = usage.get("cache_creation_input_tokens", 0)
+            cache_read_input_tokens = usage.get("cache_read_input_tokens", 0)
+
+            if not isinstance(input_tokens, int):
+                continue
+
+            used = input_tokens
+            if isinstance(cache_creation_input_tokens, int):
+                used += cache_creation_input_tokens
+            if isinstance(cache_read_input_tokens, int):
+                used += cache_read_input_tokens
+
+            model_id = message.get("model")
+            total = self._resolve_context_window_size(model_id)
+
+            return {
+                "used": used,
+                "total": total,
+                "model": model_id
+            }
+
+        return None
+
+    def _resolve_context_window_size(self, model_id: Optional[str]) -> int:
+        """
+        解析上下文窗口总量。
+        - 明确 1m 标识 => 1,000,000
+        - 其余默认 200,000（Claude Code 官方默认）
+        """
+        model_text = (model_id or "").lower()
+        if "1m" in model_text:
+            return 1_000_000
+
+        try:
+            if self.settings_file.exists():
+                with open(self.settings_file, "r", encoding="utf-8") as f:
+                    settings_data = json.load(f)
+                settings_model = str(settings_data.get("model", "")).lower()
+                if "1m" in settings_model:
+                    return 1_000_000
+        except Exception as e:
+            logger.debug(f"读取 settings.json 判定 context window 失败: {e}")
+
+        return 200_000
+
+    def _zero_usage(self, warning: str) -> Dict[str, Any]:
+        return {
+            "used": 0,
+            "total": 0,
+            "remaining": 0,
+            "percentage": 0.0,
+            "last_updated": datetime.now().isoformat(),
+            "warning": warning,
+            "source": "fallback_zero"
         }

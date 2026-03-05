@@ -161,6 +161,7 @@ scripts/
 - 命名使用英文专业术语（Skill/Agent/AgentTeam/Workflow/Task/Execution）
 - 前端 UI 可游戏化，但 API 和数据模型保持专业
 - 所有统计和评分基于真实数据，不虚构
+- 前后端功能如有报错需求，必须统一通过 Notification 组件进行错误提示
 
 ### 文件创建规范
 - **禁止在项目根目录创建日志、图片、文档文件**

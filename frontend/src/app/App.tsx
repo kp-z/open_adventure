@@ -7,7 +7,6 @@ import { ModeProvider } from './contexts/ModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ExecutionProvider } from './contexts/ExecutionContext';
 import { TerminalProvider } from './contexts/TerminalContext';
-import { ExecutionMonitor } from './components/ExecutionMonitor';
 import '../styles/theme.css';
 import '../styles/fonts.css';
 
@@ -131,10 +130,10 @@ const router = createBrowserRouter(
           },
         },
         {
-          path: 'executions',
+          path: 'history',
           lazy: async () => {
-            const Executions = await import('./pages/Executions');
-            return { Component: Executions.default };
+            const History = await import('./pages/History');
+            return { Component: History.default };
           },
         },
         {

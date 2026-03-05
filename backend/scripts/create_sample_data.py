@@ -5,9 +5,23 @@
 """
 import requests
 import json
+import os
 from datetime import datetime
+from pathlib import Path
 
 BASE_URL = "http://127.0.0.1:8000/api"
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parent.parent
+PROJECT_PATH = Path(os.getenv("PROJECT_PATH", str(REPO_ROOT))).resolve()
+PAYMENT_PROJECT_PATH = Path(
+    os.getenv("SAMPLE_PAYMENT_PROJECT_PATH", str(PROJECT_PATH.parent / "payment-service"))
+).resolve()
+WEB_APP_PROJECT_PATH = Path(
+    os.getenv("SAMPLE_WEB_APP_PROJECT_PATH", str(PROJECT_PATH.parent / "web-app"))
+).resolve()
+LEGACY_PROJECT_PATH = Path(
+    os.getenv("SAMPLE_LEGACY_PROJECT_PATH", str(PROJECT_PATH.parent / "legacy-system"))
+).resolve()
 
 def print_result(name: str, response: requests.Response):
     """打印 API 响应结果"""
@@ -386,7 +400,7 @@ def create_tasks(workflows: list, teams: list):
         {
             "title": "审查用户认证模块代码",
             "description": "对新开发的用户认证模块进行全面代码审查，包括安全性检查和性能评估",
-            "project_path": "/Users/kp/项目/Proj/claude_manager",
+            "project_path": str(PROJECT_PATH),
             "workflow_id": workflows[0]["id"] if workflows else None,
             "agent_team_id": teams[0]["id"] if teams else None,
             "meta": {
@@ -398,7 +412,7 @@ def create_tasks(workflows: list, teams: list):
         {
             "title": "编写支付系统单元测试",
             "description": "为支付处理模块编写完整的单元测试，覆盖率目标 90%",
-            "project_path": "/Users/kp/项目/Proj/payment-service",
+            "project_path": str(PAYMENT_PROJECT_PATH),
             "workflow_id": workflows[1]["id"] if len(workflows) > 1 else None,
             "agent_team_id": teams[0]["id"] if teams else None,
             "meta": {
@@ -410,7 +424,7 @@ def create_tasks(workflows: list, teams: list):
         {
             "title": "生成 REST API 文档",
             "description": "自动扫描后端代码并生成完整的 REST API 文档",
-            "project_path": "/Users/kp/项目/Proj/claude_manager/backend",
+            "project_path": str(PROJECT_PATH / "backend"),
             "workflow_id": workflows[2]["id"] if len(workflows) > 2 else None,
             "agent_team_id": teams[1]["id"] if len(teams) > 1 else None,
             "meta": {
@@ -422,7 +436,7 @@ def create_tasks(workflows: list, teams: list):
         {
             "title": "修复登录页面 500 错误",
             "description": "紧急修复生产环境登录页面出现的 500 Internal Server Error",
-            "project_path": "/Users/kp/项目/Proj/web-app",
+            "project_path": str(WEB_APP_PROJECT_PATH),
             "workflow_id": None,
             "agent_team_id": teams[2]["id"] if len(teams) > 2 else None,
             "meta": {
@@ -434,7 +448,7 @@ def create_tasks(workflows: list, teams: list):
         {
             "title": "重构数据库访问层",
             "description": "将直接 SQL 查询重构为 ORM 模式，提高代码可维护性",
-            "project_path": "/Users/kp/项目/Proj/legacy-system",
+            "project_path": str(LEGACY_PROJECT_PATH),
             "workflow_id": workflows[0]["id"] if workflows else None,
             "agent_team_id": teams[1]["id"] if len(teams) > 1 else None,
             "meta": {

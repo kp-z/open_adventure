@@ -1,0 +1,67 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - button "Open Adventure" [ref=e5]:
+      - img [ref=e8]
+      - generic [ref=e12]:
+        - generic [ref=e13]: Open
+        - generic [ref=e14]: Adventure
+    - navigation [ref=e15]:
+      - link "Dashboard" [ref=e18] [cursor=pointer]:
+        - /url: /
+        - img [ref=e19]
+        - generic [ref=e24]: Dashboard
+      - button "Library" [ref=e26]:
+        - generic [ref=e27]:
+          - img [ref=e28]
+          - generic [ref=e30]: Library
+        - img [ref=e32]
+      - button "Automation" [ref=e35]:
+        - generic [ref=e36]:
+          - img [ref=e37]
+          - generic [ref=e41]: Automation
+        - img [ref=e43]
+      - link "Terminal" [ref=e47] [cursor=pointer]:
+        - /url: /terminal
+        - img [ref=e48]
+        - generic [ref=e50]: Terminal
+      - link "Settings" [ref=e52] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e53]
+        - generic [ref=e56]: Settings
+  - main [ref=e57]:
+    - generic [ref=e58]:
+      - generic [ref=e59]:
+        - button "收起侧边栏" [ref=e60]:
+          - img [ref=e61]
+        - generic [ref=e64]:
+          - button "后退" [ref=e65]:
+            - img [ref=e66]
+          - button "前进" [ref=e68]:
+            - img [ref=e69]
+        - button [ref=e73]:
+          - img [ref=e74]
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - paragraph [ref=e80]: Local
+          - paragraph [ref=e81]: System Administrator
+        - img [ref=e84]
+    - generic [ref=e89]:
+      - generic [ref=e90]:
+        - generic [ref=e91]:
+          - heading "TERMINAL" [level=1] [ref=e92]
+          - paragraph [ref=e93]: 多标签终端，支持分屏和项目路径快速切换
+          - paragraph [ref=e95]:
+            - generic [ref=e96]: 1 个终端
+            - text: 正在运行
+        - generic [ref=e97]:
+          - button "New Tab" [ref=e99]:
+            - img [ref=e100]
+          - button "Split Horizontal" [ref=e101]:
+            - img [ref=e102]
+          - button "Split Vertical" [ref=e105]:
+            - img [ref=e106]
+          - button "Close All & Restart" [ref=e109]:
+            - img [ref=e110]
+      - generic [ref=e119]:
+        - generic:
+          - textbox "Terminal input"

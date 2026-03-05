@@ -204,6 +204,7 @@ async def get_skill_categories(
     # Collect unique plugins and projects
     plugins = {}  # plugin_name -> count
     projects = {}  # project_name -> count
+    users = {}  # user_scope(public/plugin:xxx) -> count
 
     for skill in skills.items:
         source = skill.source.value if hasattr(skill.source, 'value') else skill.source
@@ -217,6 +218,27 @@ async def get_skill_categories(
             plugin_name = skill.meta.get("plugin_name", "unknown")
             if plugin_name and plugin_name != "unknown":
                 plugins[plugin_name] = plugins.get(plugin_name, 0) + 1
+
+        # User 分组的二级标签：public + plugin
+        if source == "user":
+            users["public"] = users.get("public", 0) + 1
+
+        # plugin source 里也有一部分属于 user（~/.claude/plugins/...）
+        if source == "plugin" and skill.meta:
+            path = skill.meta.get("path", "")
+            has_claude_plugins = "/.claude/plugins/" in path or "\\.claude\\plugins\\" in path
+            has_project_markers = (
+                "/.git/" in path
+                or "\\.git\\" in path
+                or "/package.json" in path
+                or "\\package.json" in path
+            )
+            is_user_plugin = has_claude_plugins and not has_project_markers
+            if is_user_plugin:
+                plugin_name = skill.meta.get("plugin_name")
+                if plugin_name:
+                    user_scope = f"plugin:{plugin_name}"
+                    users[user_scope] = users.get(user_scope, 0) + 1
 
         # Extract project name from path
         if source == "project" and skill.meta:
@@ -240,6 +262,14 @@ async def get_skill_categories(
         "projects": [
             {"id": name, "name": name, "count": count}
             for name, count in sorted(projects.items())
+        ],
+        "users": [
+            {
+                "id": name,
+                "name": ("public" if name == "public" else name.replace("plugin:", "plugin/")),
+                "count": count
+            }
+            for name, count in sorted(users.items())
         ]
     }
 
