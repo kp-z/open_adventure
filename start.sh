@@ -123,15 +123,17 @@ check_python_deps() {
 
 if ! check_python_deps; then
     echo "Installing Python dependencies..."
-    # 优先使用 pyproject.toml
-    if [ -f "pyproject.toml" ]; then
-        pip install -q -e .
-    elif [ -f "requirements.txt" ]; then
+    # 优先使用 requirements.txt（避免 setuptools 包发现问题）
+    if [ -f "requirements.txt" ]; then
         pip install -q -r requirements.txt
     elif [ -f "../requirements.txt" ]; then
         pip install -q -r ../requirements.txt
+    elif [ -f "pyproject.toml" ]; then
+        # 回退到 pyproject.toml（可能有包发现问题）
+        echo "⚠️  Using pyproject.toml (may have package discovery issues)"
+        pip install -q -e .
     else
-        echo "❌ No dependency file found (pyproject.toml or requirements.txt)"
+        echo "❌ No dependency file found (requirements.txt or pyproject.toml)"
         exit 1
     fi
     echo "✅ Python dependencies installed"
@@ -140,8 +142,8 @@ if ! check_python_deps; then
     if ! check_python_deps; then
         echo "❌ Failed to install Python dependencies"
         echo "Please check the error messages above and try manually:"
-        echo "  cd backend && pip install -e ."
-        echo "  or: cd backend && pip install -r requirements.txt"
+        echo "  cd backend && pip install -r requirements.txt"
+        echo "  or: cd backend && pip install -e ."
         exit 1
     fi
 fi

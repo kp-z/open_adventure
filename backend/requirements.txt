@@ -1,13 +1,20 @@
-aiohttp==3.13.3
-aiosqlite==0.22.1
-alembic==1.18.4
-anthropic==0.84.0
-fastapi==0.133.1
-greenlet==3.3.2
-psutil==7.2.2
-pydantic @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_ac_4dmd4j4/croot/pydantic_1750769074322/work
-pydantic-settings @ file:///Users/builder/cbouss/buildout/croot/pydantic-settings_1735843952737/work
-pydantic_core @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_9d3ads2bae/croot/pydantic-core_1750754745671/work
-python-dotenv @ file:///private/var/folders/nz/j6p8yfhx1mv_0grj5xl4650h0000gp/T/abs_0bqseadoho/croot/python-dotenv_1745610246418/work
-python-multipart==0.0.22
-uvicorn==0.41.0
+# Core dependencies
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sqlalchemy>=2.0.36
+alembic>=1.14.0
+pydantic>=2.10.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.1
+python-multipart>=0.0.12
+aiohttp>=3.9.0
+
+# Database
+aiosqlite>=0.20.0
+greenlet>=3.0.0
+
+# System utilities
+psutil>=5.9.0
+
+# AI SDK
+anthropic>=0.39.0
