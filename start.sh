@@ -3,6 +3,47 @@
 # 严格模式：遇到错误立即退出
 set -e
 
+# 检测操作系统
+OS_TYPE="unknown"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    OS_TYPE="macos"
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    OS_TYPE="linux"
+fi
+
+# 检查必需的命令
+check_required_commands() {
+    local missing_commands=()
+
+    # 检查 lsof（端口检查必需）
+    if ! command -v lsof &> /dev/null; then
+        missing_commands+=("lsof")
+    fi
+
+    # 检查 curl（健康检查必需）
+    if ! command -v curl &> /dev/null; then
+        missing_commands+=("curl")
+    fi
+
+    if [ ${#missing_commands[@]} -gt 0 ]; then
+        echo "❌ Missing required commands: ${missing_commands[*]}"
+        echo ""
+        if [ "$OS_TYPE" = "linux" ]; then
+            echo "Please install them using:"
+            echo "  Ubuntu/Debian: sudo apt-get install lsof curl"
+            echo "  CentOS/RHEL: sudo yum install lsof curl"
+            echo "  Arch: sudo pacman -S lsof curl"
+        elif [ "$OS_TYPE" = "macos" ]; then
+            echo "Please install them using:"
+            echo "  brew install lsof curl"
+        fi
+        exit 1
+    fi
+}
+
+# 执行检查
+check_required_commands
+
 # 获取脚本所在目录
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
@@ -19,8 +60,15 @@ FRONTEND_PORT=5173
 
 # 检查是否为后台运行模式
 DAEMON_MODE=false
+NON_INTERACTIVE=false
+
 if [[ "$1" == "-d" ]] || [[ "$1" == "--daemon" ]]; then
     DAEMON_MODE=true
+fi
+
+# 检查是否为非交互模式（用于 systemd 等自动化部署）
+if [ -n "$NON_INTERACTIVE_MODE" ] || [ ! -t 0 ]; then
+    NON_INTERACTIVE=true
 fi
 
 echo "🚀 Starting Open Adventure..."
@@ -67,10 +115,13 @@ source venv/bin/activate
 # 检查依赖
 if ! python -c "import fastapi" 2>/dev/null; then
     echo "Installing Python dependencies..."
-    if [ -f "../requirements.txt" ]; then
+    # 优先使用 pyproject.toml
+    if [ -f "pyproject.toml" ]; then
+        pip install -q -e .
+    elif [ -f "../requirements.txt" ]; then
         pip install -q -r ../requirements.txt
     else
-        echo "❌ requirements.txt not found"
+        echo "❌ Neither pyproject.toml nor requirements.txt found"
         exit 1
     fi
     echo "✅ Python dependencies installed"
@@ -210,6 +261,19 @@ resolve_port_conflict() {
     fi
 
     echo "⚠️  Port $current_port is already in use for $service_name"
+
+    # 非交互模式：自动清理端口
+    if [ "$NON_INTERACTIVE" = true ]; then
+        echo "Running in non-interactive mode, automatically cleaning up port..."
+        if ! "$cleanup_func_name"; then
+            echo "❌ Failed to release port $current_port"
+            exit 1
+        fi
+        echo "✅ Port $current_port released"
+        return 0
+    fi
+
+    # 交互模式：询问用户
     echo "Choose an action:"
     echo "  [r] Restart on this port (kill occupying process)"
     echo "  [n] Use a new port"
@@ -264,8 +328,16 @@ resolve_port_conflict "frontend" "FRONTEND_PORT" "cleanup_frontend"
 
 # 启动后端服务器（后台运行）
 echo "Starting backend server on port $BACKEND_PORT..."
-# macOS 不支持 setsid，直接使用后台运行
-python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+
+# 根据操作系统选择启动方式
+if [ "$OS_TYPE" = "linux" ] && command -v setsid &> /dev/null; then
+    # Linux: 使用 setsid 创建独立会话，避免终端关闭时进程被杀死
+    setsid python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+else
+    # macOS 或不支持 setsid 的系统：直接后台运行
+    python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+fi
+
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 echo "✅ Backend started (PID: $BACKEND_PID)"
