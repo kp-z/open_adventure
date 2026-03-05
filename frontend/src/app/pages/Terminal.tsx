@@ -612,27 +612,33 @@ const Terminal = () => {
                 />
 
                 {/* 下拉菜单 */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden">
-                  <div className="p-2 border-b border-white/10">
-                    <p className="text-xs text-gray-400 px-2 py-1">选择项目路径</p>
+                <div className={`
+                  ${isMobile
+                    ? 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-sm'
+                    : 'absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64'
+                  }
+                  bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden
+                `}>
+                  <div className="p-3 border-b border-white/10">
+                    <p className="text-sm font-medium text-white">选择项目路径</p>
                   </div>
-                  <div className="max-h-64 overflow-y-auto">
+                  <div className={`${isMobile ? 'max-h-[60vh]' : 'max-h-64'} overflow-y-auto`}>
                     {projectPaths.length > 0 ? (
                       projectPaths.map((path) => (
                         <button
                           key={path.id}
                           onClick={() => handleSelectProject(path.path)}
-                          className="w-full text-left px-4 py-2 hover:bg-white/10 transition-colors flex items-center gap-2"
+                          className="w-full text-left px-4 py-3 hover:bg-white/10 active:bg-white/20 transition-colors flex items-center gap-3"
                         >
-                          <FolderOpen size={14} className="text-gray-400 shrink-0" />
+                          <FolderOpen size={16} className="text-green-400 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white truncate">{path.alias}</p>
-                            <p className="text-xs text-gray-500 truncate">{path.path}</p>
+                            <p className="text-sm font-medium text-white truncate">{path.alias}</p>
+                            <p className="text-xs text-gray-400 truncate mt-0.5">{path.path}</p>
                           </div>
                         </button>
                       ))
                     ) : (
-                      <div className="px-4 py-3 text-sm text-gray-500">
+                      <div className="px-4 py-6 text-center text-sm text-gray-500">
                         暂无项目路径
                       </div>
                     )}
@@ -658,28 +664,44 @@ const Terminal = () => {
                   className="fixed inset-0 z-40"
                   onClick={() => setShowConversationSelector(false)}
                 />
-                <div className="absolute top-full right-0 mt-2 w-80 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden">
-                  <div className="p-2 border-b border-white/10">
-                    <p className="text-xs text-gray-400 px-2 py-1">选择 Claude 会话恢复</p>
+                <div className={`
+                  ${isMobile
+                    ? 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md'
+                    : 'absolute top-full right-0 mt-2 w-80'
+                  }
+                  bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden
+                `}>
+                  <div className="p-3 border-b border-white/10">
+                    <p className="text-sm font-medium text-white">选择 Claude 会话恢复</p>
                   </div>
-                  <div className="max-h-80 overflow-y-auto">
+                  <div className={`${isMobile ? 'max-h-[60vh]' : 'max-h-80'} overflow-y-auto`}>
                     {conversationOptions.length > 0 ? (
                       conversationOptions.map((item) => (
                         <button
                           key={item.session_id}
                           onClick={() => handleRestoreConversation(item.session_id)}
-                          className="w-full text-left px-4 py-2 hover:bg-white/10 transition-colors"
+                          className="w-full text-left px-4 py-3 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5 last:border-b-0"
                         >
-                          <p className="text-sm text-white truncate">{item.title || item.session_id}</p>
-                          <p className="text-[11px] text-gray-400 truncate">{item.session_id}</p>
-                          <p className="text-[10px] text-gray-500 truncate">
-                            {item.project_hint || 'unknown project'}
-                            {item.last_updated ? ` · ${new Date(item.last_updated).toLocaleString()}` : ''}
-                          </p>
+                          <p className="text-sm font-medium text-white truncate">{item.title || item.session_id}</p>
+                          <p className="text-xs text-gray-400 truncate mt-1 font-mono">{item.session_id}</p>
+                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-500">
+                            <span className="truncate">{item.project_hint || 'unknown project'}</span>
+                            {item.last_updated && (
+                              <>
+                                <span>·</span>
+                                <span className="shrink-0">{new Date(item.last_updated).toLocaleString('zh-CN', {
+                                  month: 'numeric',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}</span>
+                              </>
+                            )}
+                          </div>
                         </button>
                       ))
                     ) : (
-                      <div className="px-4 py-3 text-sm text-gray-500">未发现可恢复会话</div>
+                      <div className="px-4 py-6 text-center text-sm text-gray-500">未发现可恢复会话</div>
                     )}
                   </div>
                 </div>
