@@ -63,6 +63,7 @@ dmypy.json
 .run/
 docs/logs/
 docs/releases/
+docs/design/
 backend/build/
 backend/dist/
 release/
