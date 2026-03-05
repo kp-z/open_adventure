@@ -62,6 +62,7 @@ dmypy.json
 # Runtime artifacts (fresh-clone consistency)
 .run/
 docs/logs/
+docs/releases/
 backend/build/
 backend/dist/
 release/
