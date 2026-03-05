@@ -36,13 +36,31 @@ async def detailed_health_check(db: AsyncSession = Depends(get_db)) -> dict:
     """
     # 数据库连接池状态
     pool = engine.pool
-    pool_status = {
-        "size": pool.size(),
-        "checked_in": pool.checkedin(),
-        "checked_out": pool.checkedout(),
-        "overflow": pool.overflow(),
-        "max_overflow": pool._max_overflow,
-    }
+    pool_status = {}
+
+    # 检查连接池类型，NullPool 不支持这些方法
+    pool_class_name = type(pool).__name__
+    if pool_class_name == "NullPool":
+        pool_status = {
+            "type": "NullPool",
+            "description": "SQLite 使用 NullPool（无连接池）",
+        }
+    else:
+        # 其他数据库的连接池状态
+        try:
+            pool_status = {
+                "type": pool_class_name,
+                "size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+                "max_overflow": getattr(pool, '_max_overflow', 'N/A'),
+            }
+        except Exception as e:
+            pool_status = {
+                "type": pool_class_name,
+                "error": f"无法获取连接池状态: {str(e)}"
+            }
 
     # WebSocket 连接数
     try:

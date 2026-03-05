@@ -1,22 +1,32 @@
 """Database configuration and session management."""
 from typing import AsyncGenerator
 
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, pool
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config.settings import settings
 
-# Create async engine with optimized connection pool settings
-engine = create_async_engine(
-    settings.database_url,
-    echo=settings.debug,
-    future=True,
-    pool_size=20,           # 增加连接池大小（默认 5）
-    max_overflow=40,        # 增加溢出连接数（默认 10）
-    pool_recycle=3600,      # 1小时回收连接，防止连接过期
-    pool_pre_ping=True,     # 连接前检查可用性，防止使用失效连接
-)
+# 根据数据库类型配置引擎参数
+engine_kwargs = {
+    "echo": settings.debug,
+    "future": True,
+}
+
+# SQLite 不支持连接池参数，使用 NullPool
+if settings.database_url.startswith("sqlite"):
+    engine_kwargs["poolclass"] = pool.NullPool
+else:
+    # 其他数据库（PostgreSQL, MySQL 等）使用连接池
+    engine_kwargs.update({
+        "pool_size": 20,           # 增加连接池大小（默认 5）
+        "max_overflow": 40,        # 增加溢出连接数（默认 10）
+        "pool_recycle": 3600,      # 1小时回收连接，防止连接过期
+        "pool_pre_ping": True,     # 连接前检查可用性，防止使用失效连接
+    })
+
+# Create async engine with optimized settings
+engine = create_async_engine(settings.database_url, **engine_kwargs)
 
 # Create async session factory
 AsyncSessionLocal = async_sessionmaker(
