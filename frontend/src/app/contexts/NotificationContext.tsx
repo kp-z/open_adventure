@@ -11,6 +11,15 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+function getNotificationFingerprint(notification: Omit<Notification, 'id' | 'timestamp'> | Notification) {
+  const normalizedMessage = notification.message
+    .replace(/client-\d+/g, 'client-*')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return `${notification.type}::${notification.title.trim()}::${normalizedMessage}`;
+}
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isMobile, setIsMobile] = useState(false);
@@ -26,6 +35,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const removeNotification = useCallback((id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp'>) => {
     const id = `notification-${Date.now()}-${Math.random()}`;
     const newNotification: Notification = {
@@ -34,21 +47,38 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       timestamp: new Date(),
     };
 
-    setNotifications((prev) => [newNotification, ...prev]);
+    let targetId = id;
+
+    setNotifications((prev) => {
+      const fingerprint = getNotificationFingerprint(notification);
+      const existing = prev.find((item) => getNotificationFingerprint(item) === fingerprint);
+
+      if (existing) {
+        targetId = existing.id;
+        return prev.map((item) =>
+          item.id === existing.id
+            ? {
+                ...item,
+                timestamp: new Date(),
+                message: notification.message,
+                title: notification.title,
+              }
+            : item,
+        );
+      }
+
+      return [newNotification, ...prev];
+    });
 
     // Auto-dismiss success and error notifications after 5 seconds
     if (notification.type === 'success' || notification.type === 'error') {
       setTimeout(() => {
-        removeNotification(id);
+        removeNotification(targetId);
       }, 5000);
     }
 
-    return id;
-  }, []);
-
-  const removeNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+    return targetId;
+  }, [removeNotification]);
 
   const updateNotification = useCallback((id: string, updates: Partial<Notification>) => {
     setNotifications((prev) =>

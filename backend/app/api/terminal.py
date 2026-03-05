@@ -9,28 +9,33 @@ import struct
 import fcntl
 import termios
 import uuid
-from typing import Dict, Optional
+import logging
+import json
+from pathlib import Path
+from typing import Dict, Optional, List, Any
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy import select as sql_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import get_db, AsyncSessionLocal
 from app.repositories.project_path_repository import ProjectPathRepository
 from app.services.project_path_service import ProjectPathService
 from app.repositories.executions_repo import ExecutionRepository
 from app.repositories.task_repository import TaskRepository
-from app.models.task import ExecutionType, ExecutionStatus, TaskStatus
+from app.models.task import Execution, ExecutionType, ExecutionStatus, TaskStatus
 from app.services.websocket_manager import get_connection_manager
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class TerminalSession:
     """Manages a PTY terminal session"""
 
-    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False):
+    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False, claude_resume_session: Optional[str] = None):
         self.session_id = session_id
         self.master_fd = None
         self.pid = None
@@ -39,6 +44,7 @@ class TerminalSession:
         self.created_at = datetime.now()
         self.initial_dir = initial_dir
         self.auto_start_claude = auto_start_claude
+        self.claude_resume_session = claude_resume_session  # Claude 会话恢复的 session ID
         self.websocket = None  # 当前连接的 WebSocket
         self.execution_id = None  # 关联的 execution ID
         self.claude_running = False  # 标记是否运行了 claude code
@@ -103,17 +109,6 @@ class TerminalSession:
     def start(self):
         """Start a new PTY session"""
         print(f"[Terminal] Starting new PTY session...")
-
-        # 在 fork 前，设置所有非标准文件描述符为 FD_CLOEXEC
-        # 这样子进程 exec 时会自动关闭这些描述符（包括 8000 端口的 socket）
-        import resource
-        max_fd = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
-        for fd in range(3, min(max_fd, 1024)):  # 从 3 开始（跳过 stdin/stdout/stderr）
-            try:
-                flags = fcntl.fcntl(fd, fcntl.F_GETFD)
-                fcntl.fcntl(fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
-            except (OSError, ValueError):
-                pass  # 忽略无效的文件描述符
 
         self.pid, self.master_fd = pty.fork()
         print(f"[Terminal] PTY forked - PID: {self.pid}, FD: {self.master_fd}")
@@ -221,6 +216,92 @@ class TerminalSession:
                 pass
 
 
+async def _mark_terminal_execution_cancelled(
+    db: AsyncSession,
+    *,
+    execution_id: int,
+    session_id: str,
+    reason: str,
+) -> None:
+    """将 terminal execution 安全收敛到 cancelled（幂等）"""
+    execution_repo = ExecutionRepository(db)
+    execution = await execution_repo.get(execution_id)
+    if not execution:
+        return
+
+    if execution.status not in [ExecutionStatus.RUNNING, ExecutionStatus.PENDING]:
+        return
+
+    now = datetime.now()
+    old_status = execution.status.value if hasattr(execution.status, "value") else str(execution.status)
+    execution.status = ExecutionStatus.CANCELLED
+    execution.finished_at = now
+    execution.last_activity_at = now
+    await db.commit()
+
+    logger.info(
+        "[Terminal] Execution status transitioned (%s): execution_id=%s, session_id=%s, %s->cancelled",
+        reason,
+        execution_id,
+        session_id,
+        old_status,
+    )
+
+    try:
+        ws_manager = get_connection_manager()
+        await ws_manager.broadcast_terminal_execution_update({
+            "id": execution.id,
+            "session_id": session_id,
+            "status": "cancelled",
+            "finished_at": execution.finished_at.isoformat() if execution.finished_at else None,
+        })
+    except Exception:
+        logger.exception(
+            "[Terminal] Failed to broadcast cancelled execution update: session_id=%s, execution_id=%s, reason=%s",
+            session_id,
+            execution_id,
+            reason,
+        )
+
+
+async def reconcile_orphan_terminal_executions() -> None:
+    """启动时收敛孤儿 terminal running 记录（session 不存在）"""
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                sql_select(
+                    Execution.id,
+                    Execution.session_id,
+                    Execution.status,
+                ).where(
+                    Execution.execution_type == ExecutionType.TERMINAL,
+                    Execution.status.in_([ExecutionStatus.RUNNING, ExecutionStatus.PENDING]),
+                    Execution.session_id.isnot(None),
+                )
+            )
+            rows = result.all()
+
+            reconciled = 0
+            for execution_id, session_id, _ in rows:
+                if not session_id:
+                    continue
+                if session_id in sessions:
+                    continue
+
+                await _mark_terminal_execution_cancelled(
+                    db,
+                    execution_id=execution_id,
+                    session_id=session_id,
+                    reason="startup_orphan_reconcile",
+                )
+                reconciled += 1
+
+            if reconciled > 0:
+                logger.info("[Terminal] Reconciled orphan terminal executions: count=%s", reconciled)
+    except Exception:
+        logger.exception("[Terminal] Failed to reconcile orphan terminal executions on startup")
+
+
 # Store active sessions - 使用持久化的 session ID
 sessions: Dict[str, TerminalSession] = {}
 
@@ -242,10 +323,28 @@ async def cleanup_dead_sessions():
                     dead_sessions.append(session_id)
                     print(f"[Terminal] Session {session_id} process died (PID: {session.pid})")
 
-            # 关闭已死亡的会话
+            # 关闭已死亡的会话并同步 execution 终态
             for session_id in dead_sessions:
                 session = sessions.get(session_id)
                 if session:
+                    execution_id = session.execution_id
+
+                    try:
+                        if execution_id:
+                            async with AsyncSessionLocal() as db:
+                                await _mark_terminal_execution_cancelled(
+                                    db,
+                                    execution_id=execution_id,
+                                    session_id=session_id,
+                                    reason="dead_session_cleanup",
+                                )
+                    except Exception:
+                        logger.exception(
+                            "[Terminal] Failed to finalize execution for dead session: session_id=%s, execution_id=%s",
+                            session_id,
+                            execution_id,
+                        )
+
                     session.close()
                     del sessions[session_id]
                     print(f"[Terminal] Cleaned up dead session: {session_id}")
@@ -276,7 +375,9 @@ async def terminal_websocket(
     websocket: WebSocket,
     db: AsyncSession = Depends(get_db),
     project_path: str = None,
-    session_id: str = None  # 支持重新连接到已存在的 session
+    session_id: str = None,  # 支持重新连接到已存在的 session
+    auto_start_claude: bool = False,  # 是否自动启动 Claude
+    claude_resume_session: str = None  # Claude 会话恢复的 session ID
 ):
     """WebSocket endpoint for terminal interaction"""
     await websocket.accept()
@@ -284,6 +385,8 @@ async def terminal_websocket(
     print(f"[Terminal] ========== NEW WEBSOCKET CONNECTION ==========")
     print(f"[Terminal] Requested session ID: {session_id}")
     print(f"[Terminal] Project path param: {project_path}")
+    print(f"[Terminal] Auto-start Claude param: {auto_start_claude}")
+    print(f"[Terminal] Claude resume session param: {claude_resume_session}")
     print(f"[Terminal] Active sessions before: {len(sessions)}")
     print(f"[Terminal] Active session IDs: {list(sessions.keys())}")
 
@@ -305,10 +408,9 @@ async def terminal_websocket(
             session.websocket = websocket
             print(f"[Terminal] Successfully reconnected to session {session_id}")
 
-            # 检查是否有 claude 进程在运行
-            print(f"[Terminal] ========== CHECKING CLAUDE PROCESS ==========")
-            claude_was_running = session.check_claude_running()
-            print(f"[Terminal] Claude process running: {claude_was_running}")
+            # 仅做会话恢复提示与回放，不注入额外命令，保留当前 shell 上下文
+            print(f"[Terminal] ========== SESSION RECONNECT CONTEXT ==========")
+            print(f"[Terminal] Session reconnect keeps existing shell context")
 
             # 等待前端 xterm 准备好（给 React 渲染和 xterm.open() 一些时间）
             print(f"[Terminal] Waiting 500ms for frontend to be ready...")
@@ -320,22 +422,30 @@ async def terminal_websocket(
             await websocket.send_text("\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n")
             print(f"[Terminal] ✅ Reconnection message sent")
 
-            # 如果 claude 还在运行，发送 Ctrl+L 刷新界面
-            if claude_was_running:
-                print(f"[Terminal] ========== CLAUDE IS RUNNING - REFRESHING ==========")
-                print(f"[Terminal] Sending Ctrl+L to refresh Claude interface")
-                await asyncio.sleep(0.2)  # 等待消息显示
-                session.write('\x0c')  # Ctrl+L
-                print(f"[Terminal] ✅ Ctrl+L sent")
-                session.claude_running = True
-            else:
-                print(f"[Terminal] ========== CLAUDE NOT RUNNING - STARTING WITH -c ==========")
-                print(f"[Terminal] Claude not running, starting with 'claude -c'")
-                await asyncio.sleep(0.3)
-                print(f"[Terminal] Sending 'claude -c\\n' to PTY...")
-                session.write('claude -c\n')
-                print(f"[Terminal] ✅ 'claude -c' command sent")
-                session.claude_running = True
+            # 回放最近终端输出，避免前端出现空白
+            try:
+                logger.info("[Terminal] Reconnect replay started: session_id=%s", session_id)
+                scrollback_text = session.get_scrollback(lines=1200)
+                replayed = bool(scrollback_text)
+
+                if scrollback_text:
+                    if not scrollback_text.endswith('\n'):
+                        scrollback_text += '\n'
+                    await websocket.send_text(scrollback_text)
+                    print(f"[Terminal] ✅ Replayed scrollback for session {session_id}")
+                else:
+                    # 避免前端黑屏误判：无回放时明确给出提示
+                    await websocket.send_text("\r\n\x1b[33mℹ Session restored (no scrollback available)\x1b[0m\r\n")
+                    # 主动触发一次换行，尽量拉起当前 shell/CLI 的可见提示符
+                    try:
+                        await asyncio.get_event_loop().run_in_executor(None, session.write, '\n')
+                    except Exception:
+                        logger.exception("[Terminal] Failed to request prompt after no-scrollback restore: session_id=%s", session_id)
+
+                logger.info("[Terminal] Reconnect replay finished: session_id=%s, replayed=%s", session_id, replayed)
+            except Exception as e:
+                logger.exception("[Terminal] Reconnect replay failed: session_id=%s", session_id)
+                print(f"[Terminal] Failed to replay scrollback for session {session_id}: {e}")
 
             print(f"[Terminal] ========== RECONNECTION COMPLETE ==========")
 
@@ -352,13 +462,14 @@ async def terminal_websocket(
 
         # Get project path from URL parameter or use first enabled path
         initial_dir = None
-        auto_start_claude = False
+        # 使用传入的 auto_start_claude 参数
 
         if project_path:
             # Use the specified project path
             initial_dir = project_path
-            auto_start_claude = True
+            # auto_start_claude 已经从参数传入，不需要重新设置
             print(f"[Terminal] Using specified project path: {initial_dir}")
+            print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
         else:
             # Get first enabled project path from database
             try:
@@ -371,7 +482,7 @@ async def terminal_websocket(
                     # Use the first enabled project path
                     first_path = enabled_paths[0]
                     initial_dir = first_path.path
-                    auto_start_claude = True
+                    # auto_start_claude 保持传入的值
                     print(f"[Terminal] Will start in project directory: {initial_dir}")
                     print(f"[Terminal] Auto-start Claude: {auto_start_claude}")
             except Exception as e:
@@ -379,9 +490,14 @@ async def terminal_websocket(
                 # Continue with default behavior (home directory)
 
         # Create a new terminal session
-        session = TerminalSession(session_id=session_id, initial_dir=initial_dir, auto_start_claude=auto_start_claude)
+        session = TerminalSession(
+            session_id=session_id,
+            initial_dir=initial_dir,
+            auto_start_claude=auto_start_claude,
+            claude_resume_session=claude_resume_session
+        )
         print(f"[Terminal] Creating new TerminalSession with ID: {session_id}")
-        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}")
+        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}, Claude resume: {claude_resume_session}")
         sessions[session_id] = session
         session.websocket = websocket
         print(f"[Terminal] Active sessions after: {len(sessions)}")
@@ -403,11 +519,29 @@ async def terminal_websocket(
             await db.commit()
             await db.refresh(task)
 
-            # 创建 Execution - 使用 Schema
-            from app.schemas.executions import ExecutionCreate
-            execution_data = ExecutionCreate(
+            # 确保 terminal execution 使用有效 workflow_id（兼容开启外键约束的环境）
+            from sqlalchemy import select
+            from app.models.workflow import Workflow
+
+            workflow_result = await db.execute(sql_select(Workflow.id).order_by(Workflow.id.asc()).limit(1))
+            workflow_id = workflow_result.scalar_one_or_none()
+
+            if workflow_id is None:
+                default_workflow = Workflow(
+                    name="terminal-monitor-workflow",
+                    description="System workflow for terminal session execution tracking",
+                    version="1.0.0",
+                    active=True,
+                )
+                db.add(default_workflow)
+                await db.flush()
+                workflow_id = default_workflow.id
+
+            # 创建 Execution（直接使用 ORM，避免 schema 包含模型不存在字段）
+            from app.models.task import Execution
+            execution = await execution_repo.create(Execution(
                 task_id=task.id,
-                workflow_id=0,  # Terminal 不需要 workflow
+                workflow_id=workflow_id,
                 execution_type=ExecutionType.TERMINAL,
                 status=ExecutionStatus.RUNNING,
                 agent_id=None,
@@ -417,9 +551,8 @@ async def terminal_websocket(
                 terminal_command="shell session",
                 started_at=datetime.now(),
                 last_activity_at=datetime.now(),
-                is_background=True
-            )
-            execution = await execution_repo.create(execution_data)
+                is_background=True,
+            ))
             await db.commit()
             await db.refresh(execution)
 
@@ -449,11 +582,40 @@ async def terminal_websocket(
             print(f"[Terminal] Broadcasted terminal execution update for session {session_id}")
 
         except Exception as e:
-            print(f"[Terminal] Failed to create execution record: {e}")
-            import traceback
-            traceback.print_exc()
+            error_message = f"创建 Terminal 执行记录失败: {str(e)}"
+            logger.exception(f"[Terminal] Failed to create execution record for session {session_id}")
+
+            # 通过 terminal websocket 直接回传错误，前端可见
+            try:
+                await websocket.send_text(
+                    f"\r\n\x1b[31m✗ {error_message}\x1b[0m\r\n"
+                    "\x1b[33m请检查后端日志 backend.log 获取详细错误信息\x1b[0m\r\n"
+                )
+            except Exception:
+                pass
+
+            # 同步广播一条失败状态到 execution 监控通道，避免静默失败
+            try:
+                ws_manager = get_connection_manager()
+                await ws_manager.broadcast_terminal_execution_update({
+                    "id": -1,
+                    "session_id": session_id,
+                    "execution_type": "terminal",
+                    "status": "failed",
+                    "error_message": error_message,
+                    "created_at": datetime.now().isoformat(),
+                    "task": {
+                        "id": -1,
+                        "title": "Terminal execution creation failed",
+                        "description": error_message,
+                        "project_path": initial_dir
+                    }
+                })
+            except Exception:
+                logger.exception("[Terminal] Failed to broadcast terminal execution creation failure")
 
         # Send session ID to client
+        logger.info("[Terminal] Sending SESSION_ID: session_id=%s", session_id)
         await websocket.send_text(f"\x1b]0;SESSION_ID:{session_id}\x07")  # 使用 OSC 序列发送 session ID
 
     try:
@@ -464,33 +626,37 @@ async def terminal_websocket(
             session.start()
             print(f"[Terminal] PTY started successfully - PID: {session.pid}, FD: {session.master_fd}")
 
-        # If auto_start_claude is enabled, send commands after a short delay (only for new sessions)
-        if auto_start_claude and initial_dir and is_new_session:
-            print(f"[Terminal] Setting up auto-start commands for: {initial_dir}")
-            async def send_startup_commands():
-                """Send cd and claude commands after shell is ready"""
-                await asyncio.sleep(0.5)  # Wait for shell to be ready
+            # 如果设置了 auto_start_claude，等待 shell 启动后自动执行 claude 命令
+            if session.auto_start_claude:
+                print(f"[Terminal] Auto-start Claude enabled, will send 'claude' command after shell initialization")
+                # 等待 shell 初始化（加载 .zshrc 等）
+                await asyncio.sleep(1.5)
+                # 发送 claude 命令
                 try:
-                    print(f"[Terminal] Sending cd command to: {initial_dir}")
-                    # Send cd command
-                    cd_command = f'cd "{initial_dir}"\n'
-                    await asyncio.get_event_loop().run_in_executor(
-                        None, session.write, cd_command
-                    )
-                    await asyncio.sleep(0.2)
-                    print(f"[Terminal] Sending claude command")
-                    # Send claude command
-                    await asyncio.get_event_loop().run_in_executor(
-                        None, session.write, 'claude\n'
-                    )
-                    # 标记 claude 正在运行
-                    session.claude_running = True
-                    print(f"[Terminal] Startup commands sent successfully")
+                    session.write('claude\n')
+                    print(f"[Terminal] ✅ Sent 'claude' command to terminal")
                 except Exception as e:
-                    print(f"[Terminal] Error sending startup commands: {e}")
+                    print(f"[Terminal] ❌ Failed to send 'claude' command: {e}")
 
-            # Start the startup commands task
-            asyncio.create_task(send_startup_commands())
+            # 如果设置了 claude_resume_session，等待 shell 启动后自动执行 claude --resume 命令
+            if session.claude_resume_session:
+                print(f"[Terminal] Claude resume session enabled, will send 'claude --resume {session.claude_resume_session}' command")
+                # 等待 shell 初始化（加载 .zshrc 等）
+                await asyncio.sleep(1.5)
+                # 发送 claude --resume 命令
+                try:
+                    resume_command = f'claude --resume {session.claude_resume_session}\n'
+                    session.write(resume_command)
+                    print(f"[Terminal] ✅ Sent 'claude --resume' command to terminal")
+                except Exception as e:
+                    print(f"[Terminal] ❌ Failed to send 'claude --resume' command: {e}")
+                    # 发送错误消息到终端
+                    try:
+                        await websocket.send_text(f"\r\n\x1b[31m✗ 无法执行 claude --resume 命令: {str(e)}\x1b[0m\r\n")
+                    except Exception:
+                        pass
+
+        # 保持纯 shell 语义：不自动注入 claude 命令（除非明确设置 auto_start_claude）
 
         # Create tasks for reading from PTY and WebSocket
         output_buffer = []  # 缓冲输出
@@ -500,17 +666,48 @@ async def terminal_websocket(
             """Read output from PTY and send to WebSocket"""
             nonlocal last_update_time
             print(f"[Terminal] read_from_pty started for session {session_id}, session.running={session.running}")
+            pty_frame_count = 0
             while session.running:
                 try:
                     data = await asyncio.get_event_loop().run_in_executor(
                         None, session.read, 0.1
                     )
                     if data:
+                        pty_frame_count += 1
+                        preview = data[:120].decode('utf-8', errors='ignore').replace('\n', '\\n').replace('\r', '\\r')
+                        logger.info(
+                            "[Terminal] pty output recv: session_id=%s, frame=%s, bytes=%s, preview=%r",
+                            session_id,
+                            pty_frame_count,
+                            len(data),
+                            preview,
+                        )
+
                         # 保存到 session 的 scrollback buffer
                         session.save_output(data)
 
                         decoded_data = data.decode('utf-8', errors='ignore')
                         await websocket.send_text(decoded_data)
+                        logger.info(
+                            "[Terminal] pty output forwarded: session_id=%s, frame=%s, bytes=%s",
+                            session_id,
+                            pty_frame_count,
+                            len(data),
+                        )
+
+                        if os.environ.get("TERMINAL_DEBUG_ECHO", "0") == "1":
+                            try:
+                                await websocket.send_text(json.dumps({
+                                    "type": "debug_output_forwarded",
+                                    "frame": pty_frame_count,
+                                    "bytes": len(data),
+                                }))
+                            except Exception:
+                                logger.exception(
+                                    "[Terminal] debug output forwarded send failed: session_id=%s, frame=%s",
+                                    session_id,
+                                    pty_frame_count,
+                                )
 
                         # 缓冲输出（限制大小）
                         output_buffer.append(decoded_data)
@@ -539,6 +736,7 @@ async def terminal_websocket(
                     print(f"[Terminal] Error reading from PTY: {e}")
                     import traceback
                     traceback.print_exc()
+                    logger.exception("[Terminal] read_from_pty fatal error: session_id=%s", session_id)
                     break
                 await asyncio.sleep(0.01)
             print(f"[Terminal] read_from_pty exited for session {session_id}")
@@ -550,19 +748,86 @@ async def terminal_websocket(
                 try:
                     message = await websocket.receive_text()
                     import json
-                    data = json.loads(message)
 
-                    if data.get('type') == 'input':
-                        input_data = data.get('data', '')
-                        await asyncio.get_event_loop().run_in_executor(
-                            None, session.write, input_data
+                    try:
+                        data = json.loads(message)
+                    except json.JSONDecodeError:
+                        logger.warning(
+                            "[Terminal] recv parse fallback continue: session_id=%s, raw=%r",
+                            session_id,
+                            message[:200],
                         )
-                    elif data.get('type') == 'resize':
+                        continue
+
+                    msg_type = data.get('type')
+                    logger.info(
+                        "[Terminal] recv msg: session_id=%s, type=%s",
+                        session_id,
+                        msg_type,
+                    )
+
+                    if msg_type == 'input':
+                        input_data = data.get('data', '')
+                        seq = data.get('seq')
+                        try:
+                            await asyncio.get_event_loop().run_in_executor(
+                                None, session.write, input_data
+                            )
+                            logger.info(
+                                "[Terminal] pty write success: session_id=%s, bytes=%s, seq=%s",
+                                session_id,
+                                len(input_data),
+                                seq,
+                            )
+                        except Exception:
+                            logger.exception(
+                                "[Terminal] pty write failed: session_id=%s, seq=%s",
+                                session_id,
+                                seq,
+                            )
+                            continue
+
+                        if isinstance(seq, int):
+                            try:
+                                await websocket.send_text(json.dumps({"type": "ack", "seq": seq}))
+                                logger.info("[Terminal] ack sent: session_id=%s, seq=%s", session_id, seq)
+                            except Exception:
+                                logger.exception("[Terminal] ack send failed: session_id=%s, seq=%s", session_id, seq)
+                                continue
+
+                        if os.environ.get("TERMINAL_DEBUG_ECHO", "0") == "1" and isinstance(seq, int):
+                            try:
+                                await websocket.send_text(json.dumps({
+                                    "type": "debug_input_accepted",
+                                    "seq": seq,
+                                    "process_alive": session.is_process_alive(),
+                                    "pid": session.pid,
+                                }))
+                            except Exception:
+                                logger.exception("[Terminal] debug echo send failed: session_id=%s, seq=%s", session_id, seq)
+                                continue
+                    elif msg_type == 'resize':
                         rows = data.get('rows', 24)
                         cols = data.get('cols', 80)
-                        await asyncio.get_event_loop().run_in_executor(
-                            None, session.resize, rows, cols
+                        try:
+                            await asyncio.get_event_loop().run_in_executor(
+                                None, session.resize, rows, cols
+                            )
+                        except Exception:
+                            logger.exception(
+                                "[Terminal] resize failed: session_id=%s, rows=%s, cols=%s",
+                                session_id,
+                                rows,
+                                cols,
+                            )
+                            continue
+                    else:
+                        logger.warning(
+                            "[Terminal] unknown msg type continue: session_id=%s, type=%r",
+                            session_id,
+                            msg_type,
                         )
+                        continue
                 except WebSocketDisconnect:
                     print(f"[Terminal] WebSocket disconnected in read_from_websocket for session {session_id}")
                     break
@@ -570,7 +835,7 @@ async def terminal_websocket(
                     print(f"[Terminal] Error reading from WebSocket: {e}")
                     import traceback
                     traceback.print_exc()
-                    break
+                    continue
             print(f"[Terminal] read_from_websocket exited for session {session_id}")
 
         # Run both tasks concurrently
@@ -611,8 +876,11 @@ async def terminal_websocket(
                         # 更新最后活动时间
                         execution.last_activity_at = datetime.now()
 
-                        # 如果进程已结束，更新状态
-                        if not session.is_process_alive():
+                        # 如果进程已结束，更新状态（仅在运行态时更新，避免覆盖手动取消）
+                        if (
+                            not session.is_process_alive()
+                            and execution.status in [ExecutionStatus.RUNNING, ExecutionStatus.PENDING]
+                        ):
                             execution.status = ExecutionStatus.SUCCEEDED
                             execution.finished_at = datetime.now()
                             print(f"[Terminal] Process ended, marking execution {session.execution_id} as succeeded")
@@ -640,6 +908,91 @@ async def terminal_websocket(
             pass
 
 
+@router.get("/claude-conversations")
+async def list_claude_conversations(limit: int = 50):
+    """列出本机可恢复的 Claude Code 会话（基于 ~/.claude/projects/*.jsonl）"""
+    projects_dir = Path.home() / ".claude" / "projects"
+    if not projects_dir.exists():
+        return JSONResponse({
+            "available": True,
+            "count": 0,
+            "items": [],
+        })
+
+    session_files = sorted(
+        projects_dir.rglob("*.jsonl"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+
+    items: List[Dict[str, Any]] = []
+    for file_path in session_files[: max(limit * 3, 150)]:
+        try:
+            stat = file_path.stat()
+            rel_path = file_path.relative_to(projects_dir)
+            rel_parts = rel_path.parts
+            project_hint = rel_parts[0] if len(rel_parts) > 1 else ""
+            session_id = file_path.stem
+
+            title = session_id
+            last_model = None
+
+            recent_lines: List[str] = []
+            with file_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    recent_lines.append(line)
+                    if len(recent_lines) > 120:
+                        recent_lines.pop(0)
+
+            for line in reversed(recent_lines):
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                message = record.get("message")
+                if not isinstance(message, dict):
+                    continue
+
+                if not last_model and isinstance(message.get("model"), str):
+                    last_model = message.get("model")
+
+                content = message.get("content")
+                if not isinstance(content, list):
+                    continue
+
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    text = block.get("text")
+                    if isinstance(text, str) and text.strip():
+                        title = text.strip().splitlines()[0][:120]
+                        break
+                if title != session_id:
+                    break
+
+            items.append({
+                "session_id": session_id,
+                "title": title,
+                "project_hint": project_hint,
+                "last_model": last_model,
+                "last_updated": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "source_file": str(file_path),
+            })
+        except Exception:
+            logger.exception("[Terminal] Failed to parse claude conversation file: %s", file_path)
+            continue
+
+        if len(items) >= limit:
+            break
+
+    return JSONResponse({
+        "available": True,
+        "count": len(items),
+        "items": items,
+    })
+
+
 @router.get("/status")
 async def terminal_status():
     """Get terminal service status"""
@@ -664,12 +1017,49 @@ async def terminal_status():
 
 
 @router.post("/sessions/{session_id}/close")
-async def close_session(session_id: str):
+async def close_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
     """手动关闭指定的 terminal session"""
-    if session_id in sessions:
-        session = sessions[session_id]
-        session.close()
-        del sessions[session_id]
-        return JSONResponse({"success": True, "message": f"Session {session_id} closed"})
-    else:
+    session = sessions.get(session_id)
+    session_exists = session is not None
+    execution_id = session.execution_id if session else None
+
+    logger.info(
+        "[Terminal] Close session requested: session_id=%s, execution_id=%s, session_exists=%s",
+        session_id,
+        execution_id,
+        session_exists,
+    )
+
+    if not session:
         return JSONResponse({"success": False, "message": f"Session {session_id} not found"}, status_code=404)
+
+    # 先更新 execution 状态，确保历史页可见终态
+    if execution_id:
+        try:
+            await _mark_terminal_execution_cancelled(
+                db,
+                execution_id=execution_id,
+                session_id=session_id,
+                reason="manual_close",
+            )
+        except Exception:
+            await db.rollback()
+            logger.exception(
+                "[Terminal] Failed to update execution when closing session: session_id=%s, execution_id=%s",
+                session_id,
+                execution_id,
+            )
+
+    session.close()
+    del sessions[session_id]
+
+    logger.info(
+        "[Terminal] Session closed: session_id=%s, active_sessions_count=%s",
+        session_id,
+        len(sessions),
+    )
+
+    return JSONResponse({"success": True, "message": f"Session {session_id} closed"})

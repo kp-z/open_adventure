@@ -37,10 +37,11 @@ ENV/
 .env
 .env.local
 
-# Database
-*.db
-*.sqlite
-*.sqlite3
+# Database (ignore runtime databases, keep initial schema)
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+!backend/claude_manager.db.init
 
 # Logs
 *.log
@@ -58,8 +59,12 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
-*.png
-node_modules/*
-frontend/node_modules/*
-frontend/dist/*
-frontend/.next/*
+# Runtime artifacts (fresh-clone consistency)
+.run/
+docs/logs/
+backend/build/
+backend/dist/
+release/
+venv/
+node_modules/
+frontend/node_modules/

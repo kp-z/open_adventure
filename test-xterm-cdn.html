@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XTerm CDN Test</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #0f111a;
+      font-family: Arial, sans-serif;
+    }
+    h1 {
+      color: white;
+      margin-bottom: 20px;
+    }
+    #terminal-container {
+      width: 100%;
+      height: 600px;
+      background: #000;
+      border: 2px solid #22c55e;
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .info {
+      color: #22c55e;
+      margin-top: 20px;
+      padding: 10px;
+      background: rgba(34, 197, 94, 0.1);
+      border-radius: 4px;
+    }
+    .error {
+      color: #ef4444;
+      margin-top: 20px;
+      padding: 10px;
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 4px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 XTerm CDN 测试</h1>
+  <div id="terminal-container"></div>
+  <div class="info">
+    <p>✅ 如果你能看到绿色的文本和光标，说明 xterm 渲染正常</p>
+    <p>❌ 如果看不到任何内容，说明 xterm 渲染有问题</p>
+  </div>
+  <div id="error-info" class="error"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script>
+    console.log('🚀 Initializing XTerm...');
+
+    try {
+      if (typeof Terminal === 'undefined') {
+        throw new Error('Terminal is not defined - xterm.js failed to load');
+      }
+
+      console.log('✅ Terminal class loaded');
+
+      const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: "'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
+        theme: {
+          background: '#0f111a',
+          foreground: '#e5e7eb',
+          cursor: '#22c55e',
+          black: '#1f2937',
+          red: '#ef4444',
+          green: '#22c55e',
+          yellow: '#eab308',
+          blue: '#3b82f6',
+          magenta: '#a855f7',
+          cyan: '#06b6d4',
+          white: '#e5e7eb',
+          brightBlack: '#4b5563',
+          brightRed: '#f87171',
+          brightGreen: '#4ade80',
+          brightYellow: '#facc15',
+          brightBlue: '#60a5fa',
+          brightMagenta: '#c084fc',
+          brightCyan: '#22d3ee',
+          brightWhite: '#f9fafb',
+        },
+        convertEol: true,
+        scrollback: 1000,
+      });
+
+      console.log('✅ Terminal instance created');
+
+      if (typeof FitAddon === 'undefined') {
+        throw new Error('FitAddon is not defined - xterm-addon-fit failed to load');
+      }
+
+      const fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+
+      console.log('✅ FitAddon loaded');
+
+      const container = document.getElementById('terminal-container');
+      console.log('📦 Container:', container);
+      console.log('📦 Container dimensions:', container.offsetWidth, 'x', container.offsetHeight);
+
+      term.open(container);
+      console.log('✅ Terminal opened');
+      console.log('📦 Container children:', container.children.length);
+
+      fitAddon.fit();
+      console.log('📏 Terminal fitted:', term.rows, 'x', term.cols);
+
+      // 写入测试内容
+      term.writeln('\x1b[32m✓ XTerm 渲染成功！\x1b[0m');
+      term.writeln('');
+      term.writeln('这是一个独立的 xterm 测试页面。');
+      term.writeln('如果你能看到这些文字，说明 xterm 本身工作正常。');
+      term.writeln('');
+      term.writeln('\x1b[33m提示：\x1b[0m 尝试在终端中输入一些文字...');
+      term.writeln('');
+      term.write('$ ');
+
+      console.log('✅ Content written to terminal');
+
+      // 监听用户输入
+      term.onData(data => {
+        term.write(data);
+      });
+
+      console.log('✅ Test complete - check the terminal above!');
+    } catch (error) {
+      console.error('❌ Error:', error);
+      const errorDiv = document.getElementById('error-info');
+      errorDiv.style.display = 'block';
+      errorDiv.textContent = `错误：${error.message}。请检查浏览器控制台获取详细信息`;
+    }
+  </script>
+</body>
+</html>

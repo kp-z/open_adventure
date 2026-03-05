@@ -95,6 +95,7 @@ const Skills = () => {
   const [categories, setCategories] = useState<{
     counts: { builtin: number; user: number; project: number };
     projects: Array<{ id: string; name: string; count: number }>;
+    users: Array<{ id: string; name: string; count: number }>;
   } | null>(null);
 
   // ========== 语义化分类数据 ==========
@@ -159,21 +160,47 @@ const Skills = () => {
 
       let userCount = data.counts.user || 0;
       let projectCount = data.counts.project || 0;
+      const userGroups: Record<string, number> = {};
 
       // 遍历所有 plugin scope 的 skills,根据路径重新分类
       allSkills.forEach(skill => {
+        if (skill.source === 'user') {
+          userGroups.public = (userGroups.public || 0) + 1;
+        }
+
         if (skill.source === 'plugin') {
           const path = (skill as any).meta?.path || '';
-          // 判断是否在用户主目录下
-          const isUserPlugin = path.startsWith('/Users/') && path.includes('/.claude/plugins/') && !path.includes('/项目/') && !path.includes('/Proj/');
+          const pluginName = (skill as any).meta?.plugin_name;
+          // 判断是否在用户主目录下的插件（跨平台兼容）
+          // 用户插件：路径包含 /.claude/plugins/ 且不包含项目特征（如 .git, package.json 等的父目录）
+          const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+          const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                   path.includes('/package.json') || path.includes('\\package.json');
+          const isUserPlugin = hasClaudePlugins && !hasProjectMarkers;
 
           if (isUserPlugin) {
             userCount++;
+            if (pluginName) {
+              const key = `plugin:${pluginName}`;
+              userGroups[key] = (userGroups[key] || 0) + 1;
+            }
           } else {
             projectCount++;
           }
         }
       });
+
+      if (userCount > 0 && Object.keys(userGroups).length === 0) {
+        userGroups.public = userCount;
+      }
+
+      const userSubCategories = Object.entries(userGroups)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([id, count]) => ({
+          id,
+          name: id === 'public' ? 'public' : id.replace('plugin:', 'plugin/'),
+          count,
+        }));
 
       const transformedData = {
         counts: {
@@ -181,7 +208,8 @@ const Skills = () => {
           user: userCount,
           project: projectCount
         },
-        projects: data.projects
+        projects: data.projects,
+        users: userSubCategories
       };
       setCategories(transformedData);
     } catch (err) {
@@ -360,6 +388,8 @@ const Skills = () => {
   }, [openMenuId]);
 
   // ========== 过滤和排序逻辑 ==========
+  const getSkillMeta = (skill: UISkill) => ((skill._raw as any)?.meta || {});
+
   const filteredSkills = skills
     .filter(s => {
       const name = s.name[lang] || s.name.en;
@@ -374,14 +404,30 @@ const Skills = () => {
         // 将 global 映射到 builtin
         if (source === 'global') source = 'builtin';
 
+        // 将部分 plugin 归类到 user/project
+        if (source === 'plugin') {
+          const meta = getSkillMeta(s);
+          const path = meta.path || '';
+          const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+          const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                   path.includes('/package.json') || path.includes('\\package.json');
+          source = hasClaudePlugins && !hasProjectMarkers ? 'user' : 'project';
+        }
+
         matchesCategory = source === selectedCategory;
 
         // Sub-category filter (multi-select)
         if (matchesCategory && selectedSubCategories.length > 0) {
           if (selectedCategory === 'project') {
-            const path = (s as any).meta?.path || '';
+            const meta = getSkillMeta(s);
+            const path = meta.path || '';
             const projectName = path.split('/.claude/')[0].split('/').pop();
-            matchesCategory = selectedSubCategories.includes(projectName);
+            matchesCategory = selectedSubCategories.includes(projectName || '');
+          } else if (selectedCategory === 'user') {
+            const meta = getSkillMeta(s);
+            const pluginName = meta.plugin_name;
+            const userScope = pluginName ? `plugin:${pluginName}` : 'public';
+            matchesCategory = selectedSubCategories.includes(userScope);
           }
         }
       }
@@ -731,7 +777,7 @@ const Skills = () => {
           selectedSubCategories={selectedSubCategories}
           counts={categories.counts}
           projectSubCategories={categories.projects}
-          pluginSubCategories={[]}
+          pluginSubCategories={categories.users}
           onCategoryChange={setSelectedCategory}
           onSubCategoriesChange={setSelectedSubCategories}
         />
@@ -748,17 +794,30 @@ const Skills = () => {
           if (selectedCategory !== 'all') {
             let source = skill.source.toLowerCase();
             if (source === 'global') source = 'builtin';
+
+            if (source === 'plugin') {
+              const meta = getSkillMeta(skill);
+              const path = meta.path || '';
+              const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+              const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                       path.includes('/package.json') || path.includes('\\package.json');
+              source = hasClaudePlugins && !hasProjectMarkers ? 'user' : 'project';
+            }
+
             matchesScope = source === selectedCategory;
 
             // Sub-category filter
             if (matchesScope && selectedSubCategories.length > 0) {
-              if (selectedCategory === 'plugin') {
-                const pluginName = (skill as any).pluginNamespace || (skill as any).meta?.plugin_name;
-                matchesScope = selectedSubCategories.includes(pluginName);
-              } else if (selectedCategory === 'project') {
-                const path = (skill as any).meta?.path || '';
+              if (selectedCategory === 'project') {
+                const meta = getSkillMeta(skill);
+                const path = meta.path || '';
                 const projectName = path.split('/.claude/')[0].split('/').pop();
-                matchesScope = selectedSubCategories.includes(projectName);
+                matchesScope = selectedSubCategories.includes(projectName || '');
+              } else if (selectedCategory === 'user') {
+                const meta = getSkillMeta(skill);
+                const pluginName = meta.plugin_name;
+                const userScope = pluginName ? `plugin:${pluginName}` : 'public';
+                matchesScope = selectedSubCategories.includes(userScope);
               }
             }
           }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   Monitor,
@@ -14,18 +14,30 @@ import {
   Check,
   Languages,
   FolderGit2,
-  Info
+  Info,
+  Package
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, ActionButton } from '../components/ui-shared';
 import { ProjectPathManager } from '../components/ProjectPathManager';
+import { MarketplacePluginsManager } from '../components/MarketplacePluginsManager';
 import { motion } from 'motion/react';
+import { useLocation } from 'react-router';
 
 const Settings = () => {
   const { mode, setMode, lang, setLang } = useMode();
   const { t } = useTranslation();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('general');
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'general' || tab === 'appearance' || tab === 'integration' || tab === 'data' || tab === 'marketplace' || tab === 'about') {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -42,6 +54,7 @@ const Settings = () => {
             { id: 'appearance', name: t("appearance"), icon: Palette },
             { id: 'integration', name: t("integration"), icon: Monitor },
             { id: 'data', name: t("dataManagement"), icon: Database },
+            { id: 'marketplace', name: 'Marketplace', icon: Package },
             { id: 'about', name: lang === 'zh' ? '关于' : 'About', icon: Info },
           ].map((item) => (
             <button
@@ -186,6 +199,22 @@ const Settings = () => {
                 </p>
               </div>
               <ProjectPathManager />
+            </section>
+          )}
+
+          {/* Marketplace Tab */}
+          {activeTab === 'marketplace' && (
+            <section className="space-y-4">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Package size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                  Marketplace Plugins
+                </h2>
+                <p className="text-sm text-gray-400 mt-2">
+                  管理 Marketplace Plugin Repositories，自动拉取和安装 plugins
+                </p>
+              </div>
+              <MarketplacePluginsManager />
             </section>
           )}
 

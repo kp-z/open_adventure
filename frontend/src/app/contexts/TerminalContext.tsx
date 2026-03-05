@@ -1,8 +1,16 @@
-import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, ReactNode, useCallback } from 'react';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { API_CONFIG } from '../../config/api';
+import { useNotifications } from './NotificationContext';
 
+export type TerminalLifecycle = 'init' | 'opened' | 'ws_connecting' | 'ready' | 'disposed';
+
+interface TerminalInputPacket {
+  seq: number;
+  data: string;
+  ts: number;
+}
 
 export interface TerminalInstance {
   id: string;
@@ -10,20 +18,50 @@ export interface TerminalInstance {
   ws: WebSocket;
   fitAddon: FitAddon;
   title: string;
-  sessionId?: string;  // 后端的 session ID
+  sessionId?: string;
+  lifecycle: TerminalLifecycle;
+  isOpened: boolean;
+  inputQueue: TerminalInputPacket[];
+  seqCounter: number;
+  lastAckSeq: number;
+  lastInputAt: number;
+  lastOutputAt: number;
+  promptNudgeScheduled: boolean;
+  lastBackendInputSeq: number;
+  backendOutputFrames: number;
+  backendProcessAlive: boolean;
+  backendPid: number;
+}
+
+interface ClaudeConversation {
+  session_id: string;
+  title: string;
+  project_hint?: string;
+  last_model?: string;
+  last_updated?: string;
+  source_file?: string;
 }
 
 interface TerminalContextType {
   terminals: TerminalInstance[];
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
-  createTerminal: (projectPath?: string) => TerminalInstance;
+  createTerminal: (projectPath?: string, autoStartClaude?: boolean) => TerminalInstance | null;
   closeTerminal: (id: string) => void;
   cleanupAll: () => void;
-  isRestoring: boolean;  // 是否正在恢复 session
+  sendInput: (terminalId: string, data: string) => void;
+  sendResize: (terminalId: string, rows: number, cols: number) => void;
+  markTerminalOpened: (terminalId: string) => void;
+  syncClaudeConversations: () => Promise<ClaudeConversation[]>;
+  restoreClaudeConversation: (sessionId: string) => Promise<TerminalInstance | null>;
+  isRestoring: boolean;
+  restoreSettled: boolean;
 }
 
 const TerminalContext = createContext<TerminalContextType | undefined>(undefined);
+
+const MAX_INPUT_QUEUE_ITEMS = 500;
+const MAX_INPUT_QUEUE_BYTES = 256 * 1024;
 
 export const useTerminalContext = () => {
   const context = useContext(TerminalContext);
@@ -40,229 +78,216 @@ interface TerminalProviderProps {
 export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) => {
   const [terminals, setTerminals] = useState<TerminalInstance[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [isRestoring, setIsRestoring] = useState(false);  // 是否正在恢复
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreSettled, setRestoreSettled] = useState(false);
+  const { addNotification } = useNotifications();
+
   const terminalCounterRef = useRef(1);
   const hasRestoredRef = useRef(false);
+  const restoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restoreSettledRef = useRef(false);
+  const restoreActiveSetRef = useRef(false);
+  const queueOverflowNotifyRef = useRef<Record<string, number>>({});
 
-  // 页面加载时尝试恢复之前的 terminal sessions
-  useEffect(() => {
-    if (hasRestoredRef.current) return;
-    hasRestoredRef.current = true;
+  const collectSavedSessions = () => {
+    const savedSessions: Array<{ id: string; sessionId: string; title: string }> = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith('terminal_session_')) {
+        continue;
+      }
+      const id = key.replace('terminal_session_', '');
+      const sessionId = localStorage.getItem(key);
+      const title = localStorage.getItem(`terminal_title_${id}`) || `Terminal ${terminalCounterRef.current++}`;
+      if (sessionId) {
+        savedSessions.push({ id, sessionId, title });
+      }
+    }
+    return savedSessions;
+  };
 
-    const restoreSessions = async () => {
-      setIsRestoring(true);  // 标记开始恢复
-      console.log('[TerminalContext] Attempting to restore previous sessions...');
-
-      // 从 localStorage 获取所有保存的 session
-      const savedSessions: Array<{ id: string; sessionId: string; title: string }> = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key?.startsWith('terminal_session_')) {
-          const id = key.replace('terminal_session_', '');
-          const sessionId = localStorage.getItem(key);
-          const title = localStorage.getItem(`terminal_title_${id}`) || `Terminal ${terminalCounterRef.current++}`;
-          if (sessionId) {
-            savedSessions.push({ id, sessionId, title });
-          }
-        }
+  const fetchActiveSessions = async () => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/status`);
+      if (!response.ok) {
+        return [] as Array<{ id: string; sessionId: string; title: string }>;
       }
 
-      if (savedSessions.length === 0) {
-        console.log('[TerminalContext] No previous sessions found');
-        setIsRestoring(false);  // 恢复完成
-        return;
-      }
+      const data = await response.json();
+      const activeSessions = Array.isArray(data.active_sessions) ? data.active_sessions : [];
+      return activeSessions.map((session: any, index: number) => ({
+        id: `terminal-restored-${session.session_id}`,
+        sessionId: session.session_id,
+        title: `Terminal ${index + 1}`,
+      }));
+    } catch (error) {
+      console.error('[TerminalContext] Failed to fetch active backend sessions:', error);
+      return [] as Array<{ id: string; sessionId: string; title: string }>;
+    }
+  };
 
-      console.log(`[TerminalContext] Found ${savedSessions.length} previous sessions`);
-      console.log('[TerminalContext] Saved sessions:', savedSessions);
-
-      // 恢复每个 session
-      savedSessions.forEach(({ id, sessionId, title }) => {
-        try {
-          console.log(`[TerminalContext] Restoring session ${sessionId} with ID ${id}`);
-
-          // 检测是否为移动设备（使用 window.innerWidth）
-          const isMobile = window.innerWidth < 768;
-          const fontSize = isMobile ? 11 : 13;
-
-          // 创建 xterm 实例
-          const term = new XTerm({
-            cursorBlink: true,
-            fontSize: fontSize,
-            fontFamily: "'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
-            theme: {
-              background: '#0f111a',
-              foreground: '#e5e7eb',
-              cursor: '#22c55e',
-              black: '#1f2937',
-              red: '#ef4444',
-              green: '#22c55e',
-              yellow: '#eab308',
-              blue: '#3b82f6',
-              magenta: '#a855f7',
-              cyan: '#06b6d4',
-              white: '#e5e7eb',
-              brightBlack: '#4b5563',
-              brightRed: '#f87171',
-              brightGreen: '#4ade80',
-              brightYellow: '#facc15',
-              brightBlue: '#60a5fa',
-              brightMagenta: '#c084fc',
-              brightCyan: '#22d3ee',
-              brightWhite: '#f9fafb',
-            },
-            allowProposedApi: true,
-            screenReaderMode: false,
-            convertEol: true,
-            scrollback: 1000,
-            fastScrollModifier: 'alt',
-            fastScrollSensitivity: 5,
-            scrollSensitivity: 3,
-            rendererType: 'canvas',
-            disableStdin: false,
-            cursorStyle: 'block',
-            cursorWidth: 2,
-          });
-
-          const fitAddon = new FitAddon();
-          term.loadAddon(fitAddon);
-
-          // 连接 WebSocket，带上 session_id 参数以恢复会话
-          const wsUrl = `${API_CONFIG.WS_BASE_URL}/terminal/ws?session_id=${sessionId}`;
-          console.log('[TerminalContext] Reconnecting to session:', wsUrl);
-          const ws = new WebSocket(wsUrl);
-
-          // 标记是否成功重连
-          let reconnected = false;
-
-          const restoredTerminal: TerminalInstance = {
-            id,
-            term,
-            ws,
-            fitAddon,
-            title,
-            sessionId
-          };
-
-          ws.onopen = () => {
-            console.log('[TerminalContext] WebSocket reconnected for session:', sessionId);
-            // 不在这里 writeln，因为 xterm 还没 open 到 DOM
-
-            // WebSocket 连接成功后再添加到状态（检查是否已存在）
-            setTerminals(prev => {
-              // 检查是否已经添加过这个 terminal
-              if (prev.find(t => t.id === id)) {
-                console.log('[TerminalContext] Terminal already exists, skipping:', id);
-                return prev;
-              }
-              return [...prev, restoredTerminal];
-            });
-            if (!activeTabId) {
-              setActiveTabId(id);
-            }
-          };
-
-          ws.onmessage = (event) => {
-            const data = event.data;
-
-            // 检查是否是 session ID 消息
-            if (typeof data === 'string' && data.includes('SESSION_ID:')) {
-              return; // 不显示这个消息
-            }
-
-            // 检查是否是重连成功消息
-            if (typeof data === 'string' && data.includes('Reconnected to existing session')) {
-              reconnected = true;
-              console.log('[TerminalContext] Session reconnection confirmed');
-              // 不显示后端的重连消息，我们已经显示了自己的
-              return;
-            }
-
-            term.write(data);
-          };
-
-          ws.onerror = (error) => {
-            console.error('[TerminalContext] WebSocket error during restore:', error);
-            term.writeln('\x1b[31m✗ Failed to restore session\x1b[0m');
-            // 清理失败的 session
-            localStorage.removeItem(`terminal_session_${id}`);
-            localStorage.removeItem(`terminal_title_${id}`);
-          };
-
-          ws.onclose = (event) => {
-            // 只在非正常关闭且未成功重连时显示错误消息
-            if (!reconnected && event.code !== 1000) {
-              console.log('[TerminalContext] Connection closed unexpectedly:', event.code, event.reason);
-              term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
-            } else if (reconnected) {
-              console.log('[TerminalContext] Connection closed after successful reconnection');
-            }
-          };
-
-          // 监听终端输入
-          term.onData((data) => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({
-                type: 'input',
-                data: data
-              }));
-            }
-          });
-
-          // restoredTerminal 已在上面的 onopen 回调中添加到状态
-        } catch (error) {
-          console.error(`[TerminalContext] Failed to restore session ${sessionId}:`, error);
-          // 清理失败的 session
-          localStorage.removeItem(`terminal_session_${id}`);
-          localStorage.removeItem(`terminal_title_${id}`);
+  const closeBackendSession = async (sessionId: string) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/sessions/${sessionId}/close`, {
+          method: 'POST',
+        });
+        if (response.ok || response.status === 404) {
+          return true;
         }
-      });
+      } catch (error) {
+        console.error(`[TerminalContext] Error closing backend session ${sessionId}, attempt ${attempt + 1}:`, error);
+      }
+    }
+    return false;
+  };
 
-      // 恢复逻辑完成（注意：WebSocket 连接是异步的，但我们已经启动了所有恢复）
-      // 延迟 1 秒后标记恢复完成，给 WebSocket 连接时间
-      setTimeout(() => {
-        setIsRestoring(false);
-        console.log('[TerminalContext] Restore process completed');
-      }, 1000);
-    };
+  const extractSessionId = (data: string): string | null => {
+    const match = data.match(/SESSION_ID:([^\x07\r\n]+)/);
+    return match?.[1]?.trim() || null;
+  };
 
-    // 立即恢复，不延迟
-    restoreSessions();
+  const notifyTerminalConnectionIssue = (title: string, message: string) => {
+    addNotification({ type: 'error', title, message });
+  };
+
+  const notifyQueueOverflow = useCallback((terminalId: string) => {
+    const now = Date.now();
+    const lastNotified = queueOverflowNotifyRef.current[terminalId] || 0;
+    if (now - lastNotified < 5000) {
+      return;
+    }
+    queueOverflowNotifyRef.current[terminalId] = now;
+    addNotification({
+      type: 'warning',
+      title: '终端输入队列溢出',
+      message: '输入过快导致队列超限，已丢弃最旧输入。请确认网络与终端连接状态。',
+    });
+  }, [addNotification]);
+
+  const logLifecycle = (terminal: TerminalInstance, next: TerminalLifecycle, reason: string) => {
+    if (terminal.lifecycle === next) {
+      return;
+    }
+    console.log(`[TerminalContext] lifecycle transition: ${terminal.id} ${terminal.lifecycle} -> ${next} (${reason})`);
+    terminal.lifecycle = next;
+  };
+
+  const getTerminalById = useCallback((id: string) => terminals.find((item) => item.id === id), [terminals]);
+
+  const syncReadyLifecycle = (terminal: TerminalInstance, reason: string) => {
+    const isWsOpen = terminal.ws.readyState === WebSocket.OPEN;
+    if (terminal.isOpened && isWsOpen) {
+      logLifecycle(terminal, 'ready', reason);
+      return;
+    }
+    if (terminal.isOpened) {
+      logLifecycle(terminal, 'opened', reason);
+      return;
+    }
+    if (isWsOpen) {
+      logLifecycle(terminal, 'ws_connecting', reason);
+    }
+  };
+
+  const flushInputQueue = useCallback((terminal: TerminalInstance) => {
+    if (terminal.lifecycle === 'disposed' || terminal.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    while (terminal.inputQueue.length > 0) {
+      const packet = terminal.inputQueue.shift();
+      if (!packet) {
+        break;
+      }
+      const payload = { type: 'input', data: packet.data, seq: packet.seq };
+      terminal.ws.send(JSON.stringify(payload));
+      console.log(`[TerminalContext] send(seq): terminal=${terminal.id}, seq=${packet.seq}, bytes=${packet.data.length}`);
+    }
+
+    console.log(`[TerminalContext] flush queue: terminal=${terminal.id}, remaining=${terminal.inputQueue.length}`);
   }, []);
 
-  const createTerminal = (projectPath?: string): TerminalInstance => {
-    // 如果正在恢复，不创建新终端
-    if (isRestoring) {
-      console.log('[TerminalContext] ⚠️ Skipping createTerminal - restore in progress');
-      // 返回一个占位符，实际不会被使用
-      return null as any;
+  const enqueueInput = useCallback((terminal: TerminalInstance, data: string) => {
+    if (terminal.lifecycle === 'disposed') {
+      return;
     }
 
-    const id = `terminal-${Date.now()}`;
+    const packet: TerminalInputPacket = {
+      seq: ++terminal.seqCounter,
+      data,
+      ts: Date.now(),
+    };
+    terminal.lastInputAt = packet.ts;
+    terminal.inputQueue.push(packet);
+    console.log(`[TerminalContext] enqueue: terminal=${terminal.id}, seq=${packet.seq}, queue=${terminal.inputQueue.length}`);
 
-    // 根据项目路径生成 title
-    let title = `Terminal ${terminalCounterRef.current++}`;
-    if (projectPath) {
-      // 从路径中提取项目名（最后一个目录名）
-      const pathParts = projectPath.split('/').filter(p => p);
-      const projectName = pathParts[pathParts.length - 1] || 'Terminal';
-      title = projectName;
+    let queueBytes = terminal.inputQueue.reduce((sum, item) => sum + item.data.length, 0);
+    let dropped = false;
+    while (terminal.inputQueue.length > MAX_INPUT_QUEUE_ITEMS || queueBytes > MAX_INPUT_QUEUE_BYTES) {
+      const removed = terminal.inputQueue.shift();
+      if (!removed) {
+        break;
+      }
+      queueBytes -= removed.data.length;
+      dropped = true;
     }
 
-    console.log('[TerminalContext] createTerminal called');
-    console.log('[TerminalContext] Project path:', projectPath);
-    console.log('[TerminalContext] Terminal title:', title);
-    console.log('[TerminalContext] New terminal ID:', id);
-    console.log('[TerminalContext] Current terminals count:', terminals.length);
+    if (dropped) {
+      console.warn(`[TerminalContext] queue overflow: terminal=${terminal.id}, queue=${terminal.inputQueue.length}, bytes=${queueBytes}`);
+      notifyQueueOverflow(terminal.id);
+    }
 
-    // 检测是否为移动设备（使用 window.innerWidth）
+    flushInputQueue(terminal);
+  }, [flushInputQueue, notifyQueueOverflow]);
+
+  const sendResize = useCallback((terminalId: string, rows: number, cols: number) => {
+    const terminal = getTerminalById(terminalId);
+    if (!terminal || terminal.lifecycle === 'disposed') {
+      return;
+    }
+    if (terminal.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    terminal.ws.send(JSON.stringify({ type: 'resize', rows, cols }));
+  }, [getTerminalById]);
+
+  const markTerminalOpened = useCallback((terminalId: string) => {
+    const terminal = getTerminalById(terminalId);
+    if (!terminal || terminal.isOpened) {
+      return;
+    }
+    terminal.isOpened = true;
+    syncReadyLifecycle(terminal, 'term.open called');
+    flushInputQueue(terminal);
+  }, [flushInputQueue, getTerminalById]);
+
+  const sendInput = useCallback((terminalId: string, data: string) => {
+    const terminal = getTerminalById(terminalId);
+    if (!terminal) {
+      return;
+    }
+    enqueueInput(terminal, data);
+  }, [enqueueInput, getTerminalById]);
+
+  const initTerminal = useCallback((options: {
+    id: string;
+    title: string;
+    projectPath?: string;
+    autoStartClaude?: boolean;
+    restoreSessionId?: string;
+    claudeResumeSession?: string;  // Claude 会话恢复的 session ID
+    mode: 'create' | 'restore';
+    onSettled?: (state: 'open' | 'error' | 'close') => void;
+  }): TerminalInstance => {
+    const { id, title, projectPath, autoStartClaude, restoreSessionId, claudeResumeSession, mode, onSettled } = options;
+
     const isMobile = window.innerWidth < 768;
     const fontSize = isMobile ? 11 : 13;
 
-    // 创建 xterm 实例
     const term = new XTerm({
       cursorBlink: true,
-      fontSize: fontSize,
+      fontSize,
       fontFamily: "'Fira Code', 'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
         background: '#0f111a',
@@ -288,186 +313,455 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       allowProposedApi: true,
       screenReaderMode: false,
       convertEol: true,
-
-      // 移动端优化配置
-      scrollback: 1000,  // 限制滚动缓冲区，提升性能
-      fastScrollModifier: 'alt',  // 快速滚动修饰键
-      fastScrollSensitivity: 5,   // 快速滚动灵敏度
-      scrollSensitivity: 3,       // 普通滚动灵敏度
-
-      // 移动端渲染优化
-      rendererType: 'canvas',     // 使用 canvas 渲染，性能更好
-      disableStdin: false,        // 确保可以输入
-
-      // 光标和选择优化
-      cursorStyle: 'block',       // 块状光标在移动端更明显
-      cursorWidth: 2,             // 光标宽度
+      scrollback: 1000,
+      fastScrollModifier: 'alt',
+      fastScrollSensitivity: 5,
+      scrollSensitivity: 3,
+      // 移除 rendererType，让 xterm 自动选择最佳渲染器
+      // rendererType: 'canvas',
+      disableStdin: false,
+      cursorStyle: 'block',
+      cursorWidth: 2,
     });
 
-    // 创建 fit addon
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
-    // 连接 WebSocket
-    const wsUrl = projectPath
-      ? `${API_CONFIG.WS_BASE_URL}/terminal/ws?project_path=${encodeURIComponent(projectPath)}`
-      : `${API_CONFIG.WS_BASE_URL}/terminal/ws`;
-    console.log('[TerminalContext] Creating WebSocket connection to:', wsUrl);
+    // 构建 WebSocket URL
+    let wsUrl: string;
+    if (mode === 'restore' && restoreSessionId) {
+      wsUrl = `${API_CONFIG.WS_BASE_URL}/terminal/ws?session_id=${restoreSessionId}`;
+    } else {
+      // 创建新终端
+      const params = new URLSearchParams();
+      if (projectPath) {
+        params.append('project_path', projectPath);
+      }
+      if (autoStartClaude) {
+        params.append('auto_start_claude', 'true');
+      }
+      if (claudeResumeSession) {
+        params.append('claude_resume_session', claudeResumeSession);
+      }
+      const queryString = params.toString();
+      wsUrl = `${API_CONFIG.WS_BASE_URL}/terminal/ws${queryString ? `?${queryString}` : ''}`;
+    }
+
     const ws = new WebSocket(wsUrl);
 
-    // 标记连接状态
-    let isConnected = false;
-
-    ws.onopen = () => {
-      console.log('[TerminalContext] WebSocket connected for terminal:', id);
-      isConnected = true;
-    };
-
-    ws.onmessage = (event) => {
-      const data = event.data;
-
-      // 检查是否是 session ID 消息（OSC 序列）
-      if (typeof data === 'string' && data.includes('SESSION_ID:')) {
-        const match = data.match(/SESSION_ID:([a-f0-9-]+)/);
-        if (match) {
-          const sessionId = match[1];
-          console.log('[TerminalContext] Received session ID:', sessionId);
-          // 保存 session ID 到 terminal 实例
-          newTerminal.sessionId = sessionId;
-          // 保存到 localStorage
-          localStorage.setItem(`terminal_session_${id}`, sessionId);
-          localStorage.setItem(`terminal_title_${id}`, title);
-          return; // 不显示这个消息
-        }
-      }
-
-      term.write(data);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      term.writeln('\x1b[31m✗ Connection error\x1b[0m');
-    };
-
-    ws.onclose = (event) => {
-      // 只在已连接后异常关闭时显示错误消息
-      if (isConnected && event.code !== 1000) {
-        console.log('[TerminalContext] Connection closed unexpectedly:', event.code, event.reason);
-        term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
-      } else if (!isConnected) {
-        console.log('[TerminalContext] Connection failed to establish');
-        term.writeln('\x1b[31m✗ Failed to connect\x1b[0m');
-      }
-    };
-
-    // 监听终端输入
-    term.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'input',
-          data: data
-        }));
-      }
-    });
-
-    // 初始化时发送终端大小
-    setTimeout(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'resize',
-          rows: term.rows,
-          cols: term.cols
-        }));
-      }
-    }, 100);
-
-    const newTerminal: TerminalInstance = {
+    const terminal: TerminalInstance = {
       id,
       term,
       ws,
       fitAddon,
-      title
+      title,
+      sessionId: restoreSessionId,
+      lifecycle: 'init',
+      isOpened: false,
+      inputQueue: [],
+      seqCounter: 0,
+      lastAckSeq: 0,
+      lastInputAt: 0,
+      lastOutputAt: Date.now(),
+      promptNudgeScheduled: false,
+      lastBackendInputSeq: 0,
+      backendOutputFrames: 0,
+      backendProcessAlive: true,
+      backendPid: 0,
     };
 
-    setTerminals(prev => [...prev, newTerminal]);
-    setActiveTabId(id);
-    console.log('[TerminalContext] Terminal added to state, new count:', terminals.length + 1);
-    console.log('[TerminalContext] Active tab set to:', id);
+    logLifecycle(terminal, 'ws_connecting', `${mode}:ws create`);
 
-    return newTerminal;
-  };
+    let sessionIdTimeout: ReturnType<typeof setTimeout> | null = null;
+    let settled = false;
+    const settleOnce = (state: 'open' | 'error' | 'close') => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      onSettled?.(state);
+    };
 
-  const closeTerminal = async (id: string) => {
-    const terminal = terminals.find(t => t.id === id);
-    if (terminal) {
-      // 调用后端 API 关闭 PTY 进程
-      if (terminal.sessionId) {
-        try {
-          console.log(`[TerminalContext] Closing backend session: ${terminal.sessionId}`);
-          const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/sessions/${terminal.sessionId}/close`, {
-            method: 'POST'
-          });
-          if (response.ok) {
-            console.log(`[TerminalContext] Backend session ${terminal.sessionId} closed successfully`);
-          } else {
-            console.error(`[TerminalContext] Failed to close backend session: ${response.status}`);
+    ws.onopen = () => {
+      console.log(`[TerminalContext] ws opened: terminal=${id}, mode=${mode}`);
+      syncReadyLifecycle(terminal, 'ws open');
+
+      if (mode === 'restore' && restoreSessionId) {
+        localStorage.setItem(`terminal_session_${id}`, restoreSessionId);
+        localStorage.setItem(`terminal_title_${id}`, title);
+        setTerminals((prev) => {
+          if (prev.find((item) => item.id === id || item.sessionId === restoreSessionId)) {
+            return prev;
           }
-        } catch (error) {
-          console.error(`[TerminalContext] Error closing backend session:`, error);
+          return [...prev, terminal];
+        });
+        setActiveTabId((prev) => {
+          if (restoreActiveSetRef.current) {
+            return prev;
+          }
+          restoreActiveSetRef.current = true;
+          return prev ?? id;
+        });
+      }
+
+      setTimeout(() => {
+        sendResize(id, term.rows, term.cols);
+      }, 120);
+
+      flushInputQueue(terminal);
+      settleOnce('open');
+    };
+
+    ws.onmessage = (event) => {
+      const raw = event.data;
+
+      if (typeof raw === 'string') {
+        let parsed: any = null;
+        if (raw.startsWith('{')) {
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            parsed = null;
+          }
+        }
+
+        if (parsed?.type === 'ack') {
+          const ackSeq = Number(parsed.seq || 0);
+          if (Number.isFinite(ackSeq) && ackSeq > 0) {
+            terminal.lastAckSeq = ackSeq;
+            console.log(`[TerminalContext] ack(seq): terminal=${id}, seq=${ackSeq}`);
+          }
+          return;
+        }
+
+        if (parsed?.type === 'debug_input_accepted') {
+          const inputSeq = Number(parsed.seq || 0);
+          if (Number.isFinite(inputSeq) && inputSeq > 0) {
+            terminal.lastBackendInputSeq = inputSeq;
+            terminal.backendProcessAlive = Boolean(parsed.process_alive);
+            terminal.backendPid = Number(parsed.pid || 0);
+            console.log(`[TerminalContext] backend_input_accepted(seq): terminal=${id}, seq=${inputSeq}`);
+          }
+          return;
+        }
+
+        if (parsed?.type === 'debug_output_forwarded') {
+          terminal.backendOutputFrames = Number(parsed.frame || terminal.backendOutputFrames + 1);
+          return;
+        }
+
+        if (raw.includes('SESSION_ID:')) {
+          const extracted = extractSessionId(raw);
+          if (extracted) {
+            terminal.sessionId = extracted;
+            localStorage.setItem(`terminal_session_${id}`, extracted);
+            localStorage.setItem(`terminal_title_${id}`, title);
+            if (sessionIdTimeout) {
+              clearTimeout(sessionIdTimeout);
+              sessionIdTimeout = null;
+            }
+          }
+          return;
+        }
+
+        if (raw.includes('Reconnected to existing session')) {
+          return;
         }
       }
 
-      // 关闭前端资源
-      terminal.term.dispose();
-      terminal.ws.close();
-      // 清理 localStorage 中的 session ID 和 title
+      // 写入终端输出
+      console.log(`[TerminalContext] 📤 Writing to terminal: ${id}, length=${raw.length}, preview=${raw.substring(0, 50)}`);
+      term.write(raw);
+      terminal.lastOutputAt = Date.now();
+      terminal.backendOutputFrames += 1;
+    };
+
+    ws.onerror = () => {
+      logLifecycle(terminal, 'disposed', 'ws error');
+      term.writeln('\x1b[31m✗ Connection error\x1b[0m');
+      notifyTerminalConnectionIssue('终端连接失败', mode === 'restore' ? 'Terminal 会话恢复失败，请重试或重建终端' : 'Terminal WebSocket 连接失败，请检查后端状态');
       localStorage.removeItem(`terminal_session_${id}`);
       localStorage.removeItem(`terminal_title_${id}`);
+      settleOnce('error');
+    };
+
+    ws.onclose = (event) => {
+      logLifecycle(terminal, 'disposed', `ws close:${event.code}`);
+      if (event.code !== 1000) {
+        term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
+      }
+      settleOnce('close');
+    };
+
+    term.onData((data) => {
+      enqueueInput(terminal, data);
+    });
+
+    if (mode === 'create') {
+      sessionIdTimeout = setTimeout(() => {
+        if (!terminal.sessionId) {
+          const message = 'Terminal 会话未返回 SESSION_ID，刷新后可能无法恢复。建议稍后重建终端。';
+          console.error('[TerminalContext] SESSION_ID timeout:', { terminalId: id });
+          term.writeln(`\x1b[33mℹ ${message}\x1b[0m`);
+          notifyTerminalConnectionIssue('终端会话告警', message);
+        }
+      }, 3000);
     }
 
-    setTerminals(prev => {
-      const newTerminals = prev.filter(t => t.id !== id);
+    return terminal;
+  }, [enqueueInput, flushInputQueue, sendResize]);
 
-      // 如果关闭的是当前活跃的终端，切换到第一个
-      if (activeTabId === id && newTerminals.length > 0) {
-        setActiveTabId(newTerminals[0].id);
-      } else if (newTerminals.length === 0) {
-        setActiveTabId(null);
+  const syncClaudeConversations = useCallback(async (): Promise<ClaudeConversation[]> => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/claude-conversations?limit=80`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const data = await response.json();
+      const items = Array.isArray(data?.items) ? data.items : [];
+      return items.map((item: any) => ({
+        session_id: item.session_id,
+        title: item.title || item.session_id,
+        project_hint: item.project_hint,
+        last_model: item.last_model,
+        last_updated: item.last_updated,
+        source_file: item.source_file,
+      }));
+    } catch (error) {
+      console.error('[TerminalContext] Failed to sync claude conversations:', error);
+      addNotification({
+        type: 'error',
+        title: '同步会话失败',
+        message: '无法读取本机 Claude Code 会话列表，请检查后端状态。',
+      });
+      return [];
+    }
+  }, [addNotification]);
+
+  const restoreClaudeConversation = useCallback(async (sessionId: string): Promise<TerminalInstance | null> => {
+    if (!sessionId) {
+      return null;
+    }
+
+    if (!restoreSettled || isRestoring) {
+      addNotification({
+        type: 'info',
+        title: '终端恢复中',
+        message: '请等待当前恢复流程完成后再切换会话。',
+      });
+      return null;
+    }
+
+    // 检查是否已经有这个会话的终端
+    const existing = terminals.find((terminal) => terminal.sessionId === sessionId);
+    if (existing) {
+      setActiveTabId(existing.id);
+      addNotification({
+        type: 'info',
+        title: '会话已存在',
+        message: `会话 ${sessionId.slice(0, 8)} 已经在运行中。`,
+      });
+      return existing;
+    }
+
+    // 创建新终端，使用 claudeResumeSession 参数
+    const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
+    const terminal = initTerminal({
+      id,
+      title: `Claude Resume ${sessionId.slice(0, 8)}`,
+      claudeResumeSession: sessionId,  // 传递 Claude 会话恢复参数
+      mode: 'create',  // 使用 create 模式，因为这是创建新的 terminal session
+    });
+
+    setTerminals((prev) => {
+      if (prev.some((item) => item.id === id)) {
+        return prev;
+      }
+      return [...prev, terminal];
+    });
+    setActiveTabId(id);
+
+    return terminal;
+  }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification]);
+
+  useEffect(() => {
+    if (hasRestoredRef.current) {
+      return;
+    }
+    hasRestoredRef.current = true;
+
+    const settleRestore = (reason: string) => {
+      if (restoreSettledRef.current) {
+        return;
+      }
+      restoreSettledRef.current = true;
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+      setIsRestoring(false);
+      setRestoreSettled(true);
+      console.log(`[TerminalContext] Restore process settled (${reason})`);
+    };
+
+    const restoreSessions = async () => {
+      setIsRestoring(true);
+      setRestoreSettled(false);
+      restoreSettledRef.current = false;
+      restoreActiveSetRef.current = false;
+      console.log('[TerminalContext] Restore process started');
+
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+      }
+      restoreTimeoutRef.current = setTimeout(() => settleRestore('timeout-fallback'), 3500);
+
+      const savedSessions = collectSavedSessions();
+      const backendSessions = await fetchActiveSessions();
+
+      const backendSessionIds = new Set(backendSessions.map((session) => session.sessionId));
+      savedSessions.forEach((session) => {
+        if (!backendSessionIds.has(session.sessionId)) {
+          localStorage.removeItem(`terminal_session_${session.id}`);
+          localStorage.removeItem(`terminal_title_${session.id}`);
+        }
+      });
+
+      if (backendSessions.length === 0) {
+        settleRestore('no-sessions');
+        return;
       }
 
-      return newTerminals;
+      let pendingConnections = backendSessions.length;
+      const markConnectionSettled = (sessionId: string, state: 'open' | 'error' | 'close') => {
+        pendingConnections = Math.max(0, pendingConnections - 1);
+        console.log(`[TerminalContext] Restore connection settled: session=${sessionId}, state=${state}, pending=${pendingConnections}`);
+        if (pendingConnections === 0) {
+          settleRestore('all-connections-settled');
+        }
+      };
+
+      backendSessions.forEach(({ id, sessionId, title }) => {
+        try {
+          initTerminal({
+            id,
+            title,
+            restoreSessionId: sessionId,
+            mode: 'restore',
+            onSettled: (state) => markConnectionSettled(sessionId, state),
+          });
+        } catch (error) {
+          console.error(`[TerminalContext] Failed to restore session ${sessionId}:`, error);
+          localStorage.removeItem(`terminal_session_${id}`);
+          localStorage.removeItem(`terminal_title_${id}`);
+          markConnectionSettled(sessionId, 'error');
+        }
+      });
+    };
+
+    restoreSessions();
+
+    return () => {
+      if (restoreTimeoutRef.current) {
+        clearTimeout(restoreTimeoutRef.current);
+        restoreTimeoutRef.current = null;
+      }
+    };
+  }, [initTerminal]);
+
+  const createTerminal = (projectPath?: string, autoStartClaude?: boolean): TerminalInstance | null => {
+    if (!restoreSettled || isRestoring) {
+      console.log('[TerminalContext] Skip createTerminal - restore not settled', { isRestoring, restoreSettled });
+      return null;
+    }
+
+    const id = `terminal-${Date.now()}`;
+    let title = `Terminal ${terminalCounterRef.current++}`;
+    if (projectPath) {
+      const pathParts = projectPath.split('/').filter((p) => p);
+      title = pathParts[pathParts.length - 1] || title;
+    }
+
+    const terminal = initTerminal({ id, title, projectPath, autoStartClaude, mode: 'create' });
+    setTerminals((prev) => [...prev, terminal]);
+    setActiveTabId(id);
+    return terminal;
+  };
+
+  const closeTerminal = async (id: string) => {
+    const terminal = terminals.find((item) => item.id === id);
+    if (!terminal) {
+      return;
+    }
+
+    if (terminal.sessionId) {
+      const closed = await closeBackendSession(terminal.sessionId);
+      if (!closed) {
+        console.error(`[TerminalContext] Failed to close backend session definitively: ${terminal.sessionId}`);
+      }
+    }
+
+    logLifecycle(terminal, 'disposed', 'closeTerminal');
+    terminal.term.dispose();
+    terminal.ws.close();
+
+    localStorage.removeItem(`terminal_session_${id}`);
+    localStorage.removeItem(`terminal_title_${id}`);
+
+    if (terminal.sessionId) {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key?.startsWith('terminal_session_') && localStorage.getItem(key) === terminal.sessionId) {
+          const tabId = key.replace('terminal_session_', '');
+          localStorage.removeItem(`terminal_session_${tabId}`);
+          localStorage.removeItem(`terminal_title_${tabId}`);
+        }
+      }
+    }
+
+    setTerminals((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      if (activeTabId === id && next.length > 0) {
+        setActiveTabId(next[0].id);
+      } else if (next.length === 0) {
+        setActiveTabId(null);
+      }
+      return next;
     });
   };
 
   const cleanupAll = async () => {
-    // 关闭所有后端 session
-    const closePromises = terminals.map(async (terminal) => {
+    setIsRestoring(false);
+    setRestoreSettled(true);
+    restoreSettledRef.current = true;
+
+    await Promise.all(terminals.map(async (terminal) => {
       if (terminal.sessionId) {
-        try {
-          console.log(`[TerminalContext] Closing backend session: ${terminal.sessionId}`);
-          const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/sessions/${terminal.sessionId}/close`, {
-            method: 'POST'
-          });
-          if (response.ok) {
-            console.log(`[TerminalContext] Backend session ${terminal.sessionId} closed successfully`);
+        const closed = await closeBackendSession(terminal.sessionId);
+        if (!closed) {
+          console.error(`[TerminalContext] Failed to close backend session definitively: ${terminal.sessionId}`);
+        }
+      }
+    }));
+
+    terminals.forEach((terminal) => {
+      logLifecycle(terminal, 'disposed', 'cleanupAll');
+      terminal.term.dispose();
+      terminal.ws.close();
+      localStorage.removeItem(`terminal_session_${terminal.id}`);
+      localStorage.removeItem(`terminal_title_${terminal.id}`);
+      if (terminal.sessionId) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key?.startsWith('terminal_session_') && localStorage.getItem(key) === terminal.sessionId) {
+            const tabId = key.replace('terminal_session_', '');
+            localStorage.removeItem(`terminal_session_${tabId}`);
+            localStorage.removeItem(`terminal_title_${tabId}`);
           }
-        } catch (error) {
-          console.error(`[TerminalContext] Error closing backend session:`, error);
         }
       }
     });
 
-    // 等待所有后端 session 关闭
-    await Promise.all(closePromises);
-
-    // 关闭前端资源
-    terminals.forEach(terminal => {
-      terminal.term.dispose();
-      terminal.ws.close();
-      // 清理 localStorage
-      localStorage.removeItem(`terminal_session_${terminal.id}`);
-      localStorage.removeItem(`terminal_title_${terminal.id}`);
-    });
     setTerminals([]);
     setActiveTabId(null);
   };
@@ -481,11 +775,16 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         createTerminal,
         closeTerminal,
         cleanupAll,
+        sendInput,
+        sendResize,
+        markTerminalOpened,
+        syncClaudeConversations,
+        restoreClaudeConversation,
         isRestoring,
+        restoreSettled,
       }}
     >
       {children}
     </TerminalContext.Provider>
   );
 };
-

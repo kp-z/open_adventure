@@ -291,7 +291,7 @@ class ClaudeFileScanner:
             if not description:
                 description = skill_name.replace("_", " ").replace("-", " ").title()
 
-            return {
+            skill_data = {
                 "name": skill_name,
                 "full_name": f"{source}/{skill_name}",
                 "type": skill_type,
@@ -304,6 +304,11 @@ class ClaudeFileScanner:
                     "path": str(skill_dir)
                 }
             }
+
+            if source == "user":
+                skill_data["meta"]["user_scope"] = "public"
+
+            return skill_data
 
         except Exception as e:
             logger.error(f"Error parsing skill {skill_dir}: {e}")
@@ -750,6 +755,13 @@ class ClaudeFileScanner:
             else:
                 skills = skills_raw or []
 
+            # 处理 exclude 字段
+            exclude_raw = frontmatter.get("exclude", [])
+            if isinstance(exclude_raw, str):
+                exclude_skills = [s.strip() for s in exclude_raw.split(",")]
+            else:
+                exclude_skills = exclude_raw or []
+
             # 处理 mcpServers 字段
             mcp_servers = frontmatter.get("mcpServers", [])
 
@@ -774,6 +786,7 @@ class ClaudeFileScanner:
                 "meta": {
                     "path": str(agent_file),
                     "color": frontmatter.get("color"),
+                    "exclude_skills": exclude_skills,
                     "file_format": "markdown"
                 }
             }

@@ -2,8 +2,9 @@
 执行记录仓储
 """
 from typing import List, Optional, Dict, Any
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.task import Execution, NodeExecution
 from app.repositories.base import BaseRepository
@@ -14,6 +15,31 @@ class ExecutionRepository(BaseRepository[Execution]):
 
     def __init__(self, db: AsyncSession):
         super().__init__(Execution, db)
+
+    async def list_for_history(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Execution]:
+        """History 专用列表：附带 task，并按更新时间倒序"""
+        query = (
+            select(Execution)
+            .options(selectinload(Execution.task))
+            .order_by(
+                func.coalesce(Execution.updated_at, Execution.created_at).desc(),
+                Execution.created_at.desc(),
+            )
+        )
+
+        if filters:
+            for key, value in filters.items():
+                if hasattr(Execution, key):
+                    query = query.where(getattr(Execution, key) == value)
+
+        query = query.offset(skip).limit(limit)
+        result = await self.db.execute(query)
+        return result.scalars().all()
 
     async def get_node_executions(self, execution_id: int) -> List[NodeExecution]:
         """
@@ -98,6 +124,7 @@ class ExecutionRepository(BaseRepository[Execution]):
         """
         result = await self.db.execute(
             select(Execution)
+            .options(selectinload(Execution.task))
             .where(Execution.session_id == session_id)
             .order_by(Execution.created_at.desc())
         )
@@ -119,6 +146,33 @@ class ExecutionRepository(BaseRepository[Execution]):
                 Execution.status.in_([ExecutionStatus.RUNNING, ExecutionStatus.PENDING])
             )
             .order_by(Execution.last_activity_at.desc())
+        )
+        return result.scalars().all()
+
+    async def get_history_card_executions(self, limit: int = 20) -> List[Execution]:
+        """
+        获取 Dashboard 历史卡片数据（running 优先、terminal 优先、时间倒序）
+
+        Args:
+            limit: 返回记录数
+
+        Returns:
+            List[Execution]: 卡片展示用执行记录
+        """
+        from app.models.task import ExecutionStatus, ExecutionType
+
+        running_priority = case((Execution.status == ExecutionStatus.RUNNING, 0), else_=1)
+        terminal_priority = case((Execution.execution_type == ExecutionType.TERMINAL, 0), else_=1)
+
+        result = await self.db.execute(
+            select(Execution)
+            .order_by(
+                running_priority,
+                terminal_priority,
+                func.coalesce(Execution.updated_at, Execution.created_at).desc(),
+                Execution.created_at.desc()
+            )
+            .limit(limit)
         )
         return result.scalars().all()
 

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+
 import { useNavigate } from 'react-router';
-import { API_CONFIG } from '../../config/api';
 import {
   BarChart3,
   Terminal,
@@ -16,16 +16,16 @@ import {
   Plus,
   Settings as SettingsIcon,
   RefreshCw,
-  Zap
+  Zap,
+  FolderGit2,
+  AlertTriangle
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
-import { useTranslation } from '../hooks/useTranslation';
 import { GlassCard, GameCard, ActionButton } from '../components/ui-shared';
 import { ClaudeConfigEditor } from '../components/ClaudeConfigEditor';
-import { LoadingSpinner, SkeletonCard, SkeletonListItem } from '../components/LoadingSpinner';
+import { LoadingSpinner, SkeletonCard } from '../components/LoadingSpinner';
 import { WaterLevel } from '../components/WaterLevel';
 import { MarketplaceCard } from '../components/MarketplaceCard';
-import { getAvatarById } from '../lib/avatars';
 import {
   BarChart,
   Bar,
@@ -37,8 +37,10 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { dashboardApi, executionsApi, claudeApi } from '@/lib/api';
-import type { DashboardStats, Execution, ClaudeHealthResponse } from '@/lib/api';
+import { dashboardApi, claudeApi, projectPathsApi } from '@/lib/api';
+import { useExecutionContext } from '../contexts/ExecutionContext';
+import { useNotifications } from '../contexts/NotificationContext';
+import type { DashboardStats, ClaudeHealthResponse, ProjectPath, Execution } from '@/lib/api';
 
 const mockChartData = [
   { name: 'Mon', value: 40 },
@@ -52,20 +54,52 @@ const mockChartData = [
 
 const Dashboard = () => {
   const { mode } = useMode();
-  const { t } = useTranslation();
+  const { addNotification, removeNotification } = useNotifications();
+  const { executions: contextExecutions } = useExecutionContext();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [executions, setExecutions] = useState<Execution[]>([]);
   const [claudeHealth, setClaudeHealth] = useState<ClaudeHealthResponse | null>(null);
   const [tokenUsage, setTokenUsage] = useState<{ percentage: number } | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingHealth, setLoadingHealth] = useState(true);
-  const [loadingExecutions, setLoadingExecutions] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfigEditor, setShowConfigEditor] = useState(false);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
+  const [projectPaths, setProjectPaths] = useState<ProjectPath[]>([]);
+  const [loadingProjectPaths, setLoadingProjectPaths] = useState(true);
+  const lastTokenWarningRef = useRef<string | null>(null);
+  const lastUsageWarningRef = useRef<string | null>(null);
+  const lastExecutionErrorRef = useRef<string | null>(null);
+  const lastProjectReminderRef = useRef<string | null>(null);
+  const historyExecutions = useMemo(() => {
+    const items = Array.from(contextExecutions.values()) as Execution[];
+    return items
+      .sort((a, b) => {
+        const timeDiff = new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
+        if (timeDiff !== 0) {
+          return timeDiff;
+        }
+        const createdDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        if (createdDiff !== 0) {
+          return createdDiff;
+        }
+        return b.id - a.id;
+      })
+      .slice(0, 8);
+  }, [contextExecutions]);
+
+  const formatHistoryTime = (dateString?: string) => {
+    if (!dateString) {
+      return '-';
+    }
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+      return '-';
+    }
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -73,23 +107,24 @@ const Dashboard = () => {
       // 获取仪表板统计数据
       const statsData = await dashboardApi.getStats();
       setStats(statsData);
+
+      const usageWarning = typeof statsData.usage_warning === 'string' ? statsData.usage_warning : null;
+      if (usageWarning && usageWarning !== lastUsageWarningRef.current) {
+        addNotification({
+          type: 'info',
+          title: 'Usage 数据告警',
+          message: usageWarning,
+        });
+        lastUsageWarningRef.current = usageWarning;
+      }
+
+      if (!usageWarning) {
+        lastUsageWarningRef.current = null;
+      }
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     } finally {
       setLoadingStats(false);
-    }
-  };
-
-  const fetchExecutions = async () => {
-    try {
-      setLoadingExecutions(true);
-      // 获取最近的执行历史，最多显示3条
-      const executionsData = await executionsApi.list({ limit: 3 });
-      setExecutions(executionsData.items || []);
-    } catch (err) {
-      console.error('Failed to fetch executions:', err);
-    } finally {
-      setLoadingExecutions(false);
     }
   };
 
@@ -104,16 +139,58 @@ const Dashboard = () => {
 
       // 获取 token 使用情况
       try {
-        const response = await fetch(`${API_CONFIG.BASE_URL}/token-usage`);
-        const tokenData = await response.json();
-        setTokenUsage({ percentage: tokenData.percentage });
+        const tokenData = await dashboardApi.getTokenUsage();
+
+        setTokenUsage({ percentage: tokenData.percentage ?? 0 });
+
+        const warningMessage = typeof tokenData.warning === 'string' ? tokenData.warning : null;
+        if (warningMessage && warningMessage !== lastTokenWarningRef.current) {
+          addNotification({
+            type: 'info',
+            title: 'Token 用量告警',
+            message: warningMessage,
+          });
+          lastTokenWarningRef.current = warningMessage;
+        }
+
+        if (!warningMessage) {
+          lastTokenWarningRef.current = null;
+        }
       } catch (err) {
         console.error('Failed to fetch token usage:', err);
+        if (lastExecutionErrorRef.current !== 'token_usage_failed') {
+          addNotification({
+            type: 'error',
+            title: 'Token 用量获取失败',
+            message: '无法获取 token 使用数据，请检查后端服务状态。',
+          });
+          lastExecutionErrorRef.current = 'token_usage_failed';
+        }
       }
     } catch (err) {
       console.error('Failed to fetch health:', err);
     } finally {
       setLoadingHealth(false);
+    }
+  };
+
+  const fetchProjectPaths = async () => {
+    try {
+      setLoadingProjectPaths(true);
+      const response = await projectPathsApi.listProjectPaths({ enabled: true });
+      setProjectPaths(response?.items || []);
+    } catch (err) {
+      console.error('Failed to fetch project paths:', err);
+      if (lastExecutionErrorRef.current !== 'project_paths_fetch_failed') {
+        addNotification({
+          type: 'error',
+          title: 'Project 配置加载失败',
+          message: '无法获取已配置项目路径，请前往 Settings 页面检查。',
+        });
+        lastExecutionErrorRef.current = 'project_paths_fetch_failed';
+      }
+    } finally {
+      setLoadingProjectPaths(false);
     }
   };
 
@@ -124,7 +201,7 @@ const Dashboard = () => {
       await Promise.all([
         fetchDashboardData(),
         fetchClaudeHealth(),
-        fetchExecutions()
+        fetchProjectPaths()
       ]);
     } catch (err) {
       console.error('Failed to refresh data:', err);
@@ -152,8 +229,33 @@ const Dashboard = () => {
     // 独立加载各个数据源，不阻塞界面渲染
     fetchDashboardData();
     fetchClaudeHealth();
-    fetchExecutions();
+    fetchProjectPaths();
   }, []);
+
+  useEffect(() => {
+    if (loadingProjectPaths) {
+      return;
+    }
+
+    if (projectPaths.length === 0) {
+      if (lastProjectReminderRef.current) {
+        return;
+      }
+
+      const reminderId = addNotification({
+        type: 'info',
+        title: '请配置 Project 地址',
+        message: '当前未配置可用 Project 路径，请前往 Settings > 项目路径配置，否则扫描功能无法使用。',
+      });
+      lastProjectReminderRef.current = reminderId;
+      return;
+    }
+
+    if (lastProjectReminderRef.current) {
+      removeNotification(lastProjectReminderRef.current);
+      lastProjectReminderRef.current = null;
+    }
+  }, [loadingProjectPaths, projectPaths, addNotification, removeNotification]);
 
   if (error) {
     return (
@@ -238,7 +340,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 lg:[--dashboard-row-h:clamp(320px,calc((100vh-220px)/3),520px)]">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">DASHBOARD</h1>
@@ -266,12 +368,12 @@ const Dashboard = () => {
       </header>
 
       {/* 响应式网格：移动端 1 列，中等屏幕 2 列，桌面端 4 列 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 md:items-stretch lg:h-[var(--dashboard-row-h)]">
         {/* Claude CLI Status Card - 响应式跨列：中等屏幕和桌面端占 2 列 */}
         {loadingHealth ? (
           <SkeletonCard className="md:col-span-2 lg:col-span-2" />
         ) : (
-          <GlassCard className="md:col-span-2 lg:col-span-2 flex flex-col justify-between">
+          <GlassCard className="md:col-span-2 lg:col-span-2 flex flex-col justify-between h-full">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl ${
@@ -640,7 +742,7 @@ const Dashboard = () => {
         {loadingStats ? (
           <SkeletonCard />
         ) : (
-          <GlassCard className="flex flex-col justify-between">
+          <GlassCard className="flex flex-col justify-between h-full">
           <div className="flex justify-between items-start mb-4">
             <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
               <Cpu size={20} />
@@ -683,7 +785,7 @@ const Dashboard = () => {
         {loadingStats ? (
           <SkeletonCard />
         ) : (
-          <GlassCard className="flex flex-col justify-between">
+          <GlassCard className="flex flex-col justify-between h-full">
           <div className="flex justify-between items-start mb-4">
             <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
               <Code2 size={20} />
@@ -724,74 +826,63 @@ const Dashboard = () => {
       </div>
 
       {/* 响应式网格：移动端 1 列，桌面端 3 列 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-        {/* Recent Tasks - 桌面端占 2 列 */}
-        <GlassCard className="lg:col-span-2">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">Execution History</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:items-stretch lg:h-[var(--dashboard-row-h)]">
+        {/* History - 桌面端占 2 列 */}
+        <GlassCard className="lg:col-span-2 flex flex-col h-full">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">History</h2>
             <button
-              onClick={() => navigate('/executions')}
+              onClick={() => navigate('/history')}
               className="text-sm text-blue-400 hover:underline"
             >
               View All
             </button>
           </div>
-          <div className="space-y-4">
-            {loadingExecutions ? (
-              <>
-                <SkeletonListItem />
-                <SkeletonListItem />
-                <SkeletonListItem />
-              </>
-            ) : executions.length > 0 ? (
-              executions.map((execution, index) => {
-                const task = execution.task;
-                const avatars = ['vanguard_1', 'vanguard_2', 'vanguard_3', 'vanguard_4'];
-                const avatar = avatars[index % avatars.length];
-                const avatarData = getAvatarById(avatar);
-                const AvatarIcon = avatarData.icon;
-                const status = task?.status === 'completed' ? 'success' :
-                              task?.status === 'running' ? 'running' :
-                              task?.status === 'failed' ? 'failed' : 'success';
-
-                return (
-                  <div key={execution.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="relative">
-                        <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/10 bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-                          <AvatarIcon className="w-6 h-6 text-white" />
-                        </div>
-                        <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-[#1a1b26] ${
-                          status === 'success' ? 'bg-green-500' :
-                          status === 'running' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'
-                        }`} />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">Execution #{execution.id}</p>
-                        <p className="text-[10px] text-gray-500 uppercase font-bold">
-                          Task #{task?.id || 'N/A'} • {new Date(execution.created_at).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    </div>
-                    <ActionButton variant="secondary" className="py-1 px-3 text-xs">Details</ActionButton>
+          {historyExecutions.length > 0 ? (
+            <div className="max-h-[232px] overflow-y-auto space-y-2 pr-1">
+              {historyExecutions.map((execution) => (
+                <button
+                  key={execution.id}
+                  onClick={() => navigate('/history')}
+                  className="w-full text-left px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors min-h-[50px]"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-white truncate">
+                      {execution.task?.title || `Execution #${execution.id}`}
+                    </span>
+                    <span className={`text-[10px] font-bold uppercase shrink-0 ${
+                      execution.status === 'running'
+                        ? 'text-blue-400'
+                        : execution.status === 'succeeded'
+                          ? 'text-green-400'
+                          : execution.status === 'failed'
+                            ? 'text-red-400'
+                            : 'text-gray-400'
+                    }`}>
+                      {execution.status}
+                    </span>
                   </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No execution history yet</p>
-              </div>
-            )}
-          </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px] text-gray-400">
+                    <span className="uppercase tracking-wide">{execution.execution_type}</span>
+                    <span>{formatHistoryTime(execution.updated_at || execution.created_at)}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 flex items-center justify-center text-gray-500">
+              <p>暂无执行记录</p>
+            </div>
+          )}
         </GlassCard>
 
         {/* Quick Actions */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-bold">Quick Actions</h2>
-          <div className="grid grid-cols-1 gap-4">
+        <div className="flex flex-col h-full">
+          <h2 className="text-xl font-bold mb-6">Quick Actions</h2>
+          <div className="grid grid-cols-1 gap-4 flex-1">
             <button
               onClick={() => navigate('/skills?action=create')}
-              className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 hover:bg-white/5 transition-all text-left"
+              className="flex items-center gap-4 p-4 h-full rounded-2xl bg-gradient-to-r from-blue-600/20 to-indigo-600/20 border border-blue-500/30 hover:bg-white/5 transition-all text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shrink-0">
                 <Plus size={20} />
@@ -803,7 +894,7 @@ const Dashboard = () => {
             </button>
             <button
               onClick={() => navigate('/agents?action=create')}
-              className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 hover:bg-white/5 transition-all text-left"
+              className="flex items-center gap-4 p-4 h-full rounded-2xl bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 hover:bg-white/5 transition-all text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center text-white shrink-0">
                 <BrainCircuit size={20} />
@@ -815,7 +906,7 @@ const Dashboard = () => {
             </button>
             <button
               onClick={() => navigate('/terminal')}
-              className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
+              className="flex items-center gap-4 p-4 h-full rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all text-left"
             >
               <div className="w-10 h-10 rounded-xl bg-gray-700 flex items-center justify-center text-white shrink-0">
                 <Terminal size={20} />
@@ -829,10 +920,109 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Marketplace Card - 响应式跨列：中等屏幕和桌面端占 2 列 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-6">
+      {/* Marketplace + Project Config */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 md:items-stretch lg:h-[var(--dashboard-row-h)]">
         <MarketplaceCard />
+
+        <GlassCard className="flex flex-col h-full p-3 md:p-4">
+          <div className="flex items-start justify-between gap-3 pb-2 border-b border-white/10">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-9 h-9 rounded-lg bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center shrink-0">
+                <FolderGit2 size={18} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm md:text-base font-bold leading-tight">Project Configuration</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+                  {loadingProjectPaths
+                    ? '正在加载 Project 配置...'
+                    : projectPaths.length > 0
+                      ? `已配置 ${projectPaths.length} 个 Project`
+                      : '扫描功能依赖已配置的 Project 路径'}
+                </p>
+              </div>
+            </div>
+
+            <div className="shrink-0">
+              <ActionButton
+                variant="secondary"
+                onClick={() => navigate('/settings?tab=data')}
+                title="Configure project"
+                className="h-8 px-2 md:px-2.5 text-[11px]"
+              >
+                <SettingsIcon size={12} />
+                <span className="hidden md:inline ml-1">Config</span>
+              </ActionButton>
+            </div>
+          </div>
+
+          {loadingProjectPaths ? (
+            <div className="flex items-center justify-center flex-1 min-h-0">
+              <LoadingSpinner size="md" />
+            </div>
+          ) : projectPaths.length > 0 ? (
+            <div className="space-y-1 flex-1 flex flex-col min-h-0">
+              <div className="space-y-1 overflow-y-auto pr-1 min-h-0 project-scroll-area h-full lg:max-h-[calc(var(--dashboard-row-h)-88px)]">
+                {projectPaths.map((project) => (
+                  <div key={project.id} className="p-2 rounded-lg bg-white/5 border border-white/10">
+                    <div className="flex items-center justify-between gap-1.5">
+                      <p className="text-[10px] font-medium text-white truncate leading-tight">{project.alias || project.path.split('/').pop() || project.path}</p>
+                      <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/20 border border-green-500/30 text-green-400 font-bold shrink-0">
+                        已启用
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-gray-500 truncate mt-0.5 leading-tight">{project.path}</p>
+                  </div>
+                ))}
+              </div>
+
+              {projectPaths.length > 5 && (
+                <p className="text-[9px] text-gray-500 leading-tight">可滚动查看全部 {projectPaths.length} 个项目</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 flex items-start">
+              <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 w-full">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={14} className="text-yellow-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-yellow-400">尚未配置 Project 路径</p>
+                    <p className="text-[11px] text-gray-400 mt-1">请先完成配置，否则 Skills / Agents / Terminal 的扫描能力将不可用。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </GlassCard>
       </div>
+
+      {/* Config Editor Modal */}
+      <style>{`
+        .project-scroll-area {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.45) rgba(255, 255, 255, 0.06);
+        }
+
+        .project-scroll-area::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .project-scroll-area::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.06);
+          border-radius: 9999px;
+        }
+
+        .project-scroll-area::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.45);
+          border-radius: 9999px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+
+        .project-scroll-area::-webkit-scrollbar-thumb:hover {
+          background: rgba(148, 163, 184, 0.7);
+          background-clip: padding-box;
+        }
+      `}</style>
 
       {/* Config Editor Modal */}
       {showConfigEditor && (

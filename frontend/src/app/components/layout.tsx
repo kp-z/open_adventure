@@ -26,7 +26,6 @@ import {
   ChevronRight,
   Terminal,
   Network,
-  Activity,
   Loader,
   Bell,
 } from "lucide-react";
@@ -34,7 +33,6 @@ import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
 import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
-import { useExecutionContext } from "../contexts/ExecutionContext";
 import { useNotifications } from "../contexts/NotificationContext";
 
 const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
@@ -135,7 +133,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
         },
         {
           name: t("history"),
-          path: "/executions",
+          path: "/history",
           icon: mode === "adventure" ? Trophy : History,
         },
       ],
@@ -356,13 +354,11 @@ export const Layout = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
-  const { runningExecutions } = useExecutionContext();
   const { notifications, removeNotification } = useNotifications();
   // 检测是否为移动端，移动端默认隐藏侧边栏
   const [isMobile, setIsMobile] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
-  const [showExecutions, setShowExecutions] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
   const [canGoBack, setCanGoBack] = React.useState(false);
@@ -401,7 +397,7 @@ export const Layout = () => {
     },
     {
       name: t("history"),
-      path: "/executions",
+      path: "/history",
       icon: mode === "adventure" ? Trophy : History,
     },
   ];
@@ -489,25 +485,6 @@ export const Layout = () => {
       searchInputRef.current.focus();
     }
   }, [isSearchOpen]);
-
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    if (seconds < 60) return `${seconds}秒前`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟前`;
-    return `${Math.floor(seconds / 3600)}小时前`;
-  };
-
-  const handleExecutionClick = (execution: any) => {
-    if (execution.execution_type === 'agent_test') {
-      navigate('/agents');
-    } else {
-      navigate('/workflows');
-    }
-    setShowExecutions(false);
-    setIsSidebarOpen(false);
-  };
 
   return (
     <div
@@ -708,62 +685,6 @@ export const Layout = () => {
               </button>
 
               <Navigation collapsed={false} />
-
-              {/* 移动端消息按钮 - 显示运行中的任务 */}
-              {runningExecutions.length > 0 && (
-                <div className="px-4 pb-4">
-                  <button
-                    onClick={() => setShowExecutions(!showExecutions)}
-                    className={`
-                      w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all
-                      ${showExecutions
-                        ? mode === "adventure"
-                          ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
-                          : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                        : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                      }
-                    `}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Activity size={20} />
-                      <span className="font-medium">运行中的任务</span>
-                    </div>
-                    <span className="bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-                      {runningExecutions.length}
-                    </span>
-                  </button>
-
-                  {/* 任务列表 */}
-                  <AnimatePresence>
-                    {showExecutions && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-2 space-y-2 overflow-hidden"
-                      >
-                        {runningExecutions.map(execution => (
-                          <button
-                            key={execution.id}
-                            onClick={() => handleExecutionClick(execution)}
-                            className="w-full text-left p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <Loader size={14} className="animate-spin text-blue-400" />
-                              <p className="text-xs font-medium truncate">
-                                {execution.execution_type === 'agent_test' ? `Agent 运行 #${execution.agent_id}` : `Workflow #${execution.workflow_id}`}
-                              </p>
-                            </div>
-                            <p className="text-[10px] text-gray-500">
-                              开始于 {execution.started_at ? formatRelativeTime(execution.started_at) : '刚刚'}
-                            </p>
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
 
               {/* 关闭按钮 */}
               <button

@@ -1,182 +1,195 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Terminal as TerminalIcon, X, Plus, SplitSquareHorizontal, SplitSquareVertical, Keyboard, FolderOpen } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { Terminal as TerminalIcon, X, Plus, RefreshCw, Keyboard, FolderOpen } from 'lucide-react';
 import { ActionButton } from '../components/ui-shared';
 import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { useIsMobile } from '../components/ui/use-mobile';
 import { API_CONFIG } from '../../config/api';
 import 'xterm/css/xterm.css';
 
-type SplitDirection = 'horizontal' | 'vertical' | null;
-
-interface ProjectPath {
-  id: number;
-  path: string;
-  alias: string;
-  enabled: boolean;
+interface ClaudeConversationOption {
+  session_id: string;
+  title: string;
+  project_hint?: string;
+  last_model?: string;
+  last_updated?: string;
+  source_file?: string;
 }
 
 const TerminalPane: React.FC<{
   terminal: TerminalInstance;
-  isFocused: boolean;
-}> = ({ terminal, isFocused }) => {
+  onActivate?: () => void;
+}> = ({ terminal, onActivate }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastFocusTimeRef = useRef<number>(0);
-  const isScrollingRef = useRef<boolean>(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isComposingRef = useRef<boolean>(false);
+  const { sendResize, markTerminalOpened } = useTerminalContext();
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    if (!terminalRef.current) {
+      console.error('[TerminalPane] ❌ terminalRef.current is null!');
+      return;
+    }
 
-    console.log('[TerminalPane] Mounting terminal:', terminal.id);
-    terminal.term.open(terminalRef.current);
-    terminal.fitAddon.fit();
+    console.log('[TerminalPane] 🚀 Mounting terminal:', terminal.id);
+    console.log('[TerminalPane] 📊 Terminal state:', {
+      id: terminal.id,
+      isOpened: terminal.isOpened,
+      hasElement: !!terminal.term.element,
+      rows: terminal.term.rows,
+      cols: terminal.term.cols,
+      lifecycle: terminal.lifecycle,
+    });
 
-    // 移动端支持：自动聚焦终端
-    const focusTerminal = (reason?: string) => {
-      // 防止频繁聚焦（100ms 内只聚焦一次）
-      const now = Date.now();
-      if (now - lastFocusTimeRef.current < 100) {
-        return;
-      }
-      lastFocusTimeRef.current = now;
+    const container = terminalRef.current;
+    console.log('[TerminalPane] 📦 Container info:', {
+      width: container.offsetWidth,
+      height: container.offsetHeight,
+      display: window.getComputedStyle(container).display,
+      visibility: window.getComputedStyle(container).visibility,
+      childCount: container.children.length,
+    });
 
-      // 如果正在滚动，延迟聚焦
-      if (isScrollingRef.current) {
-        if (focusTimeoutRef.current) {
-          clearTimeout(focusTimeoutRef.current);
+    const attachTerminalElement = () => {
+      if (!terminal.isOpened) {
+        console.log('[TerminalPane] 🔧 Attempting to open terminal...');
+        try {
+          terminal.term.open(container);
+          markTerminalOpened(terminal.id);
+          console.log('[TerminalPane] ✅ Terminal opened successfully');
+          console.log('[TerminalPane] 📊 After open:', {
+            hasElement: !!terminal.term.element,
+            elementParent: terminal.term.element?.parentElement?.tagName,
+            containerChildCount: container.children.length,
+            firstChildClass: container.firstChild ? (container.firstChild as HTMLElement).className : 'none',
+          });
+          return;
+        } catch (error) {
+          console.error('[TerminalPane] ❌ term.open failed:', error);
+          console.warn('[TerminalPane] 🔄 Attempting fallback to existing element attach');
         }
-        focusTimeoutRef.current = setTimeout(() => {
-          terminal.term.focus();
-          console.log('[TerminalPane] Focus restored after scroll:', reason);
-        }, 150);
-        return;
+      } else {
+        console.log('[TerminalPane] ℹ️ Terminal already opened, checking element attachment');
       }
 
-      terminal.term.focus();
-      console.log('[TerminalPane] Terminal focused:', reason);
-    };
+      const fallbackElement = terminal.term.element as HTMLElement | undefined;
+      console.log('[TerminalPane] 🔍 Fallback element:', {
+        exists: !!fallbackElement,
+        parent: fallbackElement?.parentElement?.tagName,
+        needsAttach: fallbackElement && fallbackElement.parentElement !== container,
+      });
 
-    // 监听焦点事件（使用 focusin/focusout，支持冒泡）
-    const handleFocusIn = (e: FocusEvent) => {
-      console.log('[TerminalPane] Focus in:', e.target);
-    };
-
-    const handleFocusOut = (e: FocusEvent) => {
-      console.log('[TerminalPane] Focus out:', e.target, 'relatedTarget:', e.relatedTarget);
-
-      // 如果焦点移到了虚拟键盘按钮，稍后恢复焦点
-      const relatedTarget = e.relatedTarget as HTMLElement;
-      if (relatedTarget && relatedTarget.tagName === 'BUTTON') {
-        // 延迟恢复焦点，等待按钮点击完成
-        if (focusTimeoutRef.current) {
-          clearTimeout(focusTimeoutRef.current);
+      if (fallbackElement && fallbackElement.parentElement !== container) {
+        console.log('[TerminalPane] 🔄 Attaching existing element to container');
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
         }
-        focusTimeoutRef.current = setTimeout(() => {
-          focusTerminal('after button click');
-        }, 100);
+        container.appendChild(fallbackElement);
+        markTerminalOpened(terminal.id);
+        console.log('[TerminalPane] ✅ Element attached successfully');
       }
     };
 
-    // 监听滚动事件
-    const handleScroll = () => {
-      isScrollingRef.current = true;
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
+    attachTerminalElement();
+
+    const fitAndNotify = () => {
+      try {
+        console.log('[TerminalPane] 📏 Fitting terminal...');
+        terminal.fitAddon.fit();
+        console.log('[TerminalPane] ✅ Fit successful:', {
+          rows: terminal.term.rows,
+          cols: terminal.term.cols,
+        });
+        sendResize(terminal.id, terminal.term.rows, terminal.term.cols);
+      } catch (error) {
+        console.error('[TerminalPane] ❌ fitAndNotify failed:', error);
       }
-      scrollTimeoutRef.current = setTimeout(() => {
-        isScrollingRef.current = false;
-        // 滚动结束后恢复焦点
-        focusTerminal('after scroll');
-      }, 200);
     };
 
-    // IME 组合事件监听
-    const handleCompositionStart = (e: CompositionEvent) => {
-      console.log('[TerminalPane] Composition start:', e.data);
+    requestAnimationFrame(() => {
+      fitAndNotify();
+      requestAnimationFrame(fitAndNotify);
+    });
+
+    const fitTimer1 = setTimeout(fitAndNotify, 60);
+    const fitTimer2 = setTimeout(fitAndNotify, 260);
+
+    const handleCompositionStart = () => {
       isComposingRef.current = true;
     };
 
-    const handleCompositionUpdate = (e: CompositionEvent) => {
-      console.log('[TerminalPane] Composition update:', e.data);
-      // 组合输入中，不做特殊处理，让 xterm.js 自己处理
-    };
-
-    const handleCompositionEnd = (e: CompositionEvent) => {
-      console.log('[TerminalPane] Composition end:', e.data);
+    const handleCompositionEnd = () => {
       isComposingRef.current = false;
-      // 组合结束后，xterm.js 会自动发送最终的输入
     };
 
     const terminalElement = terminalRef.current;
-    terminalElement.addEventListener('focusin', handleFocusIn);
-    terminalElement.addEventListener('focusout', handleFocusOut);
-    terminalElement.addEventListener('scroll', handleScroll, { passive: true });
     terminalElement.addEventListener('compositionstart', handleCompositionStart);
-    terminalElement.addEventListener('compositionupdate', handleCompositionUpdate);
     terminalElement.addEventListener('compositionend', handleCompositionEnd);
 
-    // 移除初始自动聚焦，只在用户主动点击键盘按钮时聚焦
-    // setTimeout(() => focusTerminal('initial'), 100);
-
-    // 窗口大小变化时重新适配
     const handleResize = () => {
-      terminal.fitAddon.fit();
-      if (terminal.ws.readyState === WebSocket.OPEN) {
-        terminal.ws.send(JSON.stringify({
-          type: 'resize',
-          rows: terminal.term.rows,
-          cols: terminal.term.cols
-        }));
-      }
+      fitAndNotify();
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
-    resizeObserver.observe(terminalRef.current);
+    resizeObserver.observe(terminalElement);
 
     return () => {
       resizeObserver.disconnect();
-      terminalElement.removeEventListener('focusin', handleFocusIn);
-      terminalElement.removeEventListener('focusout', handleFocusOut);
-      terminalElement.removeEventListener('scroll', handleScroll);
       terminalElement.removeEventListener('compositionstart', handleCompositionStart);
-      terminalElement.removeEventListener('compositionupdate', handleCompositionUpdate);
       terminalElement.removeEventListener('compositionend', handleCompositionEnd);
-      if (focusTimeoutRef.current) {
-        clearTimeout(focusTimeoutRef.current);
-      }
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
+      clearTimeout(fitTimer1);
+      clearTimeout(fitTimer2);
     };
-  }, [terminal]);
+  }, [terminal, markTerminalOpened, sendResize]);
 
   return (
     <div
       ref={terminalRef}
-      className="flex-1 overflow-auto"
+      className="flex-1 overflow-auto relative"
+      onClick={() => {
+        if (isComposingRef.current) {
+          return;
+        }
+        onActivate?.();
+        terminal.term.focus();
+      }}
       style={{
         minHeight: 0,
-        touchAction: 'pan-y',  // 允许垂直滚动，禁止水平滚动和缩放
-        WebkitOverflowScrolling: 'touch',  // iOS 平滑滚动
-        WebkitTouchCallout: 'none',  // 禁用长按菜单
-        WebkitUserSelect: 'text',  // 允许文本选择
-        overscrollBehavior: 'contain',  // 防止滚动穿透
-        scrollBehavior: 'smooth',  // 平滑滚动
-        willChange: 'scroll-position',  // 提示浏览器优化滚动性能
+        touchAction: 'pan-y',
+        WebkitOverflowScrolling: 'touch',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'text',
+        overscrollBehavior: 'contain',
+        scrollBehavior: 'smooth',
+        willChange: 'scroll-position',
+        backgroundColor: '#000', // 确保有背景色
       }}
-    />
+    >
+    </div>
   );
 };
 
 const Terminal = () => {
-  const { terminals, activeTabId, setActiveTabId, createTerminal, closeTerminal, cleanupAll, isRestoring } = useTerminalContext();
-  const [splitDirection, setSplitDirection] = useState<SplitDirection>(null);
-  const [splitTerminalId, setSplitTerminalId] = useState<string | null>(null);
+  const {
+    terminals,
+    activeTabId,
+    setActiveTabId,
+    createTerminal,
+    closeTerminal,
+    cleanupAll,
+    sendInput,
+    isRestoring,
+    restoreSettled,
+    syncClaudeConversations,
+    restoreClaudeConversation,
+  } = useTerminalContext();
+  const { addNotification } = useNotifications();
   const isMobile = useIsMobile();
-  const [projectPaths, setProjectPaths] = useState<ProjectPath[]>([]);
   const [showProjectSelector, setShowProjectSelector] = useState(false);
+  const [showConversationSelector, setShowConversationSelector] = useState(false);
+  const [syncingConversations, setSyncingConversations] = useState(false);
+  const [conversationOptions, setConversationOptions] = useState<ClaudeConversationOption[]>([]);
+  const [projectPaths, setProjectPaths] = useState<Array<{ id: number; path: string; alias: string }>>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -184,7 +197,76 @@ const Terminal = () => {
   const [longPressKey, setLongPressKey] = useState<string | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const terminalContainerRef = useRef<HTMLDivElement>(null);
+  const [debugExpanded, setDebugExpanded] = useState(false);
+  const showDebugInfo = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('terminal_debug') === '1';
+
+  // 诊断函数：打印终端状态
+  const diagnoseTerminal = useCallback(() => {
+    console.log('=== 🔍 TERMINAL DIAGNOSIS ===');
+    console.log('Terminals count:', terminals.length);
+    console.log('Active tab ID:', activeTabId);
+    console.log('Is restoring:', isRestoring);
+    console.log('Restore settled:', restoreSettled);
+
+    terminals.forEach((term, index) => {
+      console.log(`\n--- Terminal ${index + 1} ---`);
+      console.log('ID:', term.id);
+      console.log('Title:', term.title);
+      console.log('Is opened:', term.isOpened);
+      console.log('Lifecycle:', term.lifecycle);
+      console.log('Has element:', !!term.term.element);
+      console.log('Element parent:', term.term.element?.parentElement?.tagName);
+      console.log('Rows x Cols:', `${term.term.rows} x ${term.term.cols}`);
+      console.log('WS state:', term.ws.readyState);
+
+      if (term.term.element) {
+        const el = term.term.element as HTMLElement;
+        console.log('Element dimensions:', {
+          width: el.offsetWidth,
+          height: el.offsetHeight,
+          display: window.getComputedStyle(el).display,
+          visibility: window.getComputedStyle(el).visibility,
+        });
+      }
+    });
+    console.log('=== END DIAGNOSIS ===\n');
+  }, [terminals, activeTabId, isRestoring, restoreSettled]);
+
+  // 在开发环境下，每5秒自动诊断一次
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+
+    const interval = setInterval(() => {
+      diagnoseTerminal();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [diagnoseTerminal]);
+
+  const [, setDebugTick] = useState(0);
+  useEffect(() => {
+    if (!showDebugInfo) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setDebugTick((value) => value + 1);
+    }, 500);
+    return () => clearInterval(timer);
+  }, [showDebugInfo]);
+
+  const handleActivateTerminal = useCallback((terminalId: string) => {
+    if (activeTabId !== terminalId) {
+      setActiveTabId(terminalId);
+    }
+  }, [activeTabId, setActiveTabId]);
+
+  const notifyRestoreInProgress = useCallback(() => {
+    addNotification({
+      type: 'info',
+      title: '终端暂不可用',
+      message: '终端恢复中，请稍后重试',
+    });
+  }, [addNotification]);
 
   // 获取项目路径列表
   useEffect(() => {
@@ -201,30 +283,90 @@ const Terminal = () => {
   }, []);
 
   // 处理选择项目并创建新终端
-  const handleSelectProject = (projectPath: string) => {
-    console.log('[Terminal] Creating new terminal for project path:', projectPath);
-    createTerminal(projectPath);
+  const handleSelectProject = useCallback(async (projectPath: string) => {
     setShowProjectSelector(false);
-  };
 
-  // 初始化第一个终端（只在没有恢复 session 时）
-  useEffect(() => {
-    // 如果正在恢复，不创建新终端
     if (isRestoring) {
-      console.log('[Terminal] Skipping initial terminal creation - restore in progress');
+      notifyRestoreInProgress();
       return;
     }
 
-    // 延迟检查，等待恢复逻辑完成
-    const timer = setTimeout(() => {
-      if (terminals.length === 0) {
-        console.log('[Terminal] No terminals found, creating initial terminal');
-        createTerminal();
-      }
-    }, 200); // 等待恢复逻辑完成
+    // 创建终端并自动启动 Claude
+    const terminal = createTerminal(projectPath, true);
+    if (!terminal) {
+      notifyRestoreInProgress();
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, [isRestoring]);
+    addNotification({
+      type: 'success',
+      title: '终端已创建',
+      message: `已在项目路径 ${projectPath} 创建新终端，Claude 正在启动...`,
+    });
+  }, [createTerminal, isRestoring, notifyRestoreInProgress, addNotification]);
+
+  const handleSyncConversations = useCallback(async () => {
+    setSyncingConversations(true);
+    const items = await syncClaudeConversations();
+    setConversationOptions(items);
+    setShowConversationSelector(true);
+    setSyncingConversations(false);
+  }, [syncClaudeConversations]);
+
+  const handleRestoreConversation = useCallback(async (sessionId: string) => {
+    // 验证 session_id
+    if (!sessionId || !sessionId.trim()) {
+      addNotification({
+        type: 'error',
+        title: '会话恢复失败',
+        message: '会话 ID 不能为空，请选择一个有效的会话。',
+      });
+      return;
+    }
+
+    // 验证 session_id 格式（UUID 格式）
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(sessionId)) {
+      addNotification({
+        type: 'error',
+        title: '会话恢复失败',
+        message: `无效的会话 ID 格式: ${sessionId.slice(0, 20)}...`,
+      });
+      return;
+    }
+
+    const restored = await restoreClaudeConversation(sessionId);
+    if (!restored) {
+      addNotification({
+        type: 'error',
+        title: '会话恢复失败',
+        message: `无法恢复会话 ${sessionId.slice(0, 8)}，请检查会话是否存在。`,
+      });
+      return;
+    }
+    setShowConversationSelector(false);
+    addNotification({
+      type: 'success',
+      title: '会话恢复成功',
+      message: `已恢复会话 ${sessionId.slice(0, 8)}，正在执行 claude --resume 命令...`,
+    });
+  }, [restoreClaudeConversation, addNotification]);
+
+  // 初始化第一个终端（只在恢复流程收敛后且无终端时）
+  useEffect(() => {
+    if (!restoreSettled || isRestoring) {
+      console.log('[Terminal] Skipping initial terminal creation - restore not settled');
+      return;
+    }
+
+    if (terminals.length > 0) {
+      return;
+    }
+
+    // 如果没有终端，显示项目选择器让用户选择
+    console.log('[Terminal] No terminals found, showing project selector');
+    setShowProjectSelector(true);
+  }, [restoreSettled, isRestoring, terminals.length]);
 
   // 监听虚拟键盘事件
   useEffect(() => {
@@ -267,6 +409,16 @@ const Terminal = () => {
 
   // 获取当前活跃的终端
   const activeTerminal = terminals.find(t => t.id === activeTabId);
+
+  // 兜底：有终端但 activeTabId 无效时，自动激活第一个终端
+  useEffect(() => {
+    if (terminals.length === 0) return;
+
+    const hasValidActive = activeTabId && terminals.some(t => t.id === activeTabId);
+    if (!hasValidActive) {
+      setActiveTabId(terminals[0].id);
+    }
+  }, [terminals, activeTabId, setActiveTabId]);
 
   // 滚动到底部函数
   const scrollToBottom = () => {
@@ -325,33 +477,15 @@ const Terminal = () => {
   //   }
   // }, [isMobile, activeTabId, activeTerminal]);
 
-  const handleSplit = (direction: 'horizontal' | 'vertical') => {
-    if (!activeTabId) return;
-
-    // 如果已经有分屏，先取消
-    if (splitTerminalId) {
-      setSplitTerminalId(null);
-      setSplitDirection(null);
-    }
-
-    // 创建新终端用于分屏
-    const newTerminal = createTerminal();
-    setSplitDirection(direction);
-    setSplitTerminalId(newTerminal.id);
-  };
-
-  const handleClearActive = () => {
-    const terminal = terminals.find(t => t.id === activeTabId);
-    if (terminal) {
-      terminal.term.clear();
-    }
-  };
-
   const handleCloseAllAndRestart = async () => {
     // 关闭所有终端
     await cleanupAll();
-    // 重启一个新终端（使用默认路径，用户可以通过 + 按钮选择项目）
-    createTerminal();
+
+    // 恢复流程未收敛时不重启终端
+    const terminal = createTerminal();
+    if (!terminal) {
+      notifyRestoreInProgress();
+    }
   };
 
   const handleFocusTerminal = () => {
@@ -372,7 +506,7 @@ const Terminal = () => {
   const sendKeyToTerminal = (key: string) => {
     triggerHaptic();
     const terminal = terminals.find(t => t.id === activeTabId);
-    if (!terminal || terminal.ws.readyState !== WebSocket.OPEN) return;
+    if (!terminal) return;
 
     const keyMap: Record<string, string> = {
       'Tab': '\t',
@@ -399,20 +533,11 @@ const Terminal = () => {
 
     const keyCode = keyMap[key];
     if (keyCode) {
-      terminal.ws.send(JSON.stringify({
-        type: 'input',
-        data: keyCode
-      }));
+      sendInput(terminal.id, keyCode);
 
-      // 如果是 Shift 组合键，发送后自动释放 Shift
       if (key.startsWith('Shift+')) {
         setIsShiftPressed(false);
       }
-
-      // 发送按键后恢复焦点
-      setTimeout(() => {
-        terminal.term.focus();
-      }, 50);
     }
   };
 
@@ -442,17 +567,6 @@ const Terminal = () => {
     };
   }, []);
 
-  // 处理关闭终端时的分屏状态
-  useEffect(() => {
-    if (splitTerminalId && !terminals.find(t => t.id === splitTerminalId)) {
-      setSplitTerminalId(null);
-      setSplitDirection(null);
-    }
-  }, [terminals, splitTerminalId]);
-
-  // 获取分屏终端
-  const splitTerminal = terminals.find(t => t.id === splitTerminalId);
-
   return (
     <div
       className="h-full flex flex-col p-4 md:p-8 space-y-4 md:space-y-6"
@@ -469,7 +583,7 @@ const Terminal = () => {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">TERMINAL</h1>
           <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
-            多标签终端，支持分屏和项目路径快速切换
+            多标签终端，支持项目路径快速切换与 Claude 会话恢复
           </p>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-xs text-gray-500">
@@ -477,7 +591,7 @@ const Terminal = () => {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           {/* 添加按钮 - 点击显示项目选择器 */}
           <div className="relative">
             <ActionButton
@@ -485,7 +599,7 @@ const Terminal = () => {
               onClick={() => setShowProjectSelector(!showProjectSelector)}
               title="New Tab"
             >
-              <Plus size={16} />
+              <Plus size={18} />
             </ActionButton>
 
             {/* 项目选择器下拉菜单 */}
@@ -528,26 +642,50 @@ const Terminal = () => {
             )}
           </div>
 
-          {!isMobile && (
-            <>
-              <ActionButton
-                variant="secondary"
-                onClick={() => handleSplit('horizontal')}
-                title="Split Horizontal"
-                disabled={!activeTabId}
-              >
-                <SplitSquareHorizontal size={16} />
-              </ActionButton>
-              <ActionButton
-                variant="secondary"
-                onClick={() => handleSplit('vertical')}
-                title="Split Vertical"
-                disabled={!activeTabId}
-              >
-                <SplitSquareVertical size={16} />
-              </ActionButton>
-            </>
-          )}
+          <div className="relative">
+            <ActionButton
+              variant="secondary"
+              onClick={handleSyncConversations}
+              title="Sync Claude Conversations"
+              disabled={syncingConversations}
+            >
+              <RefreshCw size={18} className={syncingConversations ? 'animate-spin' : ''} />
+            </ActionButton>
+
+            {showConversationSelector && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowConversationSelector(false)}
+                />
+                <div className="absolute top-full right-0 mt-2 w-80 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden">
+                  <div className="p-2 border-b border-white/10">
+                    <p className="text-xs text-gray-400 px-2 py-1">选择 Claude 会话恢复</p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {conversationOptions.length > 0 ? (
+                      conversationOptions.map((item) => (
+                        <button
+                          key={item.session_id}
+                          onClick={() => handleRestoreConversation(item.session_id)}
+                          className="w-full text-left px-4 py-2 hover:bg-white/10 transition-colors"
+                        >
+                          <p className="text-sm text-white truncate">{item.title || item.session_id}</p>
+                          <p className="text-[11px] text-gray-400 truncate">{item.session_id}</p>
+                          <p className="text-[10px] text-gray-500 truncate">
+                            {item.project_hint || 'unknown project'}
+                            {item.last_updated ? ` · ${new Date(item.last_updated).toLocaleString()}` : ''}
+                          </p>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-gray-500">未发现可恢复会话</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           {isMobile && (
             <ActionButton
               variant="secondary"
@@ -555,14 +693,36 @@ const Terminal = () => {
               title="Focus Terminal (Show Keyboard)"
               disabled={!activeTabId}
             >
-              <Keyboard size={16} />
+              <Keyboard size={18} />
             </ActionButton>
           )}
           <ActionButton variant="secondary" onClick={handleCloseAllAndRestart} title="Close All & Restart">
-            <X size={16} />
+            <X size={18} />
           </ActionButton>
         </div>
       </header>
+
+      {/* 调试信息（开发环境 + 本地开关） */}
+      {showDebugInfo && (
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 font-mono text-[11px] text-yellow-200">
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left hover:bg-yellow-500/10 transition-colors"
+            onClick={() => setDebugExpanded((value) => !value)}
+          >
+            Debug 诊断条（点击{debugExpanded ? '折叠' : '展开'}）
+          </button>
+          {debugExpanded && (
+            <div className="px-3 pb-3 space-y-1 border-t border-yellow-500/20">
+              <div>activeTabId={activeTabId ?? 'null'}</div>
+              <div>wsState={activeTerminal ? activeTerminal.ws.readyState : 'null'}</div>
+              <div>lifecycle={activeTerminal?.lifecycle ?? 'null'}</div>
+              <div>queueLength={activeTerminal?.inputQueue?.length ?? 0}</div>
+              <div>lastAckSeq={activeTerminal?.lastAckSeq ?? 0}</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 移动端虚拟键盘工具栏 */}
       {isMobile && isKeyboardVisible && (
@@ -613,11 +773,8 @@ const Terminal = () => {
 
                   try {
                     const text = await navigator.clipboard.readText();
-                    if (text && terminal.ws.readyState === WebSocket.OPEN) {
-                      terminal.ws.send(JSON.stringify({
-                        type: 'input',
-                        data: text
-                      }));
+                    if (text) {
+                      sendInput(terminal.id, text);
                     }
                   } catch (error) {
                     console.error('[Terminal] Failed to paste:', error);
@@ -838,14 +995,14 @@ const Terminal = () => {
         )}
 
         {/* Terminal Content */}
-        <div className={`flex-1 flex ${splitDirection === 'horizontal' ? 'flex-col' : 'flex-row'} overflow-hidden relative`}>
+        <div className="flex-1 flex overflow-hidden relative">
           {/* Main Terminal */}
           {activeTerminal && (
-            <div className={`flex-1 flex flex-col overflow-hidden ${splitTerminal ? 'border-r border-white/10' : ''} relative`}>
+            <div className="flex-1 flex flex-col overflow-hidden relative">
               <TerminalPane
                 key={activeTerminal.id}
                 terminal={activeTerminal}
-                isFocused={true}
+                onActivate={() => handleActivateTerminal(activeTerminal.id)}
               />
 
               {/* 滚动到底部按钮 */}
@@ -873,27 +1030,6 @@ const Terminal = () => {
           )}
 
           {/* Split Terminal */}
-          {splitTerminal && (
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-1 bg-black/40 border-b border-white/10">
-                <span className="text-xs text-gray-400 font-mono">{splitTerminal.title}</span>
-                <button
-                  onClick={() => {
-                    setSplitTerminalId(null);
-                    setSplitDirection(null);
-                  }}
-                  className="text-gray-400 hover:text-red-400 transition-colors"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-              <TerminalPane
-                key={splitTerminal.id}
-                terminal={splitTerminal}
-                isFocused={false}
-              />
-            </div>
-          )}
         </div>
       </div>
     </div>

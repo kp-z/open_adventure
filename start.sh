@@ -13,6 +13,10 @@ mkdir -p "$PID_DIR"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 
+# 固定默认端口（除非用户显式选择新端口）
+BACKEND_PORT=8000
+FRONTEND_PORT=5173
+
 # 检查是否为后台运行模式
 DAEMON_MODE=false
 if [[ "$1" == "-d" ]] || [[ "$1" == "--daemon" ]]; then
@@ -104,14 +108,25 @@ if [ -f "$BACKEND_PID_FILE" ]; then
     rm -f "$BACKEND_PID_FILE"
 fi
 
+if [ -f "$FRONTEND_PID_FILE" ]; then
+    OLD_FRONTEND_PID=$(cat "$FRONTEND_PID_FILE")
+    if [ -n "$OLD_FRONTEND_PID" ] && kill -0 "$OLD_FRONTEND_PID" 2>/dev/null; then
+        echo "⚠️  Found running frontend process from previous session (PID: $OLD_FRONTEND_PID)"
+        echo "Cleaning up old process..."
+        kill "$OLD_FRONTEND_PID" 2>/dev/null || true
+        sleep 1
+    fi
+    rm -f "$FRONTEND_PID_FILE"
+fi
+
 # 强制清理后端进程的函数
 cleanup_backend() {
     echo "Cleaning up backend processes..."
 
     # 方法1: 通过端口查找并杀死进程
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-        echo "  - Killing processes on port 8000..."
-        lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+    if lsof -Pi :$BACKEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo "  - Killing processes on port $BACKEND_PORT..."
+        lsof -ti :$BACKEND_PORT | xargs kill -9 2>/dev/null || true
     fi
 
     # 方法2: 通过进程名查找并杀死
@@ -124,55 +139,133 @@ cleanup_backend() {
     pkill -9 -f "python.*run\.py" 2>/dev/null || true
     pkill -9 -f "python3.*run\.py" 2>/dev/null || true
 
-    # 方法4: 查找所有监听 8000 端口的 Python 进程
-    pgrep -f "python.*8000" | xargs kill -9 2>/dev/null || true
+    # 方法4: 查找所有监听后端端口的 Python 进程
+    pgrep -f "python.*$BACKEND_PORT" | xargs kill -9 2>/dev/null || true
 
     # 等待进程完全退出
     sleep 2
 
     # 最终验证
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-        echo "  ⚠️  Warning: Port 8000 still occupied after cleanup"
+    if lsof -Pi :$BACKEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo "  ⚠️  Warning: Port $BACKEND_PORT still occupied after cleanup"
         # 最后一次尝试：直接杀死所有占用端口的进程
-        lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+        lsof -ti :$BACKEND_PORT | xargs kill -9 2>/dev/null || true
         sleep 1
 
-        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        if lsof -Pi :$BACKEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
             return 1
         fi
     fi
 
+    rm -f "$BACKEND_PID_FILE"
     echo "  ✅ Backend cleanup completed"
     return 0
 }
 
+# 强制清理前端进程的函数
+cleanup_frontend() {
+    echo "Cleaning up frontend processes..."
+
+    # 方法1: 通过端口查找并杀死进程
+    if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo "  - Killing processes on port $FRONTEND_PORT..."
+        lsof -ti :$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+    fi
+
+    # 方法2: 通过进程名查找并杀死
+    echo "  - Killing Vite frontend processes..."
+    pkill -9 -f "vite.*$FRONTEND_PORT" 2>/dev/null || true
+    pkill -9 -f "npm.*run dev" 2>/dev/null || true
+
+    # 等待进程完全退出
+    sleep 1
+
+    # 最终验证
+    if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo "  ⚠️  Warning: Port $FRONTEND_PORT still occupied after cleanup"
+        lsof -ti :$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
+        sleep 1
+
+        if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+            return 1
+        fi
+    fi
+
+    rm -f "$FRONTEND_PID_FILE"
+    echo "  ✅ Frontend cleanup completed"
+    return 0
+}
+
+# 读取端口策略：重启占用进程 / 使用新端口 / 退出
+resolve_port_conflict() {
+    local service_name="$1"
+    local port_var_name="$2"
+    local cleanup_func_name="$3"
+
+    local current_port
+    current_port=$(eval "echo \$$port_var_name")
+
+    if ! lsof -Pi :"$current_port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo "⚠️  Port $current_port is already in use for $service_name"
+    echo "Choose an action:"
+    echo "  [r] Restart on this port (kill occupying process)"
+    echo "  [n] Use a new port"
+    echo "  [q] Quit"
+
+    while true; do
+        read -r -p "Your choice [r/n/q]: " choice
+        case "$choice" in
+            r|R)
+                if ! "$cleanup_func_name"; then
+                    echo "❌ Failed to release port $current_port"
+                    echo "Please manually stop the process and retry."
+                    exit 1
+                fi
+                echo "✅ Port $current_port released"
+                break
+                ;;
+            n|N)
+                while true; do
+                    read -r -p "Enter new $service_name port: " new_port
+                    if [[ ! "$new_port" =~ ^[0-9]+$ ]] || [ "$new_port" -lt 1 ] || [ "$new_port" -gt 65535 ]; then
+                        echo "❌ Invalid port. Please enter a number between 1 and 65535."
+                        continue
+                    fi
+
+                    if lsof -Pi :"$new_port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+                        echo "⚠️  Port $new_port is also in use. Choose another one."
+                        continue
+                    fi
+
+                    eval "$port_var_name=$new_port"
+                    echo "✅ $service_name will use port $new_port"
+                    break
+                done
+                break
+                ;;
+            q|Q)
+                echo "❌ Startup cancelled by user"
+                exit 1
+                ;;
+            *)
+                echo "Please enter r, n, or q."
+                ;;
+        esac
+    done
+}
+
 # 检查端口占用
 echo "Checking port availability..."
-if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-    echo "⚠️  Port 8000 is already in use"
-    echo "This might be an old version of Claude Manager still running."
-    echo ""
-    echo "Do you want to stop the existing process? [y/N]"
-    read -r response
-    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        if ! cleanup_backend; then
-            echo "❌ Failed to release port 8000"
-            echo "Please manually stop the processes and try again:"
-            echo "  sudo lsof -ti :8000 | xargs kill -9"
-            exit 1
-        fi
-        echo "✅ Port 8000 released"
-    else
-        echo "❌ Cannot start: Port 8000 is occupied"
-        echo "Please stop the existing service manually or choose 'y' to stop it automatically"
-        exit 1
-    fi
-fi
+resolve_port_conflict "backend" "BACKEND_PORT" "cleanup_backend"
+resolve_port_conflict "frontend" "FRONTEND_PORT" "cleanup_frontend"
 
 # 启动后端服务器（后台运行）
-echo "Starting backend server..."
+echo "Starting backend server on port $BACKEND_PORT..."
 # macOS 不支持 setsid，直接使用后台运行
-python run.py > ../docs/logs/backend.log 2>&1 &
+python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 echo "✅ Backend started (PID: $BACKEND_PID)"
@@ -180,23 +273,56 @@ echo "✅ Backend started (PID: $BACKEND_PID)"
 # 等待后端启动（最多 10 秒）
 echo "Waiting for backend to start..."
 for i in {1..20}; do
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if lsof -Pi :$BACKEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo "✅ Backend is ready"
         break
     fi
     if [ $i -eq 20 ]; then
-        echo "⚠️  Backend may not have started properly, check logs/backend.log"
+        echo "⚠️  Backend may not have started properly, check docs/logs/backend.log"
     fi
     sleep 0.5
 done
+
+# 后端健康检查（阻断前端启动）
+check_backend_endpoint() {
+    local endpoint="$1"
+    local name="$2"
+
+    for _ in {1..20}; do
+        local status
+        status=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${BACKEND_PORT}${endpoint}" || true)
+        if [ "$status" = "200" ]; then
+            echo "✅ ${name} check passed (${endpoint})"
+            return 0
+        fi
+        sleep 0.5
+    done
+
+    echo "❌ ${name} check failed (${endpoint})"
+    return 1
+}
+
+if ! check_backend_endpoint "/api/system/health" "Backend health"; then
+    echo "❌ Backend health check failed."
+    echo "👉 Please check docs/logs/backend.log for startup errors."
+    echo "👉 Possible causes: port ${BACKEND_PORT} conflict or backend process crashed."
+    exit 1
+fi
+
+if ! check_backend_endpoint "/api/terminal/status" "Terminal status"; then
+    echo "❌ Terminal status check failed."
+    echo "👉 Please check docs/logs/backend.log for terminal initialization errors."
+    echo "👉 Possible causes: backend service not fully initialized or port ${BACKEND_PORT} conflict."
+    exit 1
+fi
 
 # ============ 前端设置 ============
 cd "$SCRIPT_DIR/frontend"
 echo ""
 echo "📦 Setting up frontend..."
 
-# 检查 node_modules
-if [ ! -d "node_modules" ]; then
+# 检查 npm 依赖健康状态
+if ! npm ls --depth=0 >/dev/null 2>&1; then
     echo "Installing frontend dependencies..."
     npm install
     echo "✅ Frontend dependencies installed"
@@ -237,10 +363,8 @@ DISPLAY_IP=$(get_display_ip)
 
 if [ -n "$DISPLAY_IP" ]; then
     echo "✅ Network access configured (IP: $DISPLAY_IP)"
-    echo "   Frontend will auto-detect API address"
 else
     echo "✅ Network access configured"
-    echo "   Frontend will auto-detect API address"
 fi
 
 # 启动前端服务器
@@ -249,14 +373,14 @@ echo "Starting frontend server..."
 
 if [ "$DAEMON_MODE" = true ]; then
     # 后台模式：前端也在后台运行
-    npm run dev > ../docs/logs/frontend.log 2>&1 &
+    VITE_API_BASE_URL="http://localhost:${BACKEND_PORT}/api" npm run dev -- --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
 
     # 等待前端启动（最多 10 秒）
     echo "Waiting for frontend to start..."
     for i in {1..20}; do
-        if lsof -Pi :5173 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
             echo "✅ Frontend is ready (PID: $FRONTEND_PID)"
             break
         fi
@@ -272,15 +396,14 @@ if [ "$DAEMON_MODE" = true ]; then
     echo "============================================"
     echo ""
     echo "🌐 Local Access:"
-    echo "   Frontend: http://localhost:5173"
-    echo "   Backend API: http://localhost:8000"
-    echo "   API Docs: http://localhost:8000/docs"
+    echo "   Frontend: http://localhost:${FRONTEND_PORT}"
+    echo "   Backend API: http://localhost:${BACKEND_PORT}"
+    echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
-        echo "   Frontend: http://${DISPLAY_IP}:5173"
-        echo "   Backend API: http://${DISPLAY_IP}:8000"
-        echo "   (Frontend auto-detects API address)"
+        echo "   Frontend: http://${DISPLAY_IP}:${FRONTEND_PORT}"
+        echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
     fi
     echo ""
     echo "📋 Process IDs:"
@@ -302,15 +425,14 @@ else
     echo "============================================"
     echo ""
     echo "🌐 Local Access:"
-    echo "   Frontend: http://localhost:5173"
-    echo "   Backend API: http://localhost:8000"
-    echo "   API Docs: http://localhost:8000/docs"
+    echo "   Frontend: http://localhost:${FRONTEND_PORT}"
+    echo "   Backend API: http://localhost:${BACKEND_PORT}"
+    echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
-        echo "   Frontend: http://${DISPLAY_IP}:5173"
-        echo "   Backend API: http://${DISPLAY_IP}:8000"
-        echo "   (Frontend auto-detects API address)"
+        echo "   Frontend: http://${DISPLAY_IP}:${FRONTEND_PORT}"
+        echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
     fi
     echo ""
     echo "Press Ctrl+C to stop all servers"
@@ -322,38 +444,58 @@ else
         echo ""
         echo "🛑 Shutting down servers..."
 
-        # 1. 优先使用 PID 文件中的 PID
+        fast_stop_pid() {
+            local pid="$1"
+            local name="$2"
+
+            if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+                return 0
+            fi
+
+            echo "Stopping $name (PID: $pid)..."
+            kill "$pid" 2>/dev/null || true
+
+            # 最多等待 1.2 秒，避免 Ctrl+C 卡住
+            for _ in {1..6}; do
+                if ! kill -0 "$pid" 2>/dev/null; then
+                    return 0
+                fi
+                sleep 0.2
+            done
+
+            kill -9 "$pid" 2>/dev/null || true
+        }
+
+        # 1. 优先按 PID 文件快速停止后端
         if [ -f "$BACKEND_PID_FILE" ]; then
             SAVED_PID=$(cat "$BACKEND_PID_FILE")
-            if [ -n "$SAVED_PID" ] && kill -0 "$SAVED_PID" 2>/dev/null; then
-                echo "Stopping backend (PID: $SAVED_PID)..."
-                # 使用进程组 kill，确保子进程也被停止
-                kill -- -"$SAVED_PID" 2>/dev/null || kill "$SAVED_PID" 2>/dev/null
-                # 等待进程退出（最多 5 秒）
-                for i in {1..10}; do
-                    if ! kill -0 "$SAVED_PID" 2>/dev/null; then
-                        break
-                    fi
-                    sleep 0.5
-                done
-            fi
+            fast_stop_pid "$SAVED_PID" "backend"
             rm -f "$BACKEND_PID_FILE"
         fi
 
-        # 2. 如果 BACKEND_PID 变量存在，也尝试清理
-        if [ -n "$BACKEND_PID" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
-            kill -- -"$BACKEND_PID" 2>/dev/null || kill "$BACKEND_PID" 2>/dev/null
-            wait "$BACKEND_PID" 2>/dev/null
+        # 2. 再尝试停止当前会话记录的后端 PID
+        if [ -n "$BACKEND_PID" ]; then
+            fast_stop_pid "$BACKEND_PID" "backend"
         fi
 
-        # 3. 额外保险：强制清理可能残留的进程
+        # 3. 前端在前台退出时通常会自动停止，这里补充兜底清理
+        if [ -f "$FRONTEND_PID_FILE" ]; then
+            SAVED_FRONTEND_PID=$(cat "$FRONTEND_PID_FILE")
+            fast_stop_pid "$SAVED_FRONTEND_PID" "frontend"
+            rm -f "$FRONTEND_PID_FILE"
+        fi
+
+        # 4. 额外保险：清理残留进程
         pkill -f "uvicorn app.main:app" 2>/dev/null || true
         pkill -f "python.*run\.py" 2>/dev/null || true
+        pkill -f "vite.*$FRONTEND_PORT" 2>/dev/null || true
 
-        # 4. 最后验证端口是否释放
-        if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo "⚠️  Warning: Port 8000 still occupied, forcing cleanup..."
-            lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+        # 5. 最后验证端口
+        if lsof -Pi :$BACKEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+            lsof -ti :$BACKEND_PORT | xargs kill -9 2>/dev/null || true
+        fi
+        if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+            lsof -ti :$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
         fi
 
         echo "✅ All servers stopped"
@@ -364,7 +506,7 @@ else
     trap cleanup SIGINT SIGTERM
 
     # 启动前端（前台运行）
-    npm run dev
+    VITE_API_BASE_URL="http://localhost:${BACKEND_PORT}/api" npm run dev -- --port "$FRONTEND_PORT"
 
     # 当前端正常退出时，也停止后端
     cleanup

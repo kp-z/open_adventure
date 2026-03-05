@@ -182,6 +182,7 @@ export const AgentEditor: React.FC<AgentEditorProps> = ({
   const [model, setModel] = useState<AgentModel>(agent?.model as AgentModel || 'inherit');
   const [tools, setTools] = useState<string[]>(agent?.tools || []);
   const [skills, setSkills] = useState<string[]>(agent?.skills || []);
+  const [excludedSkills, setExcludedSkills] = useState<string[]>(agent?.meta?.exclude_skills || []);
   const [scope, setScope] = useState<AgentScope>(agent?.scope as AgentScope || 'user');
 
   // === Scope 相关状态 ===
@@ -254,6 +255,7 @@ export const AgentEditor: React.FC<AgentEditorProps> = ({
     if (permissionMode !== 'default') frontmatter.permissionMode = permissionMode;
     if (maxTurns) frontmatter.maxTurns = maxTurns;
     if (skills.length > 0) frontmatter.skills = skills;
+    if (excludedSkills.length > 0) frontmatter.exclude = excludedSkills;
     if (mcpServers.length > 0) frontmatter.mcpServers = mcpServers;
     if (memory) frontmatter.memory = memory;
     if (background) frontmatter.background = true;
@@ -275,7 +277,7 @@ ${yamlLines.join('\n')}
 
 ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
 `;
-  }, [name, description, model, tools, disallowedTools, permissionMode, maxTurns, skills, mcpServers, memory, background, isolation, systemPrompt]);
+  }, [name, description, model, tools, disallowedTools, permissionMode, maxTurns, skills, excludedSkills, mcpServers, memory, background, isolation, systemPrompt]);
 
   // 从源码解析字段
   const parseSourceContent = useCallback((content: string) => {
@@ -322,6 +324,7 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
       if (parsed.permissionMode) setPermissionMode(parsed.permissionMode);
       if (parsed.maxTurns) setMaxTurns(parsed.maxTurns);
       if (parsed.skills) setSkills(parsed.skills);
+      if (parsed.exclude) setExcludedSkills(parsed.exclude);
       if (parsed.mcpServers) setMcpServers(parsed.mcpServers);
       if (parsed.memory) setMemory(parsed.memory);
       if (parsed.background !== undefined) setBackground(parsed.background);
@@ -544,7 +547,13 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
       }
 
       // 构建 meta
-      const meta: any = { color, icon };
+      const baseMeta = isCreateMode ? {} : (agent?.meta || {});
+      const meta: any = { ...baseMeta, color, icon };
+      if (excludedSkills.length > 0) {
+        meta.exclude_skills = excludedSkills;
+      } else {
+        delete meta.exclude_skills;
+      }
       if (scope === 'plugin') {
         meta.plugin_name = selectedPlugin;
       } else if (scope === 'project') {
@@ -665,8 +674,19 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
   const handleToggleSkill = (skillName: string) => {
     if (skills.includes(skillName)) {
       setSkills(skills.filter(s => s !== skillName));
+      setExcludedSkills(prev => prev.filter(s => s !== skillName));
     } else {
       setSkills([...skills, skillName]);
+      setExcludedSkills(prev => prev.filter(s => s !== skillName));
+    }
+  };
+
+  const handleToggleExcludedSkill = (skillName: string) => {
+    if (excludedSkills.includes(skillName)) {
+      setExcludedSkills(excludedSkills.filter(s => s !== skillName));
+    } else {
+      setExcludedSkills([...excludedSkills, skillName]);
+      setSkills(prev => prev.filter(s => s !== skillName));
     }
   };
 
@@ -1462,6 +1482,54 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
               )}
             </GlassCard>
 
+            {/* Exclude Skills 配置 */}
+            <GlassCard className="p-6">
+              <div className="flex items-center gap-2 mb-6">
+                <Ban size={18} className="text-red-400" />
+                <h3 className="font-bold">排除技能（exclude）</h3>
+                <span className="px-2 py-0.5 bg-red-500/20 rounded-full text-xs font-black text-red-400">
+                  {excludedSkills.length}
+                </span>
+              </div>
+
+              {availableSkills.length === 0 ? (
+                <p className="text-sm text-gray-500">暂无可用技能</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                  {availableSkills.map(skill => {
+                    const isSelected = excludedSkills.includes(skill.name);
+                    return (
+                      <button
+                        key={`exclude-${skill.id}`}
+                        onClick={() => handleToggleExcludedSkill(skill.name)}
+                        className={`p-3 rounded-xl text-left transition-all border text-sm ${isSelected
+                          ? 'bg-red-500/20 border-red-500/50'
+                          : 'bg-white/5 border-white/10 hover:border-white/20'
+                          }`}
+                      >
+                        <p className={`font-bold truncate ${isSelected ? 'text-red-400' : ''}`}>{skill.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{skill.scope}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {excludedSkills.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <p className="text-xs text-gray-400 mb-2">已排除的技能：</p>
+                  <div className="flex flex-wrap gap-2">
+                    {excludedSkills.map(skill => (
+                      <span key={`excluded-${skill}`} className="px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-lg text-sm font-bold text-red-400 flex items-center gap-2">
+                        {skill}
+                        <button onClick={() => handleToggleExcludedSkill(skill)} className="hover:text-red-300"><X size={14} /></button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </GlassCard>
+
             {/* 系统提示 */}
             <GlassCard className="p-6">
               <div className="flex items-center gap-2 mb-6">
@@ -1713,6 +1781,7 @@ You are a specialized agent...`}
                 <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">permissionMode</span>
                 <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">maxTurns</span>
                 <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">skills</span>
+                <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">exclude</span>
                 <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">mcpServers</span>
                 <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">memory</span>
                 <span className="px-2 py-1 bg-white/10 text-gray-400 rounded">background</span>

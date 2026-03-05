@@ -204,8 +204,12 @@ const Agents = () => {
       allAgents.forEach(agent => {
         if (agent.scope === 'plugin') {
           const path = agent.meta?.path || '';
-          // 判断是否在用户主目录下
-          const isUserPlugin = path.startsWith('/Users/') && path.includes('/.claude/plugins/') && !path.includes('/项目/') && !path.includes('/Proj/');
+          // 判断是否在用户主目录下的插件（跨平台兼容）
+          // 用户插件：路径包含 /.claude/plugins/ 且不包含项目特征（如 .git, package.json 等的父目录）
+          const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+          const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                   path.includes('/package.json') || path.includes('\\package.json');
+          const isUserPlugin = hasClaudePlugins && !hasProjectMarkers;
 
           if (isUserPlugin) {
             userCount++;
@@ -346,9 +350,11 @@ const Agents = () => {
         // 将 plugin scope 重新分类到 user 或 project
         if (scope === 'plugin') {
           const path = agent.meta?.path || '';
-          // 如果路径包含用户主目录的 .claude/plugins,归入 user
-          // 如果路径包含项目目录的 .claude/plugins,归入 project
-          if (path.includes('/.claude/plugins/') && !path.includes('/项目/') && !path.includes('/Proj/')) {
+          // 判断是否在用户主目录下的插件（跨平台兼容）
+          const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+          const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                   path.includes('/package.json') || path.includes('\\package.json');
+          if (hasClaudePlugins && !hasProjectMarkers) {
             scope = 'user';
           } else {
             scope = 'project';
