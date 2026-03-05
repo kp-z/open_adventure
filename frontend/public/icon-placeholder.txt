@@ -1,0 +1,9 @@
+# PWA 图标占位符
+
+请将以下图标放置在此目录：
+- icon-192.png (192x192)
+- icon-512.png (512x512)
+
+可以使用在线工具生成：
+- https://realfavicongenerator.net/
+- https://www.pwabuilder.com/imageGenerator

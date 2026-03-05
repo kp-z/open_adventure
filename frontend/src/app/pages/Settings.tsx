@@ -15,7 +15,9 @@ import {
   Languages,
   FolderGit2,
   Info,
-  Package
+  Package,
+  Trash2,
+  HardDrive
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -24,12 +26,14 @@ import { ProjectPathManager } from '../components/ProjectPathManager';
 import { MarketplacePluginsManager } from '../components/MarketplacePluginsManager';
 import { motion } from 'motion/react';
 import { useLocation } from 'react-router';
+import { cache } from '../../lib/storage';
 
 const Settings = () => {
   const { mode, setMode, lang, setLang } = useMode();
   const { t } = useTranslation();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('general');
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -38,6 +42,32 @@ const Settings = () => {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  const handleClearCache = async () => {
+    if (!confirm('确定要清除所有缓存吗？这将删除 Service Worker 缓存和 IndexedDB 数据，下次加载时间会变长。')) {
+      return;
+    }
+
+    setIsClearing(true);
+    try {
+      // 清除 IndexedDB 缓存
+      await cache.clear();
+
+      // 清除 Service Worker 缓存
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        console.log('✅ Service Worker 缓存已清除');
+      }
+
+      alert('✅ 缓存已清除成功！');
+    } catch (error) {
+      console.error('清除缓存失败', error);
+      alert('❌ 清除缓存失败，请刷新页面重试');
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -188,18 +218,65 @@ const Settings = () => {
 
           {/* Data Management Tab */}
           {activeTab === 'data' && (
-            <section className="space-y-4">
-              <div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <FolderGit2 size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
-                  项目路径配置
-                </h2>
-                <p className="text-sm text-gray-400 mt-2">
-                  配置需要扫描的项目路径，只有配置的路径才会被检索 project 级别的 skills 和 agents
-                </p>
-              </div>
-              <ProjectPathManager />
-            </section>
+            <>
+              <section className="space-y-4">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <FolderGit2 size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                    项目路径配置
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-2">
+                    配置需要扫描的项目路径，只有配置的路径才会被检索 project 级别的 skills 和 agents
+                  </p>
+                </div>
+                <ProjectPathManager />
+              </section>
+
+              {/* 缓存管理 */}
+              <section className="space-y-4 pt-8 border-t border-white/10">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <HardDrive size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                    缓存管理
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-2">
+                    管理应用缓存，包括 Service Worker 缓存和本地数据存储
+                  </p>
+                </div>
+
+                <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-xl ${mode === 'adventure' ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
+                      <Database size={24} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg mb-2">PWA 缓存</h3>
+                      <p className="text-sm text-gray-400 mb-4">
+                        应用使用 Service Worker 和 IndexedDB 缓存静态资源和 API 数据，提升加载速度和离线体验。
+                        清除缓存会删除所有缓存数据，下次访问时需要重新加载。
+                      </p>
+                      <ul className="text-sm text-gray-400 space-y-1 mb-4">
+                        <li>• 静态资源缓存：JS、CSS、图片等文件</li>
+                        <li>• API 数据缓存：Skills、Agents、Teams 等数据（5 分钟有效期）</li>
+                        <li>• 用户偏好设置：主题、语言、置顶项等</li>
+                      </ul>
+                      <button
+                        onClick={handleClearCache}
+                        disabled={isClearing}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
+                          isClearing
+                            ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                            : 'bg-red-500 hover:bg-red-600 text-white'
+                        }`}
+                      >
+                        <Trash2 size={18} />
+                        {isClearing ? '清除中...' : '清除所有缓存'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </>
           )}
 
           {/* Marketplace Tab */}

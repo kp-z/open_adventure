@@ -7,6 +7,7 @@ import { ModeProvider } from './contexts/ModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ExecutionProvider } from './contexts/ExecutionContext';
 import { TerminalProvider } from './contexts/TerminalContext';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import '../styles/theme.css';
 import '../styles/fonts.css';
 
@@ -174,6 +175,7 @@ export default function App() {
               <TeamsProvider>
                 <ExecutionProvider>
                   <TerminalProvider>
+                    <OfflineIndicator />
                     <RouterProvider router={router} />
                   </TerminalProvider>
                 </ExecutionProvider>

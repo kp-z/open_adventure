@@ -12,6 +12,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# 但允许前端源码中的 lib 目录
+!frontend/src/lib/
 parts/
 sdist/
 var/
