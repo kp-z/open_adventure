@@ -113,18 +113,37 @@ fi
 source venv/bin/activate
 
 # 检查依赖
-if ! python -c "import fastapi" 2>/dev/null; then
+check_python_deps() {
+    # 检查多个关键依赖，确保完整性
+    python -c "import fastapi" 2>/dev/null && \
+    python -c "import uvicorn" 2>/dev/null && \
+    python -c "import sqlalchemy" 2>/dev/null && \
+    python -c "import psutil" 2>/dev/null
+}
+
+if ! check_python_deps; then
     echo "Installing Python dependencies..."
     # 优先使用 pyproject.toml
     if [ -f "pyproject.toml" ]; then
         pip install -q -e .
+    elif [ -f "requirements.txt" ]; then
+        pip install -q -r requirements.txt
     elif [ -f "../requirements.txt" ]; then
         pip install -q -r ../requirements.txt
     else
-        echo "❌ Neither pyproject.toml nor requirements.txt found"
+        echo "❌ No dependency file found (pyproject.toml or requirements.txt)"
         exit 1
     fi
     echo "✅ Python dependencies installed"
+
+    # 再次验证安装
+    if ! check_python_deps; then
+        echo "❌ Failed to install Python dependencies"
+        echo "Please check the error messages above and try manually:"
+        echo "  cd backend && pip install -e ."
+        echo "  or: cd backend && pip install -r requirements.txt"
+        exit 1
+    fi
 fi
 
 # 检查并创建 .env 文件

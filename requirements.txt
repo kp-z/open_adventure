@@ -13,6 +13,9 @@ aiohttp==3.9.0
 aiosqlite==0.20.0
 greenlet>=3.0.0
 
+# System utilities
+psutil>=5.9.0
+
 # AI SDK
 anthropic==0.40.0
 
