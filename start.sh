@@ -23,7 +23,7 @@ if [[ "$1" == "-d" ]] || [[ "$1" == "--daemon" ]]; then
     DAEMON_MODE=true
 fi
 
-echo "🚀 Starting Claude Manager..."
+echo "🚀 Starting Open Adventure..."
 if [ "$DAEMON_MODE" = true ]; then
     echo "📌 Running in daemon mode (background)"
 fi
@@ -392,7 +392,7 @@ if [ "$DAEMON_MODE" = true ]; then
 
     echo ""
     echo "============================================"
-    echo "✅ Claude Manager is running in background!"
+    echo "✅ Open Adventure is running in background!"
     echo "============================================"
     echo ""
     echo "🌐 Local Access:"
@@ -421,7 +421,7 @@ else
     # 前台模式：前端在前台运行
     echo ""
     echo "============================================"
-    echo "✅ Claude Manager is running!"
+    echo "✅ Open Adventure is running!"
     echo "============================================"
     echo ""
     echo "🌐 Local Access:"

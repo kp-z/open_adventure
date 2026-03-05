@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Seed Script: 为 Claude Manager 创建专业化 Agent 和 AgentTeam
+Seed Script: 为 Open Adventure 创建专业化 Agent 和 AgentTeam
 
 用法：
   python scripts/seed_agents.py
@@ -25,7 +25,7 @@ AGENTS = [
     {
         "name": "backend-api-agent",
         "description": "后端 API 开发专家 — 负责 FastAPI 路由开发、Pydantic Schema 设计、RESTful 端点 CRUD 实现",
-        "system_prompt": """你是 Claude Manager 项目的 FastAPI 后端 API 专家。
+        "system_prompt": """你是 Open Adventure 项目的 FastAPI 后端 API 专家。
 
 ## 核心职责
 - 设计和实现 RESTful API 端点（路由层）
@@ -72,7 +72,7 @@ AGENTS = [
     {
         "name": "backend-data-agent",
         "description": "数据层开发专家 — 负责 ORM 模型定义、Repository 层 CRUD 封装、Alembic 数据库迁移管理",
-        "system_prompt": """你是 Claude Manager 项目的数据层开发专家。
+        "system_prompt": """你是 Open Adventure 项目的数据层开发专家。
 
 ## 核心职责
 - 定义 ORM 数据模型（Model 层）
@@ -129,7 +129,7 @@ AGENTS = [
     {
         "name": "backend-service-agent",
         "description": "业务逻辑开发专家 — 负责 Service 层核心逻辑、Claude 适配器集成、工作流执行引擎开发",
-        "system_prompt": """你是 Claude Manager 项目的业务逻辑层开发专家。
+        "system_prompt": """你是 Open Adventure 项目的业务逻辑层开发专家。
 
 ## 核心职责
 - 实现 Service 层业务逻辑编排
@@ -188,7 +188,7 @@ AGENTS = [
     {
         "name": "frontend-page-agent",
         "description": "前端页面开发专家 — 负责 React 页面组件开发、路由配置、状态管理、后端 API 数据对接",
-        "system_prompt": """你是 Claude Manager 项目的前端页面开发专家。
+        "system_prompt": """你是 Open Adventure 项目的前端页面开发专家。
 
 ## 核心职责
 - 开发和维护 React 页面组件
@@ -249,7 +249,7 @@ AGENTS = [
     {
         "name": "frontend-component-agent",
         "description": "前端组件开发专家 — 负责复杂交互组件（编辑器/创建器/检查器）开发、UI 组件库维护、设计系统管理",
-        "system_prompt": """你是 Claude Manager 项目的前端组件架构专家。
+        "system_prompt": """你是 Open Adventure 项目的前端组件架构专家。
 
 ## 核心职责
 - 开发复杂交互组件（可视化编辑器、表单创建器、详情检查器）
@@ -315,7 +315,7 @@ AGENTS = [
     {
         "name": "test-backend-agent",
         "description": "后端测试专家 — 负责 FastAPI 端点测试、Service 层单元测试、集成测试、数据库 fixture 管理",
-        "system_prompt": """你是 Claude Manager 项目的后端测试专家。
+        "system_prompt": """你是 Open Adventure 项目的后端测试专家。
 
 ## 核心职责
 - 编写 FastAPI API 端点测试
@@ -389,7 +389,7 @@ assert response.status_code == 200
     {
         "name": "test-frontend-agent",
         "description": "前端测试专家 — 负责 E2E 端到端测试、TypeScript 类型验证、构建检查、用户流程自动化测试",
-        "system_prompt": """你是 Claude Manager 项目的前端测试专家。
+        "system_prompt": """你是 Open Adventure 项目的前端测试专家。
 
 ## 核心职责
 - 编写 E2E 端到端测试
@@ -616,7 +616,7 @@ def create_team(team_data: dict, agent_id_map: dict) -> dict | None:
 
 def main():
     print("=" * 60)
-    print("  Claude Manager — Agent & AgentTeam 数据初始化")
+    print("  Open Adventure — Agent & AgentTeam 数据初始化")
     print("=" * 60)
 
     # 1. 检查后端是否可用

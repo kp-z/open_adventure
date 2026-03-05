@@ -1,6 +1,6 @@
 # 云端部署无法访问后端问题排查指南
 
-**问题**: 在云端部署 Claude Manager 后，前端无法访问后端 API
+**问题**: 在云端部署 Open Adventure 后，前端无法访问后端 API
 
 ## 问题原因
 
@@ -235,7 +235,7 @@ sudo semanage port -a -t http_port_t -p tcp 8000
 
 **配置示例**:
 
-`/etc/nginx/sites-available/claude-manager`:
+`/etc/nginx/sites-available/open-adventure`:
 ```nginx
 server {
     listen 80;
@@ -277,7 +277,7 @@ server {
 
 启用配置：
 ```bash
-sudo ln -s /etc/nginx/sites-available/claude-manager /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/open-adventure /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -293,7 +293,7 @@ VITE_WS_BASE_URL=ws://your-domain.com/api
 
 ### 1. 检查后端是否启动
 ```bash
-ps aux | grep python | grep claude_manager
+ps aux | grep python | grep open_adventure
 curl http://localhost:8000/api/system/health
 ```
 
@@ -384,7 +384,7 @@ ENV=production
 # VITE_WS_BASE_URL=ws://your-domain.com/api
 
 # 数据库
-DATABASE_URL=sqlite+aiosqlite:///./backend/claude_manager.db
+DATABASE_URL=sqlite+aiosqlite:///./backend/open_adventure.db
 
 # 日志
 LOG_LEVEL=INFO

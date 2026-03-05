@@ -1,11 +1,11 @@
 # Agent Teams 设计文档
 
 **创建日期**: 2026-02-24
-**目标**: 为 Claude Manager 项目创建 Agent Team 体系，支持 Phase 6（AgentTeam 协作机制）的开发
+**目标**: 为 Open Adventure 项目创建 Agent Team 体系，支持 Phase 6（AgentTeam 协作机制）的开发
 
 ## 设计目标
 
-创建一组 Agent Team，用于 Claude Manager 自身的功能增强，特别是 AgentTeam 协作机制（Phase 6）的开发。要求单次调用即可自动完成从需求分析到质量保证的完整开发流程。
+创建一组 Agent Team，用于 Open Adventure 自身的功能增强，特别是 AgentTeam 协作机制（Phase 6）的开发。要求单次调用即可自动完成从需求分析到质量保证的完整开发流程。
 
 ## 整体架构
 

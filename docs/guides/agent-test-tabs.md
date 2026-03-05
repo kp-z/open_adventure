@@ -85,7 +85,7 @@ activeTab === 'logs' -> 显示 localStorage 中的日志
 ## 刷新前端
 
 ```bash
-cd /Users/kp/项目/Proj/claude_manager/frontend-api-integration-migration
+cd /Users/kp/项目/Proj/open_adventure/frontend-api-integration-migration
 rm -rf .next
 npm run dev
 ```

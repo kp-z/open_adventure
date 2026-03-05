@@ -1,12 +1,12 @@
-# Claude Manager Marketplace
+# Open Adventure Marketplace
 
-这个目录包含 Claude Manager 内置的 Claude Code plugins 和 skills。
+这个目录包含 Open Adventure 内置的 Claude Code plugins 和 skills。
 
 ## 目录结构
 
 ```
 marketplace/
-└── open_adventure/           # Claude Manager 的官方 plugin
+└── open_adventure/           # Open Adventure 的官方 plugin
     └── skills/               # Skills 目录
         └── prompt_optimizer/ # Prompt 优化 skill
             └── SKILL.md      # Skill 定义文件

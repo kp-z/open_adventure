@@ -2,7 +2,7 @@
 
 ## 概述
 
-基于 Claude Code 原生的 Agent Team 功能，为 Claude Manager Phase 6 开发创建协作团队。
+基于 Claude Code 原生的 Agent Team 功能，为 Open Adventure Phase 6 开发创建协作团队。
 
 ## Agent Team 架构说明
 
@@ -293,7 +293,7 @@ ls ~/.claude/tasks/<team-name>/
    - 存储在 `~/.claude/teams/`
    - 用于实际执行任务
 
-2. **数据库 Agent Teams**（Claude Manager 的数据模型）
+2. **数据库 Agent Teams**（Open Adventure 的数据模型）
    - 配置和元数据存储
    - 存储在 SQLite 数据库
    - 用于管理和展示

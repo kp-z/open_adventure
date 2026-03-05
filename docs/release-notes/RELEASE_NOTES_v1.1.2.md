@@ -39,8 +39,8 @@
 ## 📦 发布包
 
 本次发布包含以下平台版本：
-- **macOS ARM64**: `claude-manager-v1.1.2-macos-arm64.tar.gz`
-- **Linux x86_64**: `claude-manager-v1.1.2-linux-x86_64.tar.gz`
+- **macOS ARM64**: `open-adventure-v1.1.2-macos-arm64.tar.gz`
+- **Linux x86_64**: `open-adventure-v1.1.2-linux-x86_64.tar.gz`
 
 ## 升级指南
 

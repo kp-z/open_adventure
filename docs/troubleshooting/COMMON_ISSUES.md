@@ -1,4 +1,4 @@
-# Claude Manager 故障排查指南
+# Open Adventure 故障排查指南
 
 **创建日期**: 2026-02-28
 **状态**: 已发布
@@ -15,7 +15,7 @@
 - 但系统未安装 `autojump` 工具
 
 **影响**：
-- 不影响 Claude Manager 的正常运行
+- 不影响 Open Adventure 的正常运行
 - 仅在启动时显示警告信息
 
 **解决方案**：
@@ -68,7 +68,7 @@ source ~/.zshrc
 新版本的 `start.sh` 会自动检测端口占用并提示：
 ```bash
 ⚠️  Port 8000 is already in use
-This might be an old version of Claude Manager still running.
+This might be an old version of Open Adventure still running.
 
 Do you want to stop the existing process? [y/N]
 ```
@@ -80,7 +80,7 @@ Do you want to stop the existing process? [y/N]
 # 查找占用端口 8000 的进程
 lsof -i :8000
 
-# 停止所有 Claude Manager 后端进程
+# 停止所有 Open Adventure 后端进程
 pkill -f "uvicorn app.main:app"
 pkill -f "python run.py"
 
@@ -209,7 +209,7 @@ Cmd+Shift+Delete (macOS)
 
 2. 提供以下信息：
    - 操作系统版本
-   - Claude Manager 版本
+   - Open Adventure 版本
    - 错误信息截图
    - 相关日志内容
 

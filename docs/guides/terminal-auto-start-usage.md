@@ -9,7 +9,7 @@
 
 ### 1. 确认配置
 已有 2 个启用的项目路径：
-- `/Users/kp/项目/Proj/claude_manager` (第一个，将被使用)
+- `/Users/kp/项目/Proj/open_adventure` (第一个，将被使用)
 - `/Users/kp/项目/Proj/steady`
 
 ### 2. 打开终端
@@ -17,7 +17,7 @@
 
 ### 3. 预期行为
 1. Shell 启动（显示提示符）
-2. 0.5 秒后自动执行 `cd "/Users/kp/项目/Proj/claude_manager"`
+2. 0.5 秒后自动执行 `cd "/Users/kp/项目/Proj/open_adventure"`
 3. 0.2 秒后自动执行 `claude`
 4. Claude Code CLI 启动
 
@@ -31,10 +31,10 @@ tail -f /tmp/backend.log | grep Terminal
 ```
 [Terminal] WebSocket connection accepted
 [Terminal] Found 2 enabled project paths
-[Terminal] Will start in project directory: /Users/kp/项目/Proj/claude_manager
+[Terminal] Will start in project directory: /Users/kp/项目/Proj/open_adventure
 [Terminal] Auto-start Claude: True
-[Terminal] Setting up auto-start commands for: /Users/kp/项目/Proj/claude_manager
-[Terminal] Sending cd command to: /Users/kp/项目/Proj/claude_manager
+[Terminal] Setting up auto-start commands for: /Users/kp/项目/Proj/open_adventure
+[Terminal] Sending cd command to: /Users/kp/项目/Proj/open_adventure
 [Terminal] Sending claude command
 [Terminal] Startup commands sent successfully
 ```

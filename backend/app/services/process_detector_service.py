@@ -88,15 +88,15 @@ class ProcessDetectorService:
             # Check if it's a Claude process
             # Look for "claude" in process name or command line
             if "claude" in name:
-                # Exclude claude-manager itself
-                if "claude-manager" in name or "claude_manager" in name:
+                # Exclude open-adventure itself
+                if "open-adventure" in name or "open_adventure" in name:
                     return False
                 return True
 
             # Check command line for claude executable
             if cmdline:
                 cmd_str = " ".join(cmdline).lower()
-                if "claude" in cmd_str and "claude-manager" not in cmd_str:
+                if "claude" in cmd_str and "open-adventure" not in cmd_str:
                     return True
 
             return False

@@ -1,4 +1,4 @@
-# Claude Manager - 部署指南
+# Open Adventure - 部署指南
 
 ## 本地开发部署
 
@@ -12,7 +12,7 @@
 
 ```bash
 # 克隆或进入项目目录
-cd claude_manager
+cd open_adventure
 
 # 创建虚拟环境
 python3 -m venv venv
@@ -59,7 +59,7 @@ python run.py
 
 ```bash
 source venv/bin/activate
-uvicorn claude_manager.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn open_adventure.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 5. 访问应用
@@ -98,7 +98,7 @@ pip install gunicorn
 启动命令：
 
 ```bash
-gunicorn claude_manager.main:app \
+gunicorn open_adventure.main:app \
   --workers 4 \
   --worker-class uvicorn.workers.UvicornWorker \
   --bind 0.0.0.0:8000 \
@@ -108,21 +108,21 @@ gunicorn claude_manager.main:app \
 
 ### 3. 使用 Systemd 服务（Linux）
 
-创建服务文件 `/etc/systemd/system/claude-manager.service`：
+创建服务文件 `/etc/systemd/system/open-adventure.service`：
 
 ```ini
 [Unit]
-Description=Claude Manager API
+Description=Open Adventure API
 After=network.target
 
 [Service]
 Type=notify
 User=www-data
 Group=www-data
-WorkingDirectory=/path/to/claude_manager
-Environment="PATH=/path/to/claude_manager/venv/bin"
-ExecStart=/path/to/claude_manager/venv/bin/gunicorn \
-  claude_manager.main:app \
+WorkingDirectory=/path/to/open_adventure
+Environment="PATH=/path/to/open_adventure/venv/bin"
+ExecStart=/path/to/open_adventure/venv/bin/gunicorn \
+  open_adventure.main:app \
   --workers 4 \
   --worker-class uvicorn.workers.UvicornWorker \
   --bind 0.0.0.0:8000
@@ -135,9 +135,9 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable claude-manager
-sudo systemctl start claude-manager
-sudo systemctl status claude-manager
+sudo systemctl enable open-adventure
+sudo systemctl start open-adventure
+sudo systemctl status open-adventure
 ```
 
 ### 4. 使用 Docker 部署
@@ -160,7 +160,7 @@ COPY . .
 EXPOSE 8000
 
 # 启动命令
-CMD ["uvicorn", "claude_manager.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "open_adventure.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 创建 `docker-compose.yml`：
@@ -169,14 +169,14 @@ CMD ["uvicorn", "claude_manager.main:app", "--host", "0.0.0.0", "--port", "8000"
 version: '3.8'
 
 services:
-  claude-manager:
+  open-adventure:
     build: .
     ports:
       - "8000:8000"
     env_file:
       - .env
     volumes:
-      - ./claude_manager.db:/app/claude_manager.db
+      - ./open_adventure.db:/app/open_adventure.db
     restart: unless-stopped
 ```
 
@@ -241,10 +241,10 @@ alembic upgrade head
 
 ```bash
 # SQLite 备份
-cp claude_manager.db claude_manager.db.backup
+cp open_adventure.db open_adventure.db.backup
 
 # 定时备份（添加到 crontab）
-0 2 * * * cp /path/to/claude_manager.db /path/to/backups/claude_manager_$(date +\%Y\%m\%d).db
+0 2 * * * cp /path/to/open_adventure.db /path/to/backups/open_adventure_$(date +\%Y\%m\%d).db
 ```
 
 ## 监控和日志
@@ -255,10 +255,10 @@ cp claude_manager.db claude_manager.db.backup
 
 ```bash
 # 使用 journalctl 查看 systemd 服务日志
-sudo journalctl -u claude-manager -f
+sudo journalctl -u open-adventure -f
 
 # 使用 Docker 查看日志
-docker-compose logs -f claude-manager
+docker-compose logs -f open-adventure
 ```
 
 ### 健康检查
@@ -290,7 +290,7 @@ curl http://localhost:8000/health
 2. **数据库锁定**
    ```bash
    # 检查是否有其他进程在使用数据库
-   fuser claude_manager.db
+   fuser open_adventure.db
    ```
 
 3. **依赖问题**
@@ -306,7 +306,7 @@ curl http://localhost:8000/health
 考虑使用 PostgreSQL 替代 SQLite：
 
 ```env
-DATABASE_URL=postgresql+asyncpg://user:password@localhost/claude_manager
+DATABASE_URL=postgresql+asyncpg://user:password@localhost/open_adventure
 ```
 
 ### 2. 缓存

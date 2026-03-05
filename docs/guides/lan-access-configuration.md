@@ -16,7 +16,7 @@
 启动后会看到类似输出：
 ```
 ============================================
-✅ Claude Manager is running!
+✅ Open Adventure is running!
 ============================================
 
 🌐 Local Access:

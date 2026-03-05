@@ -1,7 +1,7 @@
-# Claude Manager - 项目完成总结
+# Open Adventure - 项目完成总结
 
 ## 项目概述
-Claude Manager 是一个 AI 工作流管理系统，用于配置和管理 Claude AI 的 Skills、Agents、Teams 和 Workflows。
+Open Adventure 是一个 AI 工作流管理系统，用于配置和管理 Claude AI 的 Skills、Agents、Teams 和 Workflows。
 
 ## 技术栈
 - **后端**: FastAPI + SQLAlchemy + PostgreSQL
@@ -119,7 +119,7 @@ Claude Manager 是一个 AI 工作流管理系统，用于配置和管理 Claude
 ## 项目结构
 
 ```
-claude_manager/
+open_adventure/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
@@ -263,7 +263,7 @@ alembic upgrade head
 
 ## 总结
 
-Claude Manager 项目已完成核心功能开发，包括：
+Open Adventure 项目已完成核心功能开发，包括：
 - 工作流管理和可视化编辑
 - 高级执行引擎（并行、条件、循环）
 - Dashboard 和游戏化 UI

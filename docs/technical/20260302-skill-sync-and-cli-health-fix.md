@@ -6,7 +6,7 @@
 
 ## 问题描述
 
-用户反馈 Claude Manager 系统存在两个关键问题：
+用户反馈 Open Adventure 系统存在两个关键问题：
 
 1. **Claude CLI Status 显示 "System Offline"** - 前端 Dashboard 显示系统离线
 2. **同步的 Skills 为空** - 手动触发同步后，Skills 列表仍然为空

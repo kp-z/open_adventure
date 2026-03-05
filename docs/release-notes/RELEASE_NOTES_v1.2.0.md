@@ -77,7 +77,7 @@ v1.2.0 是一个重要的稳定性和可维护性更新，系统性地解决了 
   - 常见问题
 
 ### 9. systemd 服务配置
-- **新增**: `claude-manager.service` 模板
+- **新增**: `open-adventure.service` 模板
 - **功能**: 自动重启、资源限制、安全设置、日志输出
 
 ### 10. 配置修复
@@ -89,7 +89,7 @@ v1.2.0 是一个重要的稳定性和可维护性更新，系统性地解决了 
 - 新增 `docs/deployment/linux-cloud.md` - Linux 云端部署完整指南
 - 新增 `docs/technical/20260302-linux-cloud-deployment-fixes.md` - 修复详细记录
 - 新增 `docs/technical/20260302-backend-startup-fix.md` - 启动问题修复记录
-- 新增 `claude-manager.service` - systemd 服务配置模板
+- 新增 `open-adventure.service` - systemd 服务配置模板
 
 ## 🔧 技术细节
 
@@ -107,7 +107,7 @@ v1.2.0 是一个重要的稳定性和可维护性更新，系统性地解决了 
 2. `docs/deployment/linux-cloud.md` - 云端部署文档
 3. `docs/technical/20260302-linux-cloud-deployment-fixes.md` - 修复记录
 4. `docs/technical/20260302-backend-startup-fix.md` - 启动修复记录
-5. `claude-manager.service` - systemd 配置
+5. `open-adventure.service` - systemd 配置
 
 ### 代码统计
 - 修改文件: 7 个
@@ -126,7 +126,7 @@ v1.2.0 是一个重要的稳定性和可维护性更新，系统性地解决了 
 
 2. **备份数据库**（可选但推荐）
    ```bash
-   cp backend/claude_manager.db backend/claude_manager.db.backup
+   cp backend/open_adventure.db backend/open_adventure.db.backup
    ```
 
 3. **替换代码文件**
@@ -205,12 +205,12 @@ ENV=production  # 或 development, test
 
 ### macOS ARM64
 ```bash
-wget https://github.com/kp-z/open_adventure/releases/download/v1.2.0/claude-manager-v1.2.0-macos-arm64.tar.gz
+wget https://github.com/kp-z/open_adventure/releases/download/v1.2.0/open-adventure-v1.2.0-macos-arm64.tar.gz
 ```
 
 ### Linux x86_64
 ```bash
-wget https://github.com/kp-z/open_adventure/releases/download/v1.2.0/claude-manager-v1.2.0-linux-x86_64.tar.gz
+wget https://github.com/kp-z/open_adventure/releases/download/v1.2.0/open-adventure-v1.2.0-linux-x86_64.tar.gz
 ```
 
 ## 🙏 致谢

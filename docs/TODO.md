@@ -9,7 +9,7 @@
 
 **当前代码**:
 ```python
-database_url: str = "sqlite+aiosqlite:///./claude_manager.db"
+database_url: str = "sqlite+aiosqlite:///./open_adventure.db"
 ```
 
 **问题**:
@@ -24,7 +24,7 @@ from pathlib import Path
 
 # 获取项目根目录
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-database_url: str = f"sqlite+aiosqlite:///{PROJECT_ROOT}/backend/claude_manager.db"
+database_url: str = f"sqlite+aiosqlite:///{PROJECT_ROOT}/backend/open_adventure.db"
 ```
 
 **影响范围**: 数据库文件位置

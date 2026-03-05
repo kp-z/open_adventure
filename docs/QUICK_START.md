@@ -1,31 +1,31 @@
-# Claude Manager - 快速使用指南
+# Open Adventure - 快速使用指南
 
 ## 🚀 快速开始
 
 ### 运行应用
 ```bash
-cd dist/claude-manager
-./claude-manager
+cd dist/open-adventure
+./open-adventure
 ```
 
 应用会自动：
-- 初始化数据库到 `~/.claude_manager/`
+- 初始化数据库到 `~/.open_adventure/`
 - 启动服务器在 `http://localhost:8000`
 - 打开浏览器访问前端 Dashboard
 
 ### 命令行选项
 ```bash
 # 不自动打开浏览器
-./claude-manager --no-browser
+./open-adventure --no-browser
 
 # 使用不同端口
-./claude-manager --port 9000
+./open-adventure --port 9000
 
 # 指定监听地址
-./claude-manager --host 127.0.0.1
+./open-adventure --host 127.0.0.1
 
 # 组合使用
-./claude-manager --no-browser --port 9000
+./open-adventure --no-browser --port 9000
 ```
 
 ## 📦 分发应用
@@ -33,30 +33,30 @@ cd dist/claude-manager
 ### 复制到其他位置
 ```bash
 # 必须复制整个目录
-cp -r dist/claude-manager /path/to/destination/
+cp -r dist/open-adventure /path/to/destination/
 ```
 
 ### 打包为压缩文件
 ```bash
-tar -czf claude-manager-macos-arm64.tar.gz dist/claude-manager/
+tar -czf open-adventure-macos-arm64.tar.gz dist/open-adventure/
 ```
 
 ### 解压并运行
 ```bash
-tar -xzf claude-manager-macos-arm64.tar.gz
-cd claude-manager
-./claude-manager
+tar -xzf open-adventure-macos-arm64.tar.gz
+cd open-adventure
+./open-adventure
 ```
 
 ## 🔧 配置
 
 ### 用户配置文件
-位置: `~/.claude_manager/.env`
+位置: `~/.open_adventure/.env`
 
 ```bash
 # 创建配置文件
-mkdir -p ~/.claude_manager
-cat > ~/.claude_manager/.env << EOF
+mkdir -p ~/.open_adventure
+cat > ~/.open_adventure/.env << EOF
 # 自定义端口
 PORT=9000
 
@@ -69,7 +69,7 @@ EOF
 ```
 
 ### 数据库位置
-- 用户数据库: `~/.claude_manager/claude_manager.db`
+- 用户数据库: `~/.open_adventure/open_adventure.db`
 - 自动从模板初始化
 - 可以手动删除重置
 
@@ -96,23 +96,23 @@ curl http://localhost:8000/api/agents
 
 ### 必须保持目录结构
 ```
-claude-manager/
-├── claude-manager          # 可执行文件
+open-adventure/
+├── open-adventure          # 可执行文件
 └── _internal/              # 依赖目录（必需）
 ```
 
-**不要**只复制 `claude-manager` 文件，必须包含 `_internal` 目录！
+**不要**只复制 `open-adventure` 文件，必须包含 `_internal` 目录！
 
 ### 端口占用
 如果默认端口 8000 被占用：
 ```bash
-./claude-manager --port 9000
+./open-adventure --port 9000
 ```
 
 ### 权限问题
 如果提示权限不足：
 ```bash
-chmod +x claude-manager
+chmod +x open-adventure
 ```
 
 ## 🐛 故障排查
@@ -125,13 +125,13 @@ chmod +x claude-manager
 
 2. 查看错误日志
    ```bash
-   ./claude-manager 2>&1 | tee error.log
+   ./open-adventure 2>&1 | tee error.log
    ```
 
 ### 数据库问题
 重置数据库：
 ```bash
-rm -rf ~/.claude_manager
+rm -rf ~/.open_adventure
 # 重新启动应用会自动初始化
 ```
 

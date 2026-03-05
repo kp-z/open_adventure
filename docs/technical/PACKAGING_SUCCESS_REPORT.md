@@ -1,4 +1,4 @@
-# Claude Manager 打包成功报告
+# Open Adventure 打包成功报告
 
 ## 打包日期
 2026-02-25 20:10
@@ -10,12 +10,12 @@
 
 ### 输出结构
 ```
-backend/dist/claude-manager/
-├── claude-manager          # 可执行文件 (12 MB)
+backend/dist/open-adventure/
+├── open-adventure          # 可执行文件 (12 MB)
 └── _internal/              # 依赖和资源目录 (44 MB)
     ├── app/                # Python 应用模块
     ├── frontend_dist/      # 前端静态文件
-    ├── claude_manager.db   # 数据库模板
+    ├── open_adventure.db   # 数据库模板
     └── [其他依赖库]
 ```
 
@@ -33,13 +33,13 @@ backend/dist/claude-manager/
 ### ✅ API 测试
 ```bash
 curl http://localhost:9999/api/system/health
-# 返回: {"status":"healthy","app_name":"Claude Manager","version":"0.2.0"}
+# 返回: {"status":"healthy","app_name":"Open Adventure","version":"0.2.0"}
 ```
 
 ### ✅ 前端测试
 ```bash
 curl http://localhost:9999/
-# 返回: {"message":"Welcome to Claude Manager API",...}
+# 返回: {"message":"Welcome to Open Adventure API",...}
 ```
 
 ### ✅ 跨目录测试
@@ -51,23 +51,23 @@ curl http://localhost:9999/
 ### 运行应用
 ```bash
 # 默认启动（自动打开浏览器）
-./backend/dist/claude-manager/claude-manager
+./backend/dist/open-adventure/open-adventure
 
 # 不打开浏览器
-./backend/dist/claude-manager/claude-manager --no-browser
+./backend/dist/open-adventure/open-adventure --no-browser
 
 # 自定义端口
-./backend/dist/claude-manager/claude-manager --port 9000
+./backend/dist/open-adventure/open-adventure --port 9000
 ```
 
 ### 分发方法
 ```bash
 # 复制整个目录
-cp -r backend/dist/claude-manager /path/to/destination/
+cp -r backend/dist/open-adventure /path/to/destination/
 
 # 或打包为 tar.gz
 cd backend/dist
-tar -czf claude-manager-macos-arm64.tar.gz claude-manager/
+tar -czf open-adventure-macos-arm64.tar.gz open-adventure/
 ```
 
 ## 修复历史
@@ -99,7 +99,7 @@ tar -czf claude-manager-macos-arm64.tar.gz claude-manager/
 - 平台: macOS arm64
 
 ### 关键修改
-1. **claude_manager.spec**
+1. **open_adventure.spec**
    - 改用 COLLECT 而非单文件 EXE
    - 添加 `exclude_binaries=True`
 
@@ -122,7 +122,7 @@ tar -czf claude-manager-macos-arm64.tar.gz claude-manager/
    - 必须包含 `_internal` 目录
 
 3. **首次启动**: 需要初始化数据库
-   - 在 `~/.claude_manager/` 创建用户数据
+   - 在 `~/.open_adventure/` 创建用户数据
 
 ## 性能指标
 

@@ -1,4 +1,4 @@
-# Claude Manager - 部署指南
+# Open Adventure - 部署指南
 
 ## Linux/macOS 单文件可执行版本
 
@@ -11,13 +11,13 @@
 1. **下载可执行文件**
    ```bash
    # 从 GitHub Releases 下载
-   wget https://github.com/xxx/claude-manager/releases/download/v0.2.0/claude-manager-linux
-   chmod +x claude-manager-linux
+   wget https://github.com/xxx/open-adventure/releases/download/v0.2.0/open-adventure-linux
+   chmod +x open-adventure-linux
    ```
 
 2. **运行**
    ```bash
-   ./claude-manager-linux
+   ./open-adventure-linux
    ```
 
 3. **访问**
@@ -30,19 +30,19 @@
 
 **方式 1: 命令行参数**
 ```bash
-./claude-manager --port 9000
+./open-adventure --port 9000
 ```
 
 **方式 2: 环境变量**
 ```bash
-PORT=9000 ./claude-manager
+PORT=9000 ./open-adventure
 ```
 
 **方式 3: 配置文件**
 ```bash
-mkdir -p ~/.claude_manager
-echo "PORT=9000" > ~/.claude_manager/.env
-./claude-manager
+mkdir -p ~/.open_adventure
+echo "PORT=9000" > ~/.open_adventure/.env
+./open-adventure
 ```
 
 #### 配置 Anthropic API Key
@@ -50,50 +50,50 @@ echo "PORT=9000" > ~/.claude_manager/.env
 **方式 1: 环境变量**
 ```bash
 export ANTHROPIC_API_KEY="your-api-key"
-./claude-manager
+./open-adventure
 ```
 
 **方式 2: 配置文件**
 ```bash
-mkdir -p ~/.claude_manager
-cat > ~/.claude_manager/.env << EOF
+mkdir -p ~/.open_adventure
+cat > ~/.open_adventure/.env << EOF
 ANTHROPIC_API_KEY=your-api-key
 PORT=8000
 EOF
 
-./claude-manager
+./open-adventure
 ```
 
 ### 数据存储
 
-- **数据库位置**: `~/.claude_manager/claude_manager.db`
-- **配置文件**: `~/.claude_manager/.env` (可选)
+- **数据库位置**: `~/.open_adventure/open_adventure.db`
+- **配置文件**: `~/.open_adventure/.env` (可选)
 - **日志文件**: 输出到控制台
 
 ### 常见问题
 
 **Q: 如何备份数据？**
 ```bash
-cp ~/.claude_manager/claude_manager.db ~/backup/
+cp ~/.open_adventure/open_adventure.db ~/backup/
 ```
 
 **Q: 如何重置数据？**
 ```bash
-rm ~/.claude_manager/claude_manager.db
+rm ~/.open_adventure/open_adventure.db
 # 下次启动时会自动创建新数据库
 ```
 
 **Q: 如何更新到新版本？**
 ```bash
 # 1. 备份数据
-cp ~/.claude_manager/claude_manager.db ~/backup/
+cp ~/.open_adventure/open_adventure.db ~/backup/
 
 # 2. 下载新版本
-wget https://github.com/xxx/claude-manager/releases/download/v0.3.0/claude-manager
+wget https://github.com/xxx/open-adventure/releases/download/v0.3.0/open-adventure
 
 # 3. 替换旧版本
-chmod +x claude-manager
-./claude-manager
+chmod +x open-adventure
+./open-adventure
 ```
 
 **Q: 为什么文件这么小（6.8MB）？**
@@ -104,10 +104,10 @@ chmod +x claude-manager
 
 ```bash
 # 删除数据和配置
-rm -rf ~/.claude_manager
+rm -rf ~/.open_adventure
 
 # 删除可执行文件
-rm claude-manager
+rm open-adventure
 ```
 
 ### 故障排查
@@ -115,20 +115,20 @@ rm claude-manager
 **问题: 端口被占用**
 ```bash
 # 使用其他端口
-./claude-manager --port 9000
+./open-adventure --port 9000
 ```
 
 **问题: 数据库损坏**
 ```bash
 # 删除数据库，重新初始化
-rm ~/.claude_manager/claude_manager.db
-./claude-manager
+rm ~/.open_adventure/open_adventure.db
+./open-adventure
 ```
 
 **问题: 权限错误**
 ```bash
 # 确保可执行权限
-chmod +x claude-manager
+chmod +x open-adventure
 ```
 
 **问题: 模块未找到（ModuleNotFoundError）**
@@ -143,8 +143,8 @@ chmod +x claude-manager
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/xxx/claude-manager.git
-cd claude-manager
+git clone https://github.com/xxx/open-adventure.git
+cd open-adventure
 
 # 2. 安装后端依赖
 cd backend
@@ -181,7 +181,7 @@ cd ..
 bash scripts/build_linux.sh
 
 # 3. 可执行文件位于
-# backend/dist/claude-manager
+# backend/dist/open-adventure
 ```
 
 ---
@@ -209,5 +209,5 @@ bash scripts/build_linux.sh
 ## 支持
 
 如有问题，请访问：
-- GitHub Issues: https://github.com/xxx/claude-manager/issues
-- 文档: https://github.com/xxx/claude-manager/wiki
+- GitHub Issues: https://github.com/xxx/open-adventure/issues
+- 文档: https://github.com/xxx/open-adventure/wiki

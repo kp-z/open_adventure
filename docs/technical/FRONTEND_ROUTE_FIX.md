@@ -1,4 +1,4 @@
-# Claude Manager 前端路由修复
+# Open Adventure 前端路由修复
 
 ## 修复日期
 2026-02-25 23:02
@@ -6,7 +6,7 @@
 ## 问题描述
 浏览器打开 `http://localhost:8000/` 显示 API 欢迎信息而不是前端页面：
 ```json
-{"message":"Welcome to Claude Manager API","version":"0.1.0",...}
+{"message":"Welcome to Open Adventure API","version":"0.1.0",...}
 ```
 
 ## 根本原因
@@ -69,7 +69,7 @@ curl http://localhost:9003/api/system/health
 ```
 返回:
 ```json
-{"status":"healthy","app_name":"Claude Manager","version":"0.1.0"}
+{"status":"healthy","app_name":"Open Adventure","version":"0.1.0"}
 ```
 
 ### ✅ 浏览器自动打开到前端

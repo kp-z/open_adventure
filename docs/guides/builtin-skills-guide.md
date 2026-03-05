@@ -1,12 +1,12 @@
-# Claude Manager 内置 Skills 使用指南
+# Open Adventure 内置 Skills 使用指南
 
 ## 概述
 
-Claude Manager 内置了一些实用的 Claude Code skills，这些 skills 会在首次启动应用时自动安装到你的 Claude Code 环境中。
+Open Adventure 内置了一些实用的 Claude Code skills，这些 skills 会在首次启动应用时自动安装到你的 Claude Code 环境中。
 
 ## 自动安装
 
-当你运行 `./start.sh` 启动 Claude Manager 时，系统会自动：
+当你运行 `./start.sh` 启动 Open Adventure 时，系统会自动：
 
 1. 检查 `~/.claude/plugins/open_adventure/` 是否存在
 2. 如果不存在，从 `marketplace/open_adventure/` 复制插件文件

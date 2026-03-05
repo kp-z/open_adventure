@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Claude Manager Plugin 安装脚本
+# Open Adventure Plugin 安装脚本
 # 用于按需安装内置 skills 到 ~/.claude/plugins/open_adventure/
 
 set -e
@@ -9,7 +9,7 @@ PLUGIN_NAME="open_adventure"
 USER_PLUGIN_DIR="$HOME/.claude/plugins/$PLUGIN_NAME"
 MARKETPLACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.claude/plugins/marketplace-plugins/$PLUGIN_NAME"
 SETTINGS_FILE="$HOME/.claude/settings.json"
-AUTO_INSTALL="${CLAUDE_MANAGER_PLUGIN_AUTO_INSTALL:-}"
+AUTO_INSTALL="${OPEN_ADVENTURE_PLUGIN_AUTO_INSTALL:-}"
 
 confirm() {
     local prompt="$1"
@@ -65,7 +65,7 @@ except Exception as e:
 "
 }
 
-echo "🔧 检查 Claude Manager 插件安装状态..."
+echo "🔧 检查 Open Adventure 插件安装状态..."
 
 # 已安装则幂等退出
 if [ -d "$USER_PLUGIN_DIR" ]; then
@@ -85,9 +85,9 @@ WRITE_SETTINGS=false
 if [ "$AUTO_INSTALL" = "true" ]; then
     INSTALL_PLUGIN=true
     WRITE_SETTINGS=true
-    echo "ℹ️  检测到 CLAUDE_MANAGER_PLUGIN_AUTO_INSTALL=true，自动安装并写入 settings"
+    echo "ℹ️  检测到 OPEN_ADVENTURE_PLUGIN_AUTO_INSTALL=true，自动安装并写入 settings"
 elif [ "$AUTO_INSTALL" = "false" ]; then
-    echo "ℹ️  检测到 CLAUDE_MANAGER_PLUGIN_AUTO_INSTALL=false，跳过插件安装"
+    echo "ℹ️  检测到 OPEN_ADVENTURE_PLUGIN_AUTO_INSTALL=false，跳过插件安装"
     exit 0
 else
     if [ -t 0 ]; then
@@ -101,7 +101,7 @@ else
             exit 0
         fi
     else
-        echo "ℹ️  非交互环境且未设置 CLAUDE_MANAGER_PLUGIN_AUTO_INSTALL，默认跳过插件安装"
+        echo "ℹ️  非交互环境且未设置 OPEN_ADVENTURE_PLUGIN_AUTO_INSTALL，默认跳过插件安装"
         exit 0
     fi
 fi
@@ -123,7 +123,7 @@ else
 fi
 
 echo ""
-echo "🎉 Claude Manager 插件安装完成！"
+echo "🎉 Open Adventure 插件安装完成！"
 echo ""
 echo "已安装的 skills:"
 echo "  - prompt_optimizer: 优化用户输入的 prompt"

@@ -476,7 +476,7 @@ class ClaudeFileScanner:
         从 skills 目录路径中提取插件信息
         
         示例路径：
-        - ~/.claude/plugins/claude-manager/skills -> plugin_name: claude-manager
+        - ~/.claude/plugins/open-adventure/skills -> plugin_name: open-adventure
         - ~/.claude/plugins/cache/superpowers/4.3.0/skills -> plugin_name: superpowers, version: 4.3.0
         - ~/.claude/plugins/marketplaces/official/plugins/figma/skills -> plugin_name: figma, namespace: official
         """

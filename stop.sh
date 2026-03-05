@@ -9,7 +9,7 @@ PID_DIR="$SCRIPT_DIR/.run"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 
-echo "🛑 Stopping Claude Manager..."
+echo "🛑 Stopping Open Adventure..."
 echo ""
 
 STOPPED_ANY=false
@@ -121,11 +121,11 @@ fi
 echo ""
 if [ "$STOPPED_ANY" = true ]; then
     echo "============================================"
-    echo "✅ All Claude Manager processes stopped"
+    echo "✅ All Open Adventure processes stopped"
     echo "============================================"
 else
     echo "============================================"
-    echo "ℹ️  No running Claude Manager processes found"
+    echo "ℹ️  No running Open Adventure processes found"
     echo "============================================"
 fi
 echo ""

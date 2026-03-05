@@ -1,10 +1,10 @@
-# Claude Manager 打包修复总结
+# Open Adventure 打包修复总结
 
 ## 修复日期
 2026-02-25
 
 ## 问题描述
-打包后的 claude-manager 应用在新机器上运行时出现两个主要问题：
+打包后的 open-adventure 应用在新机器上运行时出现两个主要问题：
 1. **模块导入错误**: `ModuleNotFoundError: No module named 'app'`
 2. **入口地址错误**: 启动后显示 `http://localhost:8000` 而非 `/dashboard`
 
@@ -58,7 +58,7 @@ if not args.no_browser:
 parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
 ```
 
-### 2. 修改 `backend/claude_manager.spec`
+### 2. 修改 `backend/open_adventure.spec`
 
 #### 收集 app 模块文件
 ```python
@@ -145,13 +145,13 @@ macOS 平台的打包脚本，包含：
 ### 运行应用
 ```bash
 # 默认启动（自动打开浏览器到 /dashboard）
-./backend/dist/claude-manager
+./backend/dist/open-adventure
 
 # 不自动打开浏览器
-./backend/dist/claude-manager --no-browser
+./backend/dist/open-adventure --no-browser
 
 # 指定端口
-./backend/dist/claude-manager --port 9000
+./backend/dist/open-adventure --port 9000
 ```
 
 ## 验证清单

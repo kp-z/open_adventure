@@ -2,7 +2,7 @@
 
 **设计日期**: 2026-02-24
 **架构师**: architect (team lead 协助)
-**项目**: Claude Manager Phase 6
+**项目**: Open Adventure Phase 6
 
 ## 1. 系统架构概述
 

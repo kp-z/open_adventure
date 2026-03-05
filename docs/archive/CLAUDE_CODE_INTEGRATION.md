@@ -2,7 +2,7 @@
 
 ## 概述
 
-Claude Manager 现在提供了完整的 Claude Code 集成 API，可以直接通过 HTTP 请求管理 Claude Code 中的 skills。
+Open Adventure 现在提供了完整的 Claude Code 集成 API，可以直接通过 HTTP 请求管理 Claude Code 中的 skills。
 
 ## 可用的 API 端点
 

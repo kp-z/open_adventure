@@ -1,24 +1,24 @@
-# Claude Manager Phase 6 Agent Team
+# Open Adventure Phase 6 Agent Team
 
 **创建日期**: 2026-02-24
-**团队名称**: claude-manager-phase6-team
+**团队名称**: open-adventure-phase6-team
 **状态**: 活跃
 
 ## 团队信息
 
 ### 配置文件位置
 ```bash
-~/.claude/teams/claude-manager-phase6-team/config.json
+~/.claude/teams/open-adventure-phase6-team/config.json
 ```
 
 ### 任务列表位置
 ```bash
-~/.claude/tasks/claude-manager-phase6-team/
+~/.claude/tasks/open-adventure-phase6-team/
 ```
 
 ## 团队目标
 
-开发 Claude Manager 的 AgentTeam 协作机制，实现：
+开发 Open Adventure 的 AgentTeam 协作机制，实现：
 1. **消息传递机制** - 成员间的通信系统
 2. **任务调度器** - 智能任务分配和执行
 3. **状态管理器** - 实时状态跟踪和同步
@@ -46,10 +46,10 @@
 
 ```bash
 # 打开新的 Claude Code 会话
-cd /Users/kp/项目/Proj/claude_manager
+cd /Users/kp/项目/Proj/open_adventure
 
 # 告诉 Claude
-"我想使用 claude-manager-phase6-team 继续开发 Phase 6 功能"
+"我想使用 open-adventure-phase6-team 继续开发 Phase 6 功能"
 ```
 
 ### 方式 2: 派发 Teammates
@@ -65,13 +65,13 @@ cd /Users/kp/项目/Proj/claude_manager
 
 ```bash
 # 查看团队配置
-cat ~/.claude/teams/claude-manager-phase6-team/config.json
+cat ~/.claude/teams/open-adventure-phase6-team/config.json
 
 # 查看任务列表
-ls ~/.claude/tasks/claude-manager-phase6-team/
+ls ~/.claude/tasks/open-adventure-phase6-team/
 
 # 在 Claude Code 会话中
-"显示 claude-manager-phase6-team 的任务列表"
+"显示 open-adventure-phase6-team 的任务列表"
 ```
 
 ## 团队成员（待派发）
@@ -111,11 +111,11 @@ ls ~/.claude/tasks/claude-manager-phase6-team/
 
 ```bash
 # 方式 1: 在 Claude Code 会话中
-"清理 claude-manager-phase6-team"
+"清理 open-adventure-phase6-team"
 
 # 方式 2: 手动删除
-rm -rf ~/.claude/teams/claude-manager-phase6-team
-rm -rf ~/.claude/tasks/claude-manager-phase6-team
+rm -rf ~/.claude/teams/open-adventure-phase6-team
+rm -rf ~/.claude/tasks/open-adventure-phase6-team
 ```
 
 ## 下一步

@@ -12,7 +12,7 @@ if [ ! -d "/app/data" ]; then
 fi
 
 # Check if database exists
-if [ ! -f "/app/data/claude_manager.db" ]; then
+if [ ! -f "/app/data/open_adventure.db" ]; then
     echo "🆕 Database not found, creating new database..."
 
     # Run Alembic migrations

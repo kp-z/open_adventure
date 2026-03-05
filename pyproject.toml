@@ -1,5 +1,5 @@
 [project]
-name = "claude_manager"
+name = "open_adventure"
 version = "0.1.2"
 description = "AI Configuration and Management Tool for Claude"
 readme = "README.md"

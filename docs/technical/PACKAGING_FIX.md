@@ -1,4 +1,4 @@
-# Claude Manager 打包问题修复说明
+# Open Adventure 打包问题修复说明
 
 ## 问题描述
 
@@ -44,7 +44,7 @@ def open_browser(port: int, delay: float = 1.5):
     webbrowser.open(url)
 ```
 
-### 3. 更新打包配置 (claude_manager.spec)
+### 3. 更新打包配置 (open_adventure.spec)
 
 **问题原因**: `.spec` 文件没有收集 `app` 模块的 Python 文件
 
@@ -86,7 +86,7 @@ chmod +x scripts/build_linux.sh  # Linux
 ./scripts/build_linux.sh  # Linux
 
 # 3. 测试打包结果
-./backend/dist/claude-manager
+./backend/dist/open-adventure
 ```
 
 ### 手动打包
@@ -102,35 +102,35 @@ pip install pyinstaller
 rm -rf build/ dist/
 
 # 4. 执行打包
-pyinstaller claude_manager.spec
+pyinstaller open_adventure.spec
 
 # 5. 测试
-./dist/claude-manager
+./dist/open-adventure
 ```
 
 ## 命令行参数
 
 ```bash
 # 默认启动（自动打开浏览器）
-./claude-manager
+./open-adventure
 
 # 指定端口
-./claude-manager --port 9000
+./open-adventure --port 9000
 
 # 不自动打开浏览器
-./claude-manager --no-browser
+./open-adventure --no-browser
 
 # 指定监听地址
-./claude-manager --host 127.0.0.1
+./open-adventure --host 127.0.0.1
 ```
 
 ## 验证步骤
 
 1. **复制到新位置测试**:
    ```bash
-   cp backend/dist/claude-manager ~/Desktop/
+   cp backend/dist/open-adventure ~/Desktop/
    cd ~/Desktop
-   ./claude-manager
+   ./open-adventure
    ```
 
 2. **检查启动信息**:
@@ -145,18 +145,18 @@ pyinstaller claude_manager.spec
 4. **验证功能**:
    - 访问 `/dashboard` 应显示前端界面
    - API 端点应正常工作
-   - 数据库应正确初始化在 `~/.claude_manager/`
+   - 数据库应正确初始化在 `~/.open_adventure/`
 
 ## 文件变更清单
 
 - ✅ `backend/main_packaged.py` - 修复模块导入，添加自动打开浏览器
-- ✅ `backend/claude_manager.spec` - 添加 app 模块收集，更新 hiddenimports
+- ✅ `backend/open_adventure.spec` - 添加 app 模块收集，更新 hiddenimports
 - ✅ `scripts/build_macos.sh` - 新增 macOS 打包脚本
 
 ## 注意事项
 
-1. **数据库位置**: 打包后的应用会在 `~/.claude_manager/` 创建用户数据库
-2. **配置文件**: 可在 `~/.claude_manager/.env` 放置用户配置
+1. **数据库位置**: 打包后的应用会在 `~/.open_adventure/` 创建用户数据库
+2. **配置文件**: 可在 `~/.open_adventure/.env` 放置用户配置
 3. **跨平台**: 需要在目标平台上重新打包（macOS 打包的无法在 Linux 运行）
 4. **依赖版本**: 确保 PyInstaller 版本 >= 5.0
 

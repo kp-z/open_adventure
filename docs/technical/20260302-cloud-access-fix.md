@@ -6,7 +6,7 @@
 
 ## 问题描述
 
-用户在云端服务器部署 Claude Manager 后，前端页面可以访问，但无法连接到后端 API，导致所有功能无法使用。
+用户在云端服务器部署 Open Adventure 后，前端页面可以访问，但无法连接到后端 API，导致所有功能无法使用。
 
 ## 根本原因
 
@@ -234,7 +234,7 @@ console.log(API_CONFIG.BASE_URL)
 
 ## 总结
 
-通过添加自动检测逻辑，Claude Manager 现在可以：
+通过添加自动检测逻辑，Open Adventure 现在可以：
 1. 本地开发时自动使用 `localhost`
 2. 云端部署时自动使用当前主机地址
 3. 支持 HTTP 和 HTTPS

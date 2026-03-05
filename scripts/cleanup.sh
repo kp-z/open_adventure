@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Claude Manager 进程清理脚本
+# Open Adventure 进程清理脚本
 # 用于清理所有残留的后端和前端进程
 
-echo "🧹 Cleaning up Claude Manager processes..."
+echo "🧹 Cleaning up Open Adventure processes..."
 
 # 清理后端进程
 echo "Stopping backend processes..."
@@ -12,7 +12,7 @@ pkill -f "python.*run\.py" 2>/dev/null && echo "  ✅ Stopped python run.py proc
 
 # 清理前端进程
 echo "Stopping frontend processes..."
-pkill -f "vite.*claude_manager" 2>/dev/null && echo "  ✅ Stopped vite processes" || echo "  ℹ️  No vite processes found"
+pkill -f "vite.*open_adventure" 2>/dev/null && echo "  ✅ Stopped vite processes" || echo "  ℹ️  No vite processes found"
 
 # 清理占用端口 8000 的所有进程
 if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
@@ -54,4 +54,4 @@ fi
 echo ""
 echo "✅ Cleanup complete!"
 echo ""
-echo "You can now run ./start.sh to start Claude Manager"
+echo "You can now run ./start.sh to start Open Adventure"

@@ -1,4 +1,4 @@
-# Claude Manager 打包配置更新
+# Open Adventure 打包配置更新
 
 ## 更新日期
 2026-02-25 20:26
@@ -11,14 +11,14 @@
 - **原因**: 前端 Dashboard 就在根路径 `/`，不需要 `/dashboard` 路由
 
 ### 2. 修改 dist 输出位置
-- **之前**: `backend/dist/claude-manager/`
-- **现在**: `dist/claude-manager/`（项目根目录）
+- **之前**: `backend/dist/open-adventure/`
+- **现在**: `dist/open-adventure/`（项目根目录）
 - **原因**: 更符合项目结构，与 backend、frontend 平级
 
 ## 目录结构
 
 ```
-claude_manager/
+open_adventure/
 ├── backend/
 │   ├── app/
 │   ├── build/              # PyInstaller 构建缓存
@@ -26,8 +26,8 @@ claude_manager/
 ├── frontend/
 │   └── dist/               # 前端构建产物
 ├── dist/                   # 打包输出目录（新位置）
-│   └── claude-manager/
-│       ├── claude-manager  # 可执行文件
+│   └── open-adventure/
+│       ├── open-adventure  # 可执行文件
 │       └── _internal/      # 依赖和资源
 └── scripts/
     ├── build_macos.sh
@@ -39,13 +39,13 @@ claude_manager/
 ### 运行应用
 ```bash
 # 从项目根目录
-./dist/claude-manager/claude-manager
+./dist/open-adventure/open-adventure
 
 # 不打开浏览器
-./dist/claude-manager/claude-manager --no-browser
+./dist/open-adventure/open-adventure --no-browser
 
 # 自定义端口
-./dist/claude-manager/claude-manager --port 9000
+./dist/open-adventure/open-adventure --port 9000
 ```
 
 ### 打包应用
@@ -57,7 +57,7 @@ claude_manager/
 ./scripts/build_linux.sh
 ```
 
-输出位置: `dist/claude-manager/`
+输出位置: `dist/open-adventure/`
 
 ## 修改的文件
 
@@ -65,13 +65,13 @@ claude_manager/
    - 修改 `open_browser()` 函数，打开 `/` 而非 `/dashboard`
    - 修改启动信息显示的访问地址
 
-2. **backend/claude_manager.spec**
+2. **backend/open_adventure.spec**
    - 添加 `DISTPATH` 和 `WORKPATH` 变量
    - 指定输出到项目根目录的 `dist/`
 
 3. **scripts/build_macos.sh**
    - 修改 pyinstaller 命令，添加 `--distpath ../dist`
-   - 更新验证路径为 `../dist/claude-manager`
+   - 更新验证路径为 `../dist/open-adventure`
    - 更新使用说明中的路径
 
 4. **scripts/build_linux.sh**
@@ -80,7 +80,7 @@ claude_manager/
 ## 测试结果
 
 ✅ 打包成功
-- 输出位置: `dist/claude-manager/`
+- 输出位置: `dist/open-adventure/`
 - 大小: 56 MB
 - 结构完整
 

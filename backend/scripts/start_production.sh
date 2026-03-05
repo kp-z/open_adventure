@@ -3,7 +3,7 @@
 
 set -e
 
-echo "🚀 Starting Claude Manager (Production Mode)..."
+echo "🚀 Starting Open Adventure (Production Mode)..."
 
 # Check if .env file exists
 if [ ! -f "/app/.env" ]; then

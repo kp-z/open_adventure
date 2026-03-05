@@ -11,7 +11,7 @@ import '../styles/theme.css';
 import '../styles/fonts.css';
 
 // App Version: 4.2.0 - Enhanced Teams Management
-console.log('🚀 Claude Manager v4.2.0 - Enhanced Teams Management');
+console.log('🚀 Open Adventure v4.2.0 - Enhanced Teams Management');
 console.log('✨ New: Complete Teams CRUD, Collaboration Modes, Communication Protocols');
 console.log('🔧 Clear browser cache if errors persist (Ctrl+Shift+R or Cmd+Shift+R)');
 

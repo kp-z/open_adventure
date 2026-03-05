@@ -2,7 +2,7 @@
 
 **分析日期**: 2026-02-24
 **分析师**: requirements-analyst
-**项目**: Claude Manager Phase 6
+**项目**: Open Adventure Phase 6
 
 ## 1. 现有功能分析
 

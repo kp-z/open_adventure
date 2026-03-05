@@ -323,7 +323,7 @@ class SkillService:
             # Plugin skills 如果没有 meta.path，尝试常见路径
             plugin_base = Path(self.claude_adapter.config_dir) / "plugins"
             possible_paths = [
-                plugin_base / "claude-manager" / "skills" / skill.name,
+                plugin_base / "open-adventure" / "skills" / skill.name,
                 Path.home() / ".claude" / "skills" / skill.name,
             ]
             for path in possible_paths:

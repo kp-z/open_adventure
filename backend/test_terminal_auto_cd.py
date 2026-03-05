@@ -39,8 +39,8 @@ async def test_project_path_setup():
         print("\n=== Test 1: 创建项目路径 ===")
         try:
             project_path = await service.create_project_path(
-                path="~/项目/Proj/claude_manager",
-                alias="Claude Manager",
+                path="~/项目/Proj/open_adventure",
+                alias="Open Adventure",
                 enabled=True,
                 recursive_scan=True
             )

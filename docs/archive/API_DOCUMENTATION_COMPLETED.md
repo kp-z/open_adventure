@@ -139,9 +139,9 @@
 
 - `fix_punctuation.py` - 标点符号修复脚本
 - `API_DOCUMENTATION_STATUS.md` - 文档状态跟踪
-- `claude_manager/api/skills.py` - Skills API (已完成)
-- `claude_manager/api/claude_code.py` - Claude Code API (已完成)
-- `claude_manager/api/prompts.py` - Prompts API (已完成)
+- `open_adventure/api/skills.py` - Skills API (已完成)
+- `open_adventure/api/claude_code.py` - Claude Code API (已完成)
+- `open_adventure/api/prompts.py` - Prompts API (已完成)
 
 ## 技术要点
 

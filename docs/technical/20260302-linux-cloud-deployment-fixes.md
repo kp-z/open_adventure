@@ -6,7 +6,7 @@
 
 ## 修复概述
 
-本次修复系统性地解决了 Claude Manager 在 Linux 云端环境部署时遇到的多个严重问题，包括数据库连接池耗尽、Terminal 子进程僵尸进程、同步/异步 API 混用等，显著提升了系统的稳定性和可维护性。
+本次修复系统性地解决了 Open Adventure 在 Linux 云端环境部署时遇到的多个严重问题，包括数据库连接池耗尽、Terminal 子进程僵尸进程、同步/异步 API 混用等，显著提升了系统的稳定性和可维护性。
 
 ## 🔴 严重问题修复
 
@@ -195,7 +195,7 @@
 - 日志输出配置
 
 **新增文件**:
-- `claude-manager.service`
+- `open-adventure.service`
 
 **验证结果**:
 ```
@@ -215,7 +215,7 @@
 ### 新增的文件
 1. `backend/app/services/agent_session_service_async.py` - 异步版本 service
 2. `docs/deployment/linux-cloud.md` - 云端部署文档
-3. `claude-manager.service` - systemd 配置
+3. `open-adventure.service` - systemd 配置
 
 ## 测试验证
 
@@ -334,7 +334,7 @@ tail docs/logs/backend.log
 
 ## 总结
 
-本次修复系统性地解决了 Claude Manager 在 Linux 云端部署时的核心问题，显著提升了系统的稳定性、可维护性和可观测性。所有修复都经过验证，向后兼容，可以安全地部署到生产环境。
+本次修复系统性地解决了 Open Adventure 在 Linux 云端部署时的核心问题，显著提升了系统的稳定性、可维护性和可观测性。所有修复都经过验证，向后兼容，可以安全地部署到生产环境。
 
 建议在部署后持续监控系统状态，特别是数据库连接池使用情况和 Terminal 会话管理，确保系统在高负载下稳定运行。
 

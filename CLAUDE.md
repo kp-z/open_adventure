@@ -1,13 +1,13 @@
-# Claude Manager 项目上下文
+# Open Adventure 项目上下文
 
 ## 项目信息
-- **项目名称**: Claude Manager
+- **项目名称**: Open Adventure
 - **GitHub 仓库**: https://github.com/kp-z/open_adventure
 - **仓库所有者**: kp-z
 - **仓库名称**: open_adventure
 
 ## 项目概述
-Claude Manager 是一个管理 Claude AI 生态的系统，包含技能(Skills)、智能体(Agents)、队伍(AgentTeams)、工作流(Workflows)和任务(Tasks)的统一管理平台。
+Open Adventure 是一个管理 Claude AI 生态的系统，包含技能(Skills)、智能体(Agents)、队伍(AgentTeams)、工作流(Workflows)和任务(Tasks)的统一管理平台。
 
 ## 核心架构
 三层架构设计：
@@ -61,7 +61,7 @@ frontend/src/
 └── lib/                # API 客户端
 
 marketplace/            # 内置 Claude Code Plugins
-└── open_adventure/     # Claude Manager 官方插件
+└── open_adventure/     # Open Adventure 官方插件
     └── skills/         # Skills 目录
         └── prompt_optimizer/  # Prompt 优化 skill
 
@@ -118,7 +118,7 @@ scripts/
 - **存放位置**: `docs/releases/`
 - **文件类型**: `.tar.gz`, `.zip`, `.dmg`, `.exe`
 - **命名规范**: `{项目名}-v{版本号}-{平台}-{架构}.{扩展名}`
-  - 示例: `claude-manager-v0.1.1-macos-arm64.tar.gz`
+  - 示例: `open-adventure-v0.1.1-macos-arm64.tar.gz`
 
 #### 🔧 脚本文件
 - **启动脚本**: 项目根目录（如 `start.sh`, `restart-frontend.sh`）
@@ -178,7 +178,7 @@ scripts/
 1. 用户会指定一个时间范围或具体的 commit
 2. 在 `~/项目/Proj/Claudeadventure` 项目中查找该时间范围内的 commit
 3. 查看这些 commit 中的前端代码修改
-4. 参考这些修改，将相应的设计和代码应用到当前项目（`claude_manager`）的前端
+4. 参考这些修改，将相应的设计和代码应用到当前项目（`open_adventure`）的前端
 
 **示例**:
 - "同步 Figma 前端修改，参考昨天的 commit" → 查看 Claudeadventure 项目昨天的 commit
@@ -234,14 +234,14 @@ scripts/
 
 **macOS ARM64 版本**：
 ```bash
-cd /Users/kp/项目/Proj/claude_manager
+cd /Users/kp/项目/Proj/open_adventure
 ./scripts/build_binary.sh
 ```
 
 **Linux x86_64 版本**：
 ```bash
 # 在 Linux 环境中运行
-cd /path/to/claude_manager
+cd /path/to/open_adventure
 ./scripts/build_binary.sh
 ```
 
@@ -264,58 +264,58 @@ cd /path/to/claude_manager
 ```bash
 cd /Users/kp/项目/Proj
 tar \
-  --exclude='claude_manager/backend/venv' \
-  --exclude='claude_manager/backend/dist' \
-  --exclude='claude_manager/backend/build' \
-  --exclude='claude_manager/venv' \
-  --exclude='claude_manager/backend/__pycache__' \
-  --exclude='claude_manager/backend/app/__pycache__' \
-  --exclude='claude_manager/backend/app/*/__pycache__' \
-  --exclude='claude_manager/frontend/node_modules' \
-  --exclude='claude_manager/node_modules' \
-  --exclude='claude_manager/frontend/.vite' \
-  --exclude='claude_manager/.git' \
-  --exclude='claude_manager/frontend/.git' \
-  --exclude='claude_manager/dist' \
-  --exclude='claude_manager/release' \
-  --exclude='claude_manager/docs' \
+  --exclude='open_adventure/backend/venv' \
+  --exclude='open_adventure/backend/dist' \
+  --exclude='open_adventure/backend/build' \
+  --exclude='open_adventure/venv' \
+  --exclude='open_adventure/backend/__pycache__' \
+  --exclude='open_adventure/backend/app/__pycache__' \
+  --exclude='open_adventure/backend/app/*/__pycache__' \
+  --exclude='open_adventure/frontend/node_modules' \
+  --exclude='open_adventure/node_modules' \
+  --exclude='open_adventure/frontend/.vite' \
+  --exclude='open_adventure/.git' \
+  --exclude='open_adventure/frontend/.git' \
+  --exclude='open_adventure/dist' \
+  --exclude='open_adventure/release' \
+  --exclude='open_adventure/docs' \
   --exclude='*.pyc' \
   --exclude='.DS_Store' \
-  --exclude='claude_manager/.claude' \
-  --exclude='claude_manager/.figma' \
-  --exclude='claude_manager/.playwright-mcp' \
-  -czf /tmp/open_adventure-v{版本号}-macos-arm64-source.tar.gz claude_manager/
+  --exclude='open_adventure/.claude' \
+  --exclude='open_adventure/.figma' \
+  --exclude='open_adventure/.playwright-mcp' \
+  -czf /tmp/open_adventure-v{版本号}-macos-arm64-source.tar.gz open_adventure/
 
-mv /tmp/open_adventure-v{版本号}-macos-arm64-source.tar.gz claude_manager/docs/releases/
+mv /tmp/open_adventure-v{版本号}-macos-arm64-source.tar.gz open_adventure/docs/releases/
 ```
 
 **Linux x86_64 版本**：
 ```bash
 cd /Users/kp/项目/Proj
 tar \
-  --exclude='claude_manager/backend/venv' \
-  --exclude='claude_manager/backend/dist' \
-  --exclude='claude_manager/backend/build' \
-  --exclude='claude_manager/venv' \
-  --exclude='claude_manager/backend/__pycache__' \
-  --exclude='claude_manager/backend/app/__pycache__' \
-  --exclude='claude_manager/backend/app/*/__pycache__' \
-  --exclude='claude_manager/frontend/node_modules' \
-  --exclude='claude_manager/node_modules' \
-  --exclude='claude_manager/frontend/.vite' \
-  --exclude='claude_manager/.git' \
-  --exclude='claude_manager/frontend/.git' \
-  --exclude='claude_manager/dist' \
-  --exclude='claude_manager/release' \
-  --exclude='claude_manager/docs' \
+  --exclude='open_adventure/backend/venv' \
+  --exclude='open_adventure/backend/dist' \
+  --exclude='open_adventure/backend/build' \
+  --exclude='open_adventure/venv' \
+  --exclude='open_adventure/backend/__pycache__' \
+  --exclude='open_adventure/backend/app/__pycache__' \
+  --exclude='open_adventure/backend/app/*/__pycache__' \
+  --exclude='open_adventure/frontend/node_modules' \
+  --exclude='open_adventure/node_modules' \
+  --exclude='open_adventure/frontend/.vite' \
+  --exclude='open_adventure/.git' \
+  --exclude='open_adventure/frontend/.git' \
+  --exclude='open_adventure/dist' \
+  --exclude='open_adventure/release' \
+  --exclude='open_adventure/docs' \
   --exclude='*.pyc' \
   --exclude='.DS_Store' \
-  --exclude='claude_manager/.claude' \
-  --exclude='claude_manager/.figma' \
-  --exclude='claude_manager/.playwright-mcp' \
-  -czf /tmp/open_adventure-v{版本号}-linux-x86_64-source.tar.gz claude_manager/
+  --exclude='open_adventure/.claude' \
+  --exclude='open_adventure/.figma' \
+  --exclude='open_adventure/.playwright-mcp' \
+  -czf /tmp/open_adventure-v{版本号}-linux-x86_64-source.tar.gz open_adventure/
 
-mv /tmp/open_adventure-v{版本号}-linux-x86_64-source.tar.gz claude_manager/docs/releases/
+mv /tmp/open_adventure-v{版本号}-linux-x86_64-source.tar.gz open_adventure/docs/releases/
 ```
 
 **源码打包规范**：
@@ -382,8 +382,8 @@ git push origin v{版本号}
 gh release create v{版本号} \
   --title "v{版本号} - {简要标题}" \
   --notes-file docs/release-notes/RELEASE_NOTES_v{版本号}.md \
-  docs/releases/claude-manager-v{版本号}-macos-arm64.tar.gz \
-  docs/releases/claude-manager-v{版本号}-linux-x86_64.tar.gz
+  docs/releases/open-adventure-v{版本号}-macos-arm64.tar.gz \
+  docs/releases/open-adventure-v{版本号}-linux-x86_64.tar.gz
 ```
 
 **GitHub Release 规范**：
@@ -402,9 +402,9 @@ gh release create v{版本号} \
 #### 2. 验证压缩包
 ```bash
 # 下载并解压测试
-wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/claude-manager-v{版本号}-macos-arm64.tar.gz
-tar -xzf claude-manager-v{版本号}-macos-arm64.tar.gz
-cd claude-manager
+wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/open-adventure-v{版本号}-macos-arm64.tar.gz
+tar -xzf open-adventure-v{版本号}-macos-arm64.tar.gz
+cd open-adventure
 ./start.sh
 ```
 
@@ -472,8 +472,8 @@ git push origin v{版本号}
 gh release create v{版本号} \
   --title "v{版本号} - ..." \
   --notes-file docs/release-notes/RELEASE_NOTES_v{版本号}.md \
-  docs/releases/claude-manager-v{版本号}-macos-arm64.tar.gz \
-  docs/releases/claude-manager-v{版本号}-linux-x86_64.tar.gz
+  docs/releases/open-adventure-v{版本号}-macos-arm64.tar.gz \
+  docs/releases/open-adventure-v{版本号}-linux-x86_64.tar.gz
 
 # 7. 验证发布
 # 下载并测试压缩包

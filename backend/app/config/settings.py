@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Application
-    app_name: str = "Claude Manager"
+    app_name: str = "Open Adventure"
     app_version: str = "0.2.0"
     debug: bool = False
     env: str = "development"  # development, production, test
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
 
     # Database
-    database_url: str = "sqlite+aiosqlite:///./claude_manager.db"
+    database_url: str = "sqlite+aiosqlite:///./open_adventure.db"
 
     # Claude Configuration
     anthropic_api_key: Optional[str] = None

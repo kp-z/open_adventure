@@ -34,7 +34,7 @@
 ### 2. 选择项目路径
 在页面顶部可以看到项目路径下拉框（文件夹图标旁边）：
 ```
-🗂️ [claude_manager ▼]
+🗂️ [open_adventure ▼]
 ```
 
 ### 3. 切换项目
@@ -48,7 +48,7 @@
 ### 下拉框位置
 ```
 SHELL
-🟢 1 terminal active  🗂️ [claude_manager ▼]
+🟢 1 terminal active  🗂️ [open_adventure ▼]
 ```
 
 ### 下拉框样式
@@ -70,7 +70,7 @@ GET http://localhost:8000/api/project-paths?enabled=true
 ws://localhost:8000/api/terminal/ws
 
 // 指定项目路径
-ws://localhost:8000/api/terminal/ws?project_path=/Users/kp/项目/Proj/claude_manager
+ws://localhost:8000/api/terminal/ws?project_path=/Users/kp/项目/Proj/open_adventure
 ```
 
 ## 工作流程

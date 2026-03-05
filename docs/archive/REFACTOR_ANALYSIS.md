@@ -1,10 +1,10 @@
-# Claude Manager 重构分析报告
+# Open Adventure 重构分析报告
 
 ## 当前项目结构 vs 目标架构对比
 
 ### 当前结构 (现有)
 ```
-claude_manager/
+open_adventure/
 ├── main.py                    # FastAPI 入口
 ├── core/
 │   ├── config.py              # 配置管理
@@ -174,10 +174,10 @@ backend/
 ### Phase 0: 准备工作 (1-2天)
 
 **后端重构**:
-1. ✅ 保留现有 `claude_manager/` 结构
+1. ✅ 保留现有 `open_adventure/` 结构
 2. 新增目录:
-   - `claude_manager/adapters/` (Adapter 层)
-   - `claude_manager/repositories/` (Repository 层)
+   - `open_adventure/adapters/` (Adapter 层)
+   - `open_adventure/repositories/` (Repository 层)
 3. 拆分 `models/__init__.py` 为独立文件:
    - `models/skills.py`
    - `models/agents.py`
@@ -378,13 +378,13 @@ backend/
 ### 立即执行 (Phase 0)
 
 1. **确认重构方案**: 渐进式 vs 全新
-2. **备份当前数据库**: `cp claude_manager.db claude_manager.db.backup`
+2. **备份当前数据库**: `cp open_adventure.db open_adventure.db.backup`
 3. **创建新分支**: `git checkout -b refactor/phase-0`
 4. **开始目录重构**:
    ```bash
-   mkdir -p claude_manager/adapters/claude
-   mkdir -p claude_manager/repositories
-   mkdir -p claude_manager/config
+   mkdir -p open_adventure/adapters/claude
+   mkdir -p open_adventure/repositories
+   mkdir -p open_adventure/config
    ```
 5. **拆分 models 和 schemas**
 6. **初始化前端项目**:

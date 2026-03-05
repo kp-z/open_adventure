@@ -2,7 +2,7 @@
 
 **实验日期**: 2026-02-24
 **团队名称**: phase6-development-team
-**目标**: 演示 Claude Code Agent Team 功能，为 Claude Manager Phase 6 开发做准备
+**目标**: 演示 Claude Code Agent Team 功能，为 Open Adventure Phase 6 开发做准备
 
 ## 实验成果
 
@@ -213,7 +213,7 @@ SendMessage({
 
 ## 后续建议
 
-### 对 Claude Manager 项目
+### 对 Open Adventure 项目
 
 1. **实际应用 Agent Team**
    - 在真实的 Phase 6 开发中使用

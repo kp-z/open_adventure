@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
     # Startup
-    logger.info("Starting Claude Manager Backend...")
+    logger.info("Starting Open Adventure Backend...")
     await init_db()
     logger.info("Database initialized")
 
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Shutting down Claude Manager Backend...")
+    logger.info("Shutting down Open Adventure Backend...")
 
     # 停止 Agent Session 清理任务
     if cleanup_task:

@@ -47,7 +47,7 @@ python test_api.py
 ```
 
 ### 工作目录
-默认工作目录：`/Users/kp/项目/Proj/claude_manager/backend`
+默认工作目录：`/Users/kp/项目/Proj/open_adventure/backend`
 
 ### 快捷键
 - `Ctrl+C`: 中断当前命令

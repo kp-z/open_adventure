@@ -1,4 +1,4 @@
-# Claude Manager - Phase 6 完成
+# Open Adventure - Phase 6 完成
 
 ## 项目状态
 
@@ -15,13 +15,13 @@
 ## 当前架构
 
 ### 后端 (FastAPI + SQLAlchemy)
-- **位置**: `/Users/kp/项目/Proj/claude_manager/backend`
+- **位置**: `/Users/kp/项目/Proj/open_adventure/backend`
 - **运行**: `cd backend && source venv/bin/activate && python run.py`
 - **端口**: http://127.0.0.1:8000
 - **API 文档**: http://127.0.0.1:8000/docs
 
 ### 前端 (Next.js + TypeScript + Tailwind)
-- **位置**: `/Users/kp/项目/Proj/claude_manager/frontend`
+- **位置**: `/Users/kp/项目/Proj/open_adventure/frontend`
 - **运行**: `cd frontend && npm run dev`
 - **端口**: http://localhost:3000
 

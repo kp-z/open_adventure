@@ -1,6 +1,6 @@
-# Claude Manager 文档索引
+# Open Adventure 文档索引
 
-本目录包含 Claude Manager 项目的所有文档和资源文件。
+本目录包含 Open Adventure 项目的所有文档和资源文件。
 
 ## 📁 目录结构
 
@@ -48,7 +48,7 @@
 
 ### 📦 releases/
 发布包文件
-- `claude-manager-v0.1.1-macos-arm64.tar.gz` - v0.1.1 macOS ARM64 版本
+- `open-adventure-v0.1.1-macos-arm64.tar.gz` - v0.1.1 macOS ARM64 版本
 
 ### 📋 logs/
 日志文件（14 个文件）

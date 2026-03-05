@@ -77,12 +77,12 @@
 1. 下载并解压：
 ```bash
 tar -xzf open_adventure-v1.2.3-macos-arm64.tar.gz
-cd claude-manager
+cd open-adventure
 ```
 
 2. 运行：
 ```bash
-./claude-manager
+./open-adventure
 ```
 
 ### 构建二进制版本

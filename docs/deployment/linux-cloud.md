@@ -1,4 +1,4 @@
-# Claude Manager Linux 云端部署指南
+# Open Adventure Linux 云端部署指南
 
 ## 环境要求
 
@@ -22,11 +22,11 @@
 ```bash
 # 下载最新版本（根据你的架构选择）
 # Linux x86_64
-wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/claude-manager-v{版本号}-linux-x86_64.tar.gz
+wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/open-adventure-v{版本号}-linux-x86_64.tar.gz
 
 # 解压
-tar -xzf claude-manager-v{版本号}-linux-x86_64.tar.gz
-cd claude_manager
+tar -xzf open-adventure-v{版本号}-linux-x86_64.tar.gz
+cd open_adventure
 ```
 
 ### 2. 安装依赖
@@ -62,7 +62,7 @@ vim .env
 ENV=production
 
 # 数据库
-DATABASE_URL=sqlite+aiosqlite:///./backend/claude_manager.db
+DATABASE_URL=sqlite+aiosqlite:///./backend/open_adventure.db
 
 # 日志级别
 LOG_LEVEL=INFO
@@ -184,7 +184,7 @@ sudo firewall-cmd --reload
 ### Nginx 反向代理（推荐）
 
 ```nginx
-# /etc/nginx/sites-available/claude-manager
+# /etc/nginx/sites-available/open-adventure
 server {
     listen 80;
     server_name your-domain.com;
@@ -225,7 +225,7 @@ server {
 
 启用配置：
 ```bash
-sudo ln -s /etc/nginx/sites-available/claude-manager /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/open-adventure /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -236,26 +236,26 @@ sudo systemctl reload nginx
 
 ```bash
 # 编辑服务文件
-sudo vim /etc/systemd/system/claude-manager.service
+sudo vim /etc/systemd/system/open-adventure.service
 ```
 
 内容（修改路径和用户）：
 ```ini
 [Unit]
-Description=Claude Manager Backend Service
+Description=Open Adventure Backend Service
 After=network.target
 
 [Service]
 Type=simple
 User=your-user
-WorkingDirectory=/path/to/claude_manager
+WorkingDirectory=/path/to/open_adventure
 Environment="ENV=production"
 Environment="PYTHONUNBUFFERED=1"
-ExecStart=/path/to/claude_manager/backend/venv/bin/python /path/to/claude_manager/backend/run.py
+ExecStart=/path/to/open_adventure/backend/venv/bin/python /path/to/open_adventure/backend/run.py
 Restart=always
 RestartSec=10
-StandardOutput=append:/path/to/claude_manager/docs/logs/backend.log
-StandardError=append:/path/to/claude_manager/docs/logs/error.log
+StandardOutput=append:/path/to/open_adventure/docs/logs/backend.log
+StandardError=append:/path/to/open_adventure/docs/logs/error.log
 
 # 资源限制
 LimitNOFILE=65536
@@ -276,29 +276,29 @@ WantedBy=multi-user.target
 sudo systemctl daemon-reload
 
 # 启用开机自启
-sudo systemctl enable claude-manager
+sudo systemctl enable open-adventure
 
 # 启动服务
-sudo systemctl start claude-manager
+sudo systemctl start open-adventure
 
 # 查看状态
-sudo systemctl status claude-manager
+sudo systemctl status open-adventure
 
 # 查看日志
-sudo journalctl -u claude-manager -f
+sudo journalctl -u open-adventure -f
 ```
 
 ### 3. 服务管理命令
 
 ```bash
 # 停止服务
-sudo systemctl stop claude-manager
+sudo systemctl stop open-adventure
 
 # 重启服务
-sudo systemctl restart claude-manager
+sudo systemctl restart open-adventure
 
 # 禁用开机自启
-sudo systemctl disable claude-manager
+sudo systemctl disable open-adventure
 ```
 
 ## 日志管理
@@ -373,13 +373,13 @@ curl http://localhost:8000/api/system/health/detailed | jq '.database.pool'
 
 ```bash
 # 查找僵尸进程
-ps aux | grep python | grep claude_manager
+ps aux | grep python | grep open_adventure
 
 # 查找占用 8000 端口的进程
 lsof -i :8000
 
 # 强制杀死所有相关进程
-pkill -9 -f "claude_manager"
+pkill -9 -f "open_adventure"
 
 # 或使用 stop.sh
 ./stop.sh
@@ -418,13 +418,13 @@ curl -I -X OPTIONS http://localhost:8000/api/system/health
 
 ```bash
 # 定期清理旧数据
-sqlite3 backend/claude_manager.db "DELETE FROM executions WHERE created_at < datetime('now', '-30 days');"
+sqlite3 backend/open_adventure.db "DELETE FROM executions WHERE created_at < datetime('now', '-30 days');"
 
 # 优化数据库
-sqlite3 backend/claude_manager.db "VACUUM;"
+sqlite3 backend/open_adventure.db "VACUUM;"
 
 # 重建索引
-sqlite3 backend/claude_manager.db "REINDEX;"
+sqlite3 backend/open_adventure.db "REINDEX;"
 ```
 
 ### 2. 连接池配置
@@ -501,12 +501,12 @@ npm update
 
 ```bash
 # 定期备份
-cp backend/claude_manager.db backend/claude_manager.db.backup.$(date +%Y%m%d)
+cp backend/open_adventure.db backend/open_adventure.db.backup.$(date +%Y%m%d)
 
 # 或使用 cron 自动备份
 crontab -e
 # 添加：每天凌晨 2 点备份
-0 2 * * * cp /path/to/claude_manager/backend/claude_manager.db /path/to/backups/claude_manager.db.$(date +\%Y\%m\%d)
+0 2 * * * cp /path/to/open_adventure/backend/open_adventure.db /path/to/backups/open_adventure.db.$(date +\%Y\%m\%d)
 ```
 
 ## 监控和告警
@@ -524,7 +524,7 @@ if [ $RESPONSE -ne 200 ]; then
     echo "Backend is down! HTTP code: $RESPONSE"
     # 发送告警（邮件、钉钉、Slack 等）
     # 自动重启服务
-    sudo systemctl restart claude-manager
+    sudo systemctl restart open-adventure
 fi
 ```
 
@@ -546,7 +546,7 @@ crontab -e
 sudo apt install htop
 
 # 监控进程
-htop -p $(pgrep -f claude_manager)
+htop -p $(pgrep -f open_adventure)
 
 # 监控磁盘
 df -h
@@ -560,17 +560,17 @@ free -h
 ### Q: 如何更新到新版本？
 
 A:
-1. 停止服务：`./stop.sh` 或 `sudo systemctl stop claude-manager`
-2. 备份数据库：`cp backend/claude_manager.db backend/claude_manager.db.backup`
+1. 停止服务：`./stop.sh` 或 `sudo systemctl stop open-adventure`
+2. 备份数据库：`cp backend/open_adventure.db backend/open_adventure.db.backup`
 3. 下载新版本并解压覆盖
 4. 重新安装依赖（如果有变化）
-5. 启动服务：`./start.sh` 或 `sudo systemctl start claude-manager`
+5. 启动服务：`./start.sh` 或 `sudo systemctl start open-adventure`
 
 ### Q: 如何迁移到其他服务器？
 
 A:
-1. 打包整个目录：`tar -czf claude_manager.tar.gz claude_manager/`
-2. 传输到新服务器：`scp claude_manager.tar.gz user@new-server:/path/`
+1. 打包整个目录：`tar -czf open_adventure.tar.gz open_adventure/`
+2. 传输到新服务器：`scp open_adventure.tar.gz user@new-server:/path/`
 3. 在新服务器解压并重新安装依赖
 4. 启动服务
 
@@ -582,7 +582,7 @@ A:
 ./stop.sh
 
 # 删除数据库
-rm backend/claude_manager.db
+rm backend/open_adventure.db
 
 # 重新启动（会自动创建新数据库）
 ./start.sh

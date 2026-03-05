@@ -9,8 +9,8 @@
 curl -X POST http://localhost:8000/api/project-paths \
   -H "Content-Type: application/json" \
   -d '{
-    "path": "~/项目/Proj/claude_manager",
-    "alias": "Claude Manager",
+    "path": "~/项目/Proj/open_adventure",
+    "alias": "Open Adventure",
     "enabled": true,
     "recursive_scan": true
   }'

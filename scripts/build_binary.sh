@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Claude Manager 二进制构建脚本
+# Open Adventure 二进制构建脚本
 # 用途：使用 PyInstaller 构建保护源码的二进制版本
 
 set -e  # 遇到错误立即退出
@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}Claude Manager 二进制构建脚本${NC}"
+echo -e "${GREEN}Open Adventure 二进制构建脚本${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 
@@ -105,7 +105,7 @@ echo ""
 # 使用 PyInstaller 构建
 echo -e "${YELLOW}[5/6] 使用 PyInstaller 构建二进制...${NC}"
 cd "$BACKEND_DIR"
-pyinstaller claude_manager.spec --clean
+pyinstaller open_adventure.spec --clean
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ PyInstaller 构建失败${NC}"
@@ -118,18 +118,18 @@ echo ""
 echo -e "${YELLOW}[6/6] 验证构建产物...${NC}"
 # PyInstaller 输出到 backend/dist，不是项目根目录的 dist
 ACTUAL_DIST_DIR="$BACKEND_DIR/dist"
-BINARY_PATH="$ACTUAL_DIST_DIR/claude-manager/claude-manager"
+BINARY_PATH="$ACTUAL_DIST_DIR/open-adventure/open-adventure"
 if [ ! -f "$BINARY_PATH" ]; then
     echo -e "${RED}❌ 可执行文件不存在: $BINARY_PATH${NC}"
     exit 1
 fi
 
 # 检查是否包含源码文件（不应该有）
-PY_FILES=$(find "$ACTUAL_DIST_DIR/claude-manager" -name "*.py" 2>/dev/null | wc -l)
+PY_FILES=$(find "$ACTUAL_DIST_DIR/open-adventure" -name "*.py" 2>/dev/null | wc -l)
 if [ "$PY_FILES" -gt 0 ]; then
     echo -e "${RED}❌ 警告: 构建产物中仍包含 $PY_FILES 个 .py 源码文件${NC}"
     echo -e "${YELLOW}前 10 个文件:${NC}"
-    find "$ACTUAL_DIST_DIR/claude-manager" -name "*.py" | head -10
+    find "$ACTUAL_DIST_DIR/open-adventure" -name "*.py" | head -10
     echo ""
     echo -e "${YELLOW}这可能表示配置有问题，但构建已完成${NC}"
 else
@@ -137,7 +137,7 @@ else
 fi
 
 # 获取构建产物大小
-DIST_SIZE=$(du -sh "$ACTUAL_DIST_DIR/claude-manager" | cut -f1)
+DIST_SIZE=$(du -sh "$ACTUAL_DIST_DIR/open-adventure" | cut -f1)
 echo -e "${GREEN}✓ 构建产物大小: $DIST_SIZE${NC}"
 echo ""
 
@@ -157,7 +157,7 @@ mkdir -p "$PROJECT_ROOT/docs/releases"
 
 # 打包（从 backend/dist 目录打包，保持目录结构）
 cd "$ACTUAL_DIST_DIR"
-tar -czf "$TARBALL_PATH" claude-manager/
+tar -czf "$TARBALL_PATH" open-adventure/
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ 打包失败${NC}"
@@ -181,7 +181,7 @@ echo -e "  压缩包路径: $TARBALL_PATH"
 echo -e "  压缩包大小: $TARBALL_SIZE"
 echo ""
 echo -e "${YELLOW}下一步:${NC}"
-echo -e "  1. 测试二进制: cd $DIST_DIR/claude-manager && ./claude-manager"
-echo -e "  2. 验证源码保护: find $DIST_DIR/claude-manager -name '*.py'"
+echo -e "  1. 测试二进制: cd $DIST_DIR/open-adventure && ./open-adventure"
+echo -e "  2. 验证源码保护: find $DIST_DIR/open-adventure -name '*.py'"
 echo -e "  3. 发布到 GitHub: gh release create v$VERSION $TARBALL_PATH"
 echo ""

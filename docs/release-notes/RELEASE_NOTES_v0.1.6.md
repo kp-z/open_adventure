@@ -1,4 +1,4 @@
-# Claude Manager v0.1.6 发布说明
+# Open Adventure v0.1.6 发布说明
 
 **发布日期**: 2026-02-28
 **版本**: v0.1.6
@@ -37,7 +37,7 @@
 **示例**:
 ```bash
 ⚠️  Port 8000 is already in use
-This might be an old version of Claude Manager still running.
+This might be an old version of Open Adventure still running.
 
 Do you want to stop the existing process? [y/N]
 ```
@@ -134,13 +134,13 @@ Do you want to stop the existing process? [y/N]
 
 1. **下载新版本**
    ```bash
-   # 下载 claude-manager-v0.1.6-macos-arm64.tar.gz
+   # 下载 open-adventure-v0.1.6-macos-arm64.tar.gz
    ```
 
 2. **解压到新目录**
    ```bash
-   tar -xzf claude-manager-v0.1.6-macos-arm64.tar.gz
-   cd claude-manager
+   tar -xzf open-adventure-v0.1.6-macos-arm64.tar.gz
+   cd open-adventure
    ```
 
 3. **启动应用**

@@ -2,7 +2,7 @@
 
 ## 概述
 
-Claude Manager 现在支持在创建 Skills 和 Agents 时**自动安装到 Claude Code**，无需手动调用安装 API！
+Open Adventure 现在支持在创建 Skills 和 Agents 时**自动安装到 Claude Code**，无需手动调用安装 API！
 
 ## 功能特性
 

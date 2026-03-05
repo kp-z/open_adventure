@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Claude Manager - Packaged Entry Point
+Open Adventure - Packaged Entry Point
 单文件可执行版本的启动脚本
 """
 import sys
@@ -30,7 +30,7 @@ if getattr(sys, 'frozen', False):
         BASE_DIR = Path(sys.executable).parent
 
     FRONTEND_DIR = BASE_DIR / "frontend_dist"
-    DB_TEMPLATE = BASE_DIR / "claude_manager.db"
+    DB_TEMPLATE = BASE_DIR / "open_adventure.db"
 
     # 将 app 模块路径添加到 sys.path
     APP_DIR = BASE_DIR / "app"
@@ -40,7 +40,7 @@ else:
     # 开发环境
     BASE_DIR = Path(__file__).parent
     FRONTEND_DIR = BASE_DIR.parent / "frontend" / "dist"
-    DB_TEMPLATE = BASE_DIR / "claude_manager.db"
+    DB_TEMPLATE = BASE_DIR / "open_adventure.db"
     # 开发环境下也添加 backend 目录到路径
     sys.path.insert(0, str(BASE_DIR))
 
@@ -51,8 +51,8 @@ os.environ["DB_TEMPLATE_PATH"] = str(DB_TEMPLATE)
 
 def init_database():
     """初始化数据库"""
-    user_dir = Path.home() / ".claude_manager"
-    user_db = user_dir / "claude_manager.db"
+    user_dir = Path.home() / ".open_adventure"
+    user_db = user_dir / "open_adventure.db"
     user_dir.mkdir(parents=True, exist_ok=True)
 
     if not user_db.exists() and DB_TEMPLATE.exists():
@@ -73,7 +73,7 @@ def init_database():
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description="Claude Manager - AI Configuration Management System")
+    parser = argparse.ArgumentParser(description="Open Adventure - AI Configuration Management System")
     parser.add_argument("--port", type=int, default=None, help="服务端口 (默认: 8000)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="监听地址 (默认: 0.0.0.0)")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
@@ -90,7 +90,7 @@ def open_browser(port: int, delay: float = 1.5):
 
 if __name__ == "__main__":
     print("=" * 60, flush=True)
-    print("Claude Manager - AI Configuration Management System", flush=True)
+    print("Open Adventure - AI Configuration Management System", flush=True)
     print("=" * 60, flush=True)
 
     # 解析命令行参数

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Claude Manager Release Build Script
+# Open Adventure Release Build Script
 # 用于创建干净的发布包
 
 set -e
@@ -20,11 +20,11 @@ VERSION=${1:-"0.1.3"}
 PLATFORM=${2:-"macos"}
 ARCH=${3:-"arm64"}
 
-RELEASE_NAME="claude-manager-v${VERSION}-${PLATFORM}-${ARCH}"
+RELEASE_NAME="open-adventure-v${VERSION}-${PLATFORM}-${ARCH}"
 RELEASE_FILE="${RELEASE_NAME}.tar.gz"
 RELEASE_DIR="${PROJECT_ROOT}/docs/releases"
 
-echo -e "${GREEN}🚀 Building Claude Manager Release${NC}"
+echo -e "${GREEN}🚀 Building Open Adventure Release${NC}"
 echo -e "Version: ${YELLOW}${VERSION}${NC}"
 echo -e "Platform: ${YELLOW}${PLATFORM}${NC}"
 echo -e "Architecture: ${YELLOW}${ARCH}${NC}"

@@ -2,7 +2,7 @@
 
 
 class ClaudeManagerException(Exception):
-    """Base exception for Claude Manager."""
+    """Base exception for Open Adventure."""
 
     def __init__(self, message: str, details: dict = None):
         self.message = message

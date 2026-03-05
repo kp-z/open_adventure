@@ -51,7 +51,7 @@ def process_file(file_path):
 
 def main():
     """Process all API files."""
-    api_dir = Path(__file__).parent / "claude_manager" / "api"
+    api_dir = Path(__file__).parent / "open_adventure" / "api"
 
     files_to_process = [
         "skills.py",

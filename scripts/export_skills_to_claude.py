@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Export skills from claude_manager database to Claude Code skills directory.
+Export skills from open_adventure database to Claude Code skills directory.
 """
 import os
 import sqlite3
@@ -11,7 +11,7 @@ def export_skills_to_claude():
     """Export all skills from database to Claude Code skills directory."""
 
     # Database path
-    db_path = Path(__file__).parent / "claude_manager.db"
+    db_path = Path(__file__).parent / "open_adventure.db"
 
     # Claude Code skills directory
     claude_skills_dir = Path.home() / ".claude" / "skills"

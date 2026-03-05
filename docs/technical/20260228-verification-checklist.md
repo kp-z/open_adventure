@@ -22,7 +22,7 @@
 
 ### 后端 API 测试（已完成 ✅）
 ```bash
-cd /Users/kp/项目/Proj/claude_manager
+cd /Users/kp/项目/Proj/open_adventure
 ./scripts/test-connection.sh
 ```
 
@@ -37,7 +37,7 @@ cd /Users/kp/项目/Proj/claude_manager
 
 #### 测试 1: Chat API 独立测试
 1. 打开浏览器
-2. 访问: `file:///Users/kp/项目/Proj/claude_manager/docs/test-chat-api.html`
+2. 访问: `file:///Users/kp/项目/Proj/open_adventure/docs/test-chat-api.html`
 3. 点击 "测试 Chat API" 按钮
 4. 预期结果:
    - 显示 "连接成功，开始接收数据..."

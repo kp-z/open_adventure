@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Claude Manager 开发环境一键安装脚本
+# Open Adventure 开发环境一键安装脚本
 # 目标：可控地清理旧环境并安装新开发环境（默认保守）
 
 set -euo pipefail
@@ -27,7 +27,7 @@ print_help() {
   cat <<'EOF'
 Usage: ./install.sh [options]
 
-一键安装 Claude Manager 开发环境（支持可选清理旧环境）
+一键安装 Open Adventure 开发环境（支持可选清理旧环境）
 
 Options:
   --yes                         非交互模式，自动确认
@@ -363,7 +363,7 @@ main() {
   parse_args "$@"
 
   echo "=========================================="
-  echo "Claude Manager 开发环境安装"
+  echo "Open Adventure 开发环境安装"
   echo "仓库路径: $REPO_ROOT"
   echo "模式: clean-runtime=$CLEAN_RUNTIME clean-deps=$CLEAN_DEPS with-plugin=$WITH_PLUGIN no-plugin=$NO_PLUGIN no-kill=$NO_KILL dry-run=$DRY_RUN"
   echo "=========================================="

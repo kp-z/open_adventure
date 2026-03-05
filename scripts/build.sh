@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Claude Manager 打包脚本
+# Open Adventure 打包脚本
 # 用于将前后端打包成可分发的应用程序
 
 set -e
 
-echo "🚀 开始打包 Claude Manager..."
+echo "🚀 开始打包 Open Adventure..."
 
 # 颜色定义
 GREEN='\033[0;32m'
@@ -39,7 +39,7 @@ echo -e "${GREEN}✅ 前端构建完成${NC}"
 # 3. 打包后端
 echo -e "\n${BLUE}🐍 打包后端应用...${NC}"
 cd "$BACKEND_DIR"
-pyinstaller claude_manager.spec --clean
+pyinstaller open_adventure.spec --clean
 echo -e "${GREEN}✅ 后端打包完成${NC}"
 
 # 4. 创建发布目录
@@ -47,29 +47,29 @@ echo -e "\n${BLUE}📦 创建发布包...${NC}"
 mkdir -p "$RELEASE_DIR"
 
 # 5. 复制打包好的应用
-cp -r "$DIST_DIR/claude-manager" "$RELEASE_DIR/"
+cp -r "$DIST_DIR/open-adventure" "$RELEASE_DIR/"
 
 # 6. 创建启动脚本
 cat > "$RELEASE_DIR/start.sh" << 'EOF'
 #!/bin/bash
 
-# Claude Manager 启动脚本
+# Open Adventure 启动脚本
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="$SCRIPT_DIR/claude-manager"
+APP_DIR="$SCRIPT_DIR/open-adventure"
 
-echo "🚀 启动 Claude Manager..."
+echo "🚀 启动 Open Adventure..."
 echo "📍 应用目录: $APP_DIR"
 
 # 检查应用是否存在
-if [ ! -f "$APP_DIR/claude-manager" ]; then
-    echo "❌ 错误: 找不到 claude-manager 可执行文件"
+if [ ! -f "$APP_DIR/open-adventure" ]; then
+    echo "❌ 错误: 找不到 open-adventure 可执行文件"
     exit 1
 fi
 
 # 启动应用
 cd "$APP_DIR"
-./claude-manager
+./open-adventure
 
 EOF
 
@@ -77,7 +77,7 @@ chmod +x "$RELEASE_DIR/start.sh"
 
 # 7. 创建 README
 cat > "$RELEASE_DIR/README.md" << 'EOF'
-# Claude Manager v0.1.1
+# Open Adventure v0.1.1
 
 ## 快速开始
 
@@ -90,8 +90,8 @@ cat > "$RELEASE_DIR/README.md" << 'EOF'
 或直接运行：
 
 ```bash
-cd claude-manager
-./claude-manager
+cd open-adventure
+./open-adventure
 ```
 
 ### 访问应用
@@ -105,12 +105,12 @@ http://localhost:8000
 ## 目录结构
 
 ```
-claude-manager/
-├── claude-manager          # 主程序可执行文件
+open-adventure/
+├── open-adventure          # 主程序可执行文件
 └── _internal/              # 内部依赖和资源
     ├── app/                # 后端应用代码
     ├── frontend_dist/      # 前端静态文件
-    └── claude_manager.db   # 数据库模板
+    └── open_adventure.db   # 数据库模板
 ```
 
 ## 配置
@@ -123,7 +123,7 @@ API_HOST=0.0.0.0
 API_PORT=8000
 
 # 数据库配置
-DATABASE_URL=sqlite+aiosqlite:///./claude_manager.db
+DATABASE_URL=sqlite+aiosqlite:///./open_adventure.db
 
 # Claude API 配置（可选）
 ANTHROPIC_API_KEY=your_api_key_here
@@ -150,13 +150,13 @@ API_PORT=8001
 如果遇到权限问题，运行：
 
 ```bash
-chmod +x claude-manager/claude-manager
+chmod +x open-adventure/open-adventure
 chmod +x start.sh
 ```
 
 ### 数据库问题
 
-如果数据库损坏，删除 `claude_manager.db` 文件，应用会自动创建新的数据库。
+如果数据库损坏，删除 `open_adventure.db` 文件，应用会自动创建新的数据库。
 
 ## 更多信息
 
@@ -168,7 +168,7 @@ EOF
 
 # 8. 创建版本信息文件
 cat > "$RELEASE_DIR/VERSION" << EOF
-Claude Manager v0.1.1
+Open Adventure v0.1.1
 Build Date: $(date +"%Y-%m-%d %H:%M:%S")
 Platform: macOS (Apple Silicon)
 EOF
@@ -185,4 +185,4 @@ ls -lh "$RELEASE_DIR"
 echo -e "\n${GREEN}🎉 可以将 release 目录打包分发了！${NC}"
 echo -e "${BLUE}💡 提示: 可以使用以下命令创建压缩包:${NC}"
 echo -e "   cd $PROJECT_ROOT"
-echo -e "   tar -czf claude-manager-v0.1.1-macos-arm64.tar.gz release/"
+echo -e "   tar -czf open-adventure-v0.1.1-macos-arm64.tar.gz release/"

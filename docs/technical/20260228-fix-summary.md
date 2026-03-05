@@ -15,7 +15,7 @@
 ```bash
 # 检查后端健康状态
 curl http://localhost:8000/api/system/health
-# ✅ 返回: {"status":"healthy","app_name":"Claude Manager","version":"0.2.0"}
+# ✅ 返回: {"status":"healthy","app_name":"Open Adventure","version":"0.2.0"}
 
 # 检查 Agents API
 curl http://localhost:8000/api/agents

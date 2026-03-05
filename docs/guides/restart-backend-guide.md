@@ -16,7 +16,7 @@
 
 ### 2. 重新启动后端
 ```bash
-cd /Users/kp/项目/Proj/claude_manager/backend
+cd /Users/kp/项目/Proj/open_adventure/backend
 python3 -m uvicorn app.main:app --reload --port 8000
 ```
 

@@ -1,0 +1,26 @@
+[Unit]
+Description=Open Adventure Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=your-user
+WorkingDirectory=/path/to/open_adventure
+Environment="ENV=production"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/path/to/open_adventure/backend/venv/bin/python /path/to/open_adventure/backend/run.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/path/to/open_adventure/docs/logs/backend.log
+StandardError=append:/path/to/open_adventure/docs/logs/error.log
+
+# 资源限制
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# 安全设置
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

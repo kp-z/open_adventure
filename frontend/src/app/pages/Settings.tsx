@@ -222,7 +222,7 @@ const Settings = () => {
           {activeTab === 'about' && (
             <section className="space-y-6">
               <div>
-                <h2 className="text-3xl font-bold mb-3">Claude Manager</h2>
+                <h2 className="text-3xl font-bold mb-3">Open Adventure</h2>
                 <p className="text-gray-400 text-lg">
                   统一管理 Claude AI 生态的专业工具 - Skills、Agents、Teams、Workflows 一站式解决方案
                 </p>
@@ -393,7 +393,7 @@ const Settings = () => {
                 <p><strong className="text-gray-300">版本：</strong> 0.2.0</p>
                 <p><strong className="text-gray-300">更新：</strong> 2026-02-28</p>
                 <p><strong className="text-gray-300">开源协议：</strong> MIT License</p>
-                <p className="text-sm pt-2">Made with ❤️ by Claude Manager Team</p>
+                <p className="text-sm pt-2">Made with ❤️ by Open Adventure Team</p>
               </div>
             </section>
           )}

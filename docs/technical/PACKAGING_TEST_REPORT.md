@@ -1,4 +1,4 @@
-# Claude Manager 打包测试报告
+# Open Adventure 打包测试报告
 
 ## 测试日期
 2026-02-25 19:02
@@ -11,22 +11,22 @@
 ## 打包结果
 
 ### 可执行文件信息
-- 文件名: `claude-manager`
+- 文件名: `open-adventure`
 - 大小: 27 MB
-- 位置: `backend/dist/claude-manager`
+- 位置: `backend/dist/open-adventure`
 - 架构: arm64
 
 ### 打包内容
 - ✅ app 模块: 78 个 Python 文件
 - ✅ 前端资源: 8 个文件
-- ✅ 数据库模板: claude_manager.db
+- ✅ 数据库模板: open_adventure.db
 
 ## 功能测试
 
 ### 1. 基本启动测试
 ```bash
-cd /tmp/claude-manager-test-53731
-./claude-manager --help
+cd /tmp/open-adventure-test-53731
+./open-adventure --help
 ```
 
 **结果**: ✅ 通过
@@ -49,18 +49,18 @@ cd /tmp/claude-manager-test-53731
 
 ### 3. 应用启动测试
 ```bash
-./claude-manager --no-browser --port 9999
+./open-adventure --no-browser --port 9999
 ```
 
 **启动日志**:
 ```
 ============================================================
-Claude Manager - AI Configuration Management System
+Open Adventure - AI Configuration Management System
 ============================================================
 
 🚀 启动服务器...
 📂 前端资源: /var/folders/.../frontend_dist
-💾 数据库: sqlite+aiosqlite:////Users/kp/.claude_manager/claude_manager.db
+💾 数据库: sqlite+aiosqlite:////Users/kp/.open_adventure/open_adventure.db
 
 🌐 访问地址: http://localhost:9999/dashboard
 按 Ctrl+C 停止服务
@@ -77,12 +77,12 @@ INFO:     Application startup complete.
 - 访问地址指向 `/dashboard`
 
 ### 4. 数据库初始化测试
-**检查**: `~/.claude_manager/claude_manager.db`
+**检查**: `~/.open_adventure/open_adventure.db`
 
 **结果**: ✅ 通过
 - 数据库文件已创建
 - 大小: 196 KB
-- 位置: `/Users/kp/.claude_manager/claude_manager.db`
+- 位置: `/Users/kp/.open_adventure/open_adventure.db`
 
 ### 5. 入口地址测试
 **之前的问题**: 显示 `http://localhost:8000` 而非 `/dashboard`
@@ -121,7 +121,7 @@ INFO:     Application startup complete.
 
 ### macOS
 - ✅ 已测试通过
-- 可执行文件: `claude-manager` (27 MB)
+- 可执行文件: `open-adventure` (27 MB)
 
 ### Linux
 - ⚠️ 需要在 Linux 环境重新打包
@@ -141,22 +141,22 @@ INFO:     Application startup complete.
 ### 2. 用户使用
 ```bash
 # 下载可执行文件
-chmod +x claude-manager  # macOS/Linux
+chmod +x open-adventure  # macOS/Linux
 
 # 运行
-./claude-manager
+./open-adventure
 
 # 自定义端口
-./claude-manager --port 9000
+./open-adventure --port 9000
 
 # 不打开浏览器
-./claude-manager --no-browser
+./open-adventure --no-browser
 ```
 
 ### 3. 数据存储
-- 用户数据: `~/.claude_manager/`
-- 数据库: `~/.claude_manager/claude_manager.db`
-- 配置文件: `~/.claude_manager/.env` (可选)
+- 用户数据: `~/.open_adventure/`
+- 数据库: `~/.open_adventure/open_adventure.db`
+- 配置文件: `~/.open_adventure/.env` (可选)
 
 ## 性能指标
 

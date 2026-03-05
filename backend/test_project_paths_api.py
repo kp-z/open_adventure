@@ -17,8 +17,8 @@ def test_project_paths_api():
     # 1. 创建项目路径
     print("\n1. 创建项目路径")
     create_data = {
-        "path": "~/项目/Proj/claude_manager",
-        "alias": "Claude Manager",
+        "path": "~/项目/Proj/open_adventure",
+        "alias": "Open Adventure",
         "enabled": True,
         "recursive_scan": True
     }
@@ -84,7 +84,7 @@ def test_project_paths_api():
     # 4. 更新项目路径
     print("\n4. 更新项目路径")
     update_data = {
-        "alias": "Claude Manager (Updated)"
+        "alias": "Open Adventure (Updated)"
     }
     try:
         response = requests.put(f"{BASE_URL}/project-paths/{path_id}", json=update_data)

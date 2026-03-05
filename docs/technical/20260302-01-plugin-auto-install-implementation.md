@@ -1,4 +1,4 @@
-# Claude Manager Plugin 自动安装功能实现总结
+# Open Adventure Plugin 自动安装功能实现总结
 
 **实现日期**: 2026-03-02
 **功能**: 在应用首次启动时自动安装内置的 Claude Code skills 到用户环境
@@ -12,7 +12,7 @@
 ```
 marketplace/
 ├── README.md                           # Marketplace 说明文档
-└── open_adventure/                     # Claude Manager 官方插件
+└── open_adventure/                     # Open Adventure 官方插件
     └── skills/                         # Skills 目录
         └── prompt_optimizer/           # Prompt 优化 skill
             └── SKILL.md                # Skill 定义文件
@@ -214,7 +214,7 @@ Claude 会在检测到模糊需求时自动使用该 skill。
 
 ### 长期计划
 1. 支持从远程仓库安装插件
-2. 创建插件市场界面（在 Claude Manager UI 中）
+2. 创建插件市场界面（在 Open Adventure UI 中）
 3. 支持插件依赖管理
 4. 添加插件卸载功能
 
@@ -245,7 +245,7 @@ Claude 会在检测到模糊需求时自动使用该 skill。
 
 ## 总结
 
-本次实现成功地为 Claude Manager 添加了自动安装内置 Claude Code skills 的功能。用户在首次启动应用时，系统会自动将 `prompt_optimizer` skill 安装到 Claude Code 环境中，无需手动配置。
+本次实现成功地为 Open Adventure 添加了自动安装内置 Claude Code skills 的功能。用户在首次启动应用时，系统会自动将 `prompt_optimizer` skill 安装到 Claude Code 环境中，无需手动配置。
 
 **核心优势**：
 - ✅ 自动化：首次启动自动安装，无需用户干预

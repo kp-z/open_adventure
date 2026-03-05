@@ -22,20 +22,20 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<Mode>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('claude-manager-mode') as Mode) || 'professional';
+      return (localStorage.getItem('open-adventure-mode') as Mode) || 'professional';
     }
     return 'professional';
   });
 
   const [lang, setLang] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('claude-manager-lang') as Language) || 'en';
+      return (localStorage.getItem('open-adventure-lang') as Language) || 'en';
     }
     return 'en';
   });
 
   useEffect(() => {
-    localStorage.setItem('claude-manager-mode', mode);
+    localStorage.setItem('open-adventure-mode', mode);
     if (mode === 'adventure') {
       document.documentElement.classList.add('claude-adventure-mode');
     } else {
@@ -44,7 +44,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [mode]);
 
   useEffect(() => {
-    localStorage.setItem('claude-manager-lang', lang);
+    localStorage.setItem('open-adventure-lang', lang);
     document.documentElement.lang = lang;
   }, [lang]);
 

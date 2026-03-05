@@ -30,7 +30,7 @@ class ClaudeProcessInfo(BaseModel):
     memory_mb: float = Field(0.0, description="Memory usage in MB")
     status: ProcessStatus = Field(ProcessStatus.RUNNING, description="Process status")
     is_managed: bool = Field(
-        False, description="Whether this process is managed by Claude Manager"
+        False, description="Whether this process is managed by Open Adventure"
     )
 
     class Config:

@@ -1,10 +1,10 @@
-# Claude Manager Plugin 自动安装功能测试
+# Open Adventure Plugin 自动安装功能测试
 
 ## 测试日期
 2026-03-02
 
 ## 测试目的
-验证 Claude Manager 在首次启动时能够自动安装内置的 Claude Code plugins 和 skills。
+验证 Open Adventure 在首次启动时能够自动安装内置的 Claude Code plugins 和 skills。
 
 ## 测试环境
 - 操作系统: macOS
@@ -24,7 +24,7 @@ cp ~/.claude/settings.json ~/.claude/settings.json.backup
 
 ### 2. 运行启动脚本
 ```bash
-cd /Users/kp/项目/Proj/claude_manager
+cd /Users/kp/项目/Proj/open_adventure
 ./start.sh
 ```
 

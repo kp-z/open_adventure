@@ -498,7 +498,7 @@ def update_task_statuses(tasks: list):
 def main():
     """主函数"""
     print("="*50)
-    print("🚀 Claude Manager 示例数据创建脚本")
+    print("🚀 Open Adventure 示例数据创建脚本")
     print(f"⏰ 执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*50)
     

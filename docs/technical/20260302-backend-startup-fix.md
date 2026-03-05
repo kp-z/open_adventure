@@ -22,7 +22,7 @@ if settings.env == "production":
 
 ```python
 # Application
-app_name: str = "Claude Manager"
+app_name: str = "Open Adventure"
 app_version: str = "0.2.0"
 debug: bool = False
 env: str = "development"  # development, production, test

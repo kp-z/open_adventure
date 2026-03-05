@@ -2,7 +2,7 @@
 
 ## 概述
 
-Claude Manager 提供了完整的 Claude Code 集成 API，支持管理两种类型的 skills：
+Open Adventure 提供了完整的 Claude Code 集成 API，支持管理两种类型的 skills：
 
 1. **全局 Skills** - 存储在 `~/.claude/skills/` 目录
 2. **Plugin Skills** - 存储在 `~/.claude/plugins/{plugin-name}/skills/` 目录，使用 namespace 格式（`plugin-name:skill-name`）
@@ -48,11 +48,11 @@ curl http://127.0.0.1:8000/api/v1/claude-code/list-installed-skills
     "count": 25,
     "skills": [
       {
-        "namespace": "claude-manager:prompt_optimizer",
-        "plugin_name": "claude-manager",
+        "namespace": "open-adventure:prompt_optimizer",
+        "plugin_name": "open-adventure",
         "skill_name": "prompt_optimizer",
         "description": "Prompt优化技能",
-        "path": "/Users/kp/.claude/plugins/claude-manager/skills/prompt_optimizer/SKILL.md",
+        "path": "/Users/kp/.claude/plugins/open-adventure/skills/prompt_optimizer/SKILL.md",
         "source": "plugin"
       }
     ]
@@ -94,7 +94,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/claude-code/install-skill/5
 
 **示例 2: 安装为 Plugin Skill**
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skill/5?as_plugin=true&plugin_name=claude-manager"
+curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skill/5?as_plugin=true&plugin_name=open-adventure"
 ```
 
 **响应**:
@@ -104,11 +104,11 @@ curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skill/5?as_plugin
   "skill": {
     "id": 5,
     "name": "prompt_optimizer",
-    "namespace": "claude-manager:prompt_optimizer",
-    "path": "/Users/kp/.claude/plugins/claude-manager/skills/prompt_optimizer/SKILL.md",
+    "namespace": "open-adventure:prompt_optimizer",
+    "path": "/Users/kp/.claude/plugins/open-adventure/skills/prompt_optimizer/SKILL.md",
     "source": "plugin"
   },
-  "message": "Successfully installed skill 'prompt_optimizer' as plugin skill with namespace 'claude-manager:prompt_optimizer'"
+  "message": "Successfully installed skill 'prompt_optimizer' as plugin skill with namespace 'open-adventure:prompt_optimizer'"
 }
 ```
 
@@ -130,7 +130,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/claude-code/install-skills
 
 **示例 2: 安装所有 Skills 为 Plugin Skills**
 ```bash
-curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skills?as_plugin=true&plugin_name=claude-manager"
+curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skills?as_plugin=true&plugin_name=open-adventure"
 ```
 
 **响应**:
@@ -142,13 +142,13 @@ curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skills?as_plugin=
     {
       "id": 1,
       "name": "code_review",
-      "namespace": "claude-manager:code_review",
-      "path": "/Users/kp/.claude/plugins/claude-manager/skills/code_review/SKILL.md",
+      "namespace": "open-adventure:code_review",
+      "path": "/Users/kp/.claude/plugins/open-adventure/skills/code_review/SKILL.md",
       "source": "plugin"
     }
   ],
   "failed_skills": [],
-  "plugin_directory": "/Users/kp/.claude/plugins/claude-manager"
+  "plugin_directory": "/Users/kp/.claude/plugins/open-adventure"
 }
 ```
 
@@ -259,7 +259,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/claude-code/install-skills?skill_ids=
 
 ```bash
 # 在对话中
-"请使用 claude-manager:prompt_optimizer 优化这个提示词"
+"请使用 open-adventure:prompt_optimizer 优化这个提示词"
 "用 my-team:code_review 审查这段代码"
 ```
 
@@ -315,7 +315,7 @@ curl http://127.0.0.1:8000/api/v1/claude-code/list-installed-skills | \
 ### Plugin Skills
 ```
 ~/.claude/plugins/
-├── claude-manager/
+├── open-adventure/
 │   └── skills/
 │       ├── prompt_optimizer/
 │       │   └── SKILL.md
@@ -453,7 +453,7 @@ chmod 755 ~/.claude/plugins/
 
 ## 总结
 
-通过 Claude Manager 的 Claude Code 集成 API，你可以：
+通过 Open Adventure 的 Claude Code 集成 API，你可以：
 
 ✅ **统一管理** - 在数据库中集中管理所有 skills
 ✅ **灵活安装** - 选择安装为全局或 plugin skills

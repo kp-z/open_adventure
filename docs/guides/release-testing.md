@@ -13,7 +13,7 @@
 ### 1. 创建测试发布包
 
 ```bash
-cd /Users/kp/项目/Proj/claude_manager
+cd /Users/kp/项目/Proj/open_adventure
 ./scripts/build-release.sh 0.1.3 macos arm64
 ```
 
@@ -22,13 +22,13 @@ cd /Users/kp/项目/Proj/claude_manager
 ```bash
 # 创建临时测试目录
 cd /tmp
-rm -rf claude-manager-test
-mkdir claude-manager-test
-cd claude-manager-test
+rm -rf open-adventure-test
+mkdir open-adventure-test
+cd open-adventure-test
 
 # 解压发布包
-tar -xzf /Users/kp/项目/Proj/claude_manager/docs/releases/claude-manager-v0.1.3-macos-arm64.tar.gz
-cd claude-manager-v0.1.3-macos-arm64
+tar -xzf /Users/kp/项目/Proj/open_adventure/docs/releases/open-adventure-v0.1.3-macos-arm64.tar.gz
+cd open-adventure-v0.1.3-macos-arm64
 
 # 检查文件结构
 ls -la
@@ -91,7 +91,7 @@ cat backend/.env
 ```bash
 # 停止服务（Ctrl+C）
 cd /tmp
-rm -rf claude-manager-test
+rm -rf open-adventure-test
 ```
 
 ## 测试检查清单
@@ -141,7 +141,7 @@ pip install -r requirements.txt
 cat backend/.env
 
 # 检查数据库路径
-ls -la backend/claude_manager.db
+ls -la backend/open_adventure.db
 
 # 查看详细错误
 cd backend

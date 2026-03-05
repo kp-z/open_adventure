@@ -1,4 +1,4 @@
-# Claude Manager API 测试报告
+# Open Adventure API 测试报告
 
 ## 测试时间
 2026-02-15
@@ -24,7 +24,7 @@
 - **响应**:
 ```json
 {
-  "message": "Welcome to Claude Manager API",
+  "message": "Welcome to Open Adventure API",
   "version": "0.1.0",
   "docs": "/docs"
 }
@@ -106,7 +106,7 @@
 
 ## 数据库
 - **类型**: SQLite (异步)
-- **位置**: `./claude_manager.db`
+- **位置**: `./open_adventure.db`
 - **状态**: ✅ 自动创建并初始化
 
 ## 测试总结
@@ -162,6 +162,6 @@
 
 ## 结论
 
-✅ **Claude Manager API 已成功创建并运行！**
+✅ **Open Adventure API 已成功创建并运行！**
 
 所有核心功能都已实现并通过测试。API 文档自动生成，数据库正常工作，CRUD 操作正常。项目已准备好进行进一步开发和部署。

@@ -228,7 +228,7 @@ python scripts/seed_agent_teams.py
 **Step 3: 验证数据库**
 
 ```bash
-sqlite3 backend/data/claude_manager.db "SELECT id, name, description FROM agent_teams;"
+sqlite3 backend/data/open_adventure.db "SELECT id, name, description FROM agent_teams;"
 ```
 
 预期输出：显示 5 个团队的记录
@@ -691,7 +691,7 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>"
 
 ## 概述
 
-Agent Teams 是 Claude Manager 的核心功能，提供自动化的开发流程调度系统。
+Agent Teams 是 Open Adventure 的核心功能，提供自动化的开发流程调度系统。
 
 ## 团队结构
 

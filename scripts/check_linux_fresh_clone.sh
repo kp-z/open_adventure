@@ -143,7 +143,7 @@ check_npm_deps() {
 }
 
 echo "==============================================="
-echo "Claude Manager Linux Fresh Clone 自检"
+echo "Open Adventure Linux Fresh Clone 自检"
 echo "仓库路径: $REPO_ROOT"
 echo "==============================================="
 echo ""

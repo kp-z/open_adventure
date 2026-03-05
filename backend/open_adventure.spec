@@ -9,7 +9,7 @@ block_cipher = None
 backend_dir = Path(SPECPATH).resolve()
 project_root = backend_dir.parent
 frontend_dist = project_root / 'frontend' / 'dist'
-db_template = backend_dir / 'claude_manager.db'
+db_template = backend_dir / 'open_adventure.db'
 app_dir = backend_dir / 'app'
 
 # 设置输出目录到项目根目录
@@ -105,7 +105,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='claude-manager',
+    name='open-adventure',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -126,5 +126,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='claude-manager',
+    name='open-adventure',
 )

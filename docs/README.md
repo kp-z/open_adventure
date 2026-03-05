@@ -1,6 +1,6 @@
-# Claude Manager 文档中心
+# Open Adventure 文档中心
 
-欢迎来到 Claude Manager 文档中心。这里包含了项目的所有文档资源。
+欢迎来到 Open Adventure 文档中心。这里包含了项目的所有文档资源。
 
 ## 📚 文档导航
 
@@ -29,7 +29,7 @@
 
 ## 🏗️ 项目架构
 
-Claude Manager 采用三层架构：
+Open Adventure 采用三层架构：
 
 ```
 ┌─────────────────────────────────────────┐

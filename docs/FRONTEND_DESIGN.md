@@ -1,8 +1,8 @@
-# Claude Manager 前端界面设计文档
+# Open Adventure 前端界面设计文档
 
 ## 一、设计理念
 
-Claude Manager 前端采用**双模式设计**，提供两种完全不同的用户体验，但共享同一套后端 API：
+Open Adventure 前端采用**双模式设计**，提供两种完全不同的用户体验，但共享同一套后端 API：
 
 1. **专业管理模式（Professional Mode）** - 面向工程师的高效管理界面
 2. **游戏化模式（Gamification Mode）** - 面向日常使用的沉浸式体验
@@ -749,4 +749,4 @@ frontend/
 
 **文档版本**: 1.0
 **最后更新**: 2025-01-XX
-**维护者**: Claude Manager Team
+**维护者**: Open Adventure Team
