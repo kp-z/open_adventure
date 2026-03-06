@@ -568,30 +568,23 @@ const Terminal = () => {
   }, []);
 
   return (
-    <div
-      className="h-full flex flex-col p-4 md:p-8 space-y-4 md:space-y-6"
-      style={{
-        // 移动端键盘弹出时调整高度
-        height: isMobile && isKeyboardVisible
-          ? `calc(100vh - ${keyboardHeight}px)`
-          : '100%',
-        transition: 'height 0.2s ease-out',  // 平滑过渡
-      }}
-    >
-      {/* Header */}
-      <header className="flex justify-between items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">TERMINAL</h1>
-          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
-            多标签终端，支持项目路径快速切换与 Claude 会话恢复
-          </p>
-          <div className="flex items-center gap-3 mt-1">
-            <p className="text-xs text-gray-500">
-              <span className="text-green-500">{terminals.length} 个终端</span>正在运行
+    <div className="h-full flex flex-col">
+      {/* 主内容区域 */}
+      <div className="flex-1 flex flex-col p-4 md:p-8 space-y-4 md:space-y-6 overflow-hidden">
+        {/* Header */}
+        <header className="flex justify-between items-start gap-3 shrink-0">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">TERMINAL</h1>
+            <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
+              多标签终端，支持项目路径快速切换与 Claude 会话恢复
             </p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-xs text-gray-500">
+                <span className="text-green-500">{terminals.length} 个终端</span>正在运行
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center">
           {/* 添加按钮 - 点击显示项目选择器 */}
           <div className="relative">
             <ActionButton
@@ -726,7 +719,7 @@ const Terminal = () => {
 
       {/* 调试信息（开发环境 + 本地开关） */}
       {showDebugInfo && (
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 font-mono text-[11px] text-yellow-200">
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 font-mono text-[11px] text-yellow-200 shrink-0">
           <button
             type="button"
             className="w-full px-3 py-2 text-left hover:bg-yellow-500/10 transition-colors"
@@ -746,9 +739,87 @@ const Terminal = () => {
         </div>
       )}
 
-      {/* 移动端虚拟键盘工具栏 */}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+        {/* Tabs - 移动端在上方，桌面端在右侧 */}
+        {terminals.length > 1 && (
+          <div className={`
+            ${isMobile
+              ? 'flex flex-row gap-2 overflow-x-auto'
+              : 'flex flex-col gap-2 p-3 bg-black/20 border-l border-white/5 overflow-y-auto w-48 shrink-0 order-last'
+            }
+          `}>
+            {terminals.map(terminal => (
+              <button
+                key={terminal.id}
+                onClick={() => setActiveTabId(terminal.id)}
+                className={`
+                  flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-mono transition-colors
+                  ${isMobile ? 'whitespace-nowrap' : ''}
+                  ${activeTabId === terminal.id
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                  }
+                `}
+              >
+                <span className="truncate text-xs sm:text-sm">{terminal.title}</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTerminal(terminal.id);
+                  }}
+                  className="hover:text-red-400 transition-colors shrink-0 cursor-pointer"
+                >
+                  <X size={14} />
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Terminal Content */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Main Terminal */}
+          {activeTerminal && (
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+              <TerminalPane
+                key={activeTerminal.id}
+                terminal={activeTerminal}
+                onActivate={() => handleActivateTerminal(activeTerminal.id)}
+              />
+
+              {/* 滚动到底部按钮 */}
+              {isMobile && showScrollToBottom && (
+                <button
+                  onClick={scrollToBottom}
+                  className="absolute bottom-4 right-4 p-3 bg-green-500/80 hover:bg-green-500 rounded-full shadow-lg transition-all z-50 animate-fade-in"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-white"
+                  >
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Split Terminal */}
+        </div>
+      </div>
+      </div>
+
+      {/* 移动端虚拟键盘工具栏 - 固定在底部 */}
       {isMobile && isKeyboardVisible && (
-        <div className="bg-black/60 border-b border-white/10">
+        <div className="bg-black/90 border-t border-white/10 shrink-0 safe-area-bottom">
           {/* 长按提示 */}
           {longPressKey && (
             <div className="px-4 py-2 bg-blue-500/20 border-b border-blue-500/30 text-xs text-blue-300">
@@ -977,83 +1048,6 @@ const Terminal = () => {
           )}
         </div>
       )}
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* Tabs - 移动端在上方，桌面端在右侧 */}
-        {terminals.length > 1 && (
-          <div className={`
-            ${isMobile
-              ? 'flex flex-row gap-2 overflow-x-auto'
-              : 'flex flex-col gap-2 p-3 bg-black/20 border-l border-white/5 overflow-y-auto w-48 shrink-0 order-last'
-            }
-          `}>
-            {terminals.map(terminal => (
-              <button
-                key={terminal.id}
-                onClick={() => setActiveTabId(terminal.id)}
-                className={`
-                  flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-mono transition-colors
-                  ${isMobile ? 'whitespace-nowrap' : ''}
-                  ${activeTabId === terminal.id
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                  }
-                `}
-              >
-                <span className="truncate text-xs sm:text-sm">{terminal.title}</span>
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTerminal(terminal.id);
-                  }}
-                  className="hover:text-red-400 transition-colors shrink-0 cursor-pointer"
-                >
-                  <X size={14} />
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Terminal Content */}
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Main Terminal */}
-          {activeTerminal && (
-            <div className="flex-1 flex flex-col overflow-hidden relative">
-              <TerminalPane
-                key={activeTerminal.id}
-                terminal={activeTerminal}
-                onActivate={() => handleActivateTerminal(activeTerminal.id)}
-              />
-
-              {/* 滚动到底部按钮 */}
-              {isMobile && showScrollToBottom && (
-                <button
-                  onClick={scrollToBottom}
-                  className="absolute bottom-4 right-4 p-3 bg-green-500/80 hover:bg-green-500 rounded-full shadow-lg transition-all z-50 animate-fade-in"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-white"
-                  >
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Split Terminal */}
-        </div>
-      </div>
     </div>
   );
 };
