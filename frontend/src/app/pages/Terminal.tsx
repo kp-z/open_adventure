@@ -19,8 +19,9 @@ interface ClaudeConversationOption {
 
 const TerminalPane: React.FC<{
   terminal: TerminalInstance;
-  onActivate?: () => void;
-}> = ({ terminal, onActivate }) => {
+  onActivate?: () => boolean | void;
+  onFocusChange?: (focused: boolean) => void;
+}> = ({ terminal, onActivate, onFocusChange }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef<boolean>(false);
   const { sendResize, markTerminalOpened } = useTerminalContext();
@@ -106,13 +107,9 @@ const TerminalPane: React.FC<{
       }
     };
 
-    requestAnimationFrame(() => {
-      fitAndNotify();
-      requestAnimationFrame(fitAndNotify);
-    });
+    requestAnimationFrame(fitAndNotify);
 
-    const fitTimer1 = setTimeout(fitAndNotify, 60);
-    const fitTimer2 = setTimeout(fitAndNotify, 260);
+    const fitTimer = setTimeout(fitAndNotify, 160);
 
     const handleCompositionStart = () => {
       isComposingRef.current = true;
@@ -133,14 +130,30 @@ const TerminalPane: React.FC<{
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(terminalElement);
 
+    const handleFocusIn = () => {
+      onFocusChange?.(true);
+    };
+
+    const handleFocusOut = () => {
+      requestAnimationFrame(() => {
+        if (!terminalElement.contains(document.activeElement)) {
+          onFocusChange?.(false);
+        }
+      });
+    };
+
+    terminalElement.addEventListener('focusin', handleFocusIn);
+    terminalElement.addEventListener('focusout', handleFocusOut);
+
     return () => {
       resizeObserver.disconnect();
       terminalElement.removeEventListener('compositionstart', handleCompositionStart);
       terminalElement.removeEventListener('compositionend', handleCompositionEnd);
-      clearTimeout(fitTimer1);
-      clearTimeout(fitTimer2);
+      terminalElement.removeEventListener('focusin', handleFocusIn);
+      terminalElement.removeEventListener('focusout', handleFocusOut);
+      clearTimeout(fitTimer);
     };
-  }, [terminal, markTerminalOpened, sendResize]);
+  }, [terminal, markTerminalOpened, sendResize, onFocusChange]);
 
   return (
     <div
@@ -150,7 +163,13 @@ const TerminalPane: React.FC<{
         if (isComposingRef.current) {
           return;
         }
-        onActivate?.();
+        const shouldDeferFocus = onActivate?.() === true;
+        if (shouldDeferFocus) {
+          requestAnimationFrame(() => {
+            terminal.term.focus();
+          });
+          return;
+        }
         terminal.term.focus();
       }}
       style={{
@@ -192,12 +211,19 @@ const Terminal = () => {
   const [projectPaths, setProjectPaths] = useState<Array<{ id: number; path: string; alias: string }>>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isTerminalFocused, setIsTerminalFocused] = useState(false);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [showMoreKeys, setShowMoreKeys] = useState(false);
+  const [isQuickToolbarExpanded, setIsQuickToolbarExpanded] = useState(false);
   const [longPressKey, setLongPressKey] = useState<string | null>(null);
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const quickToolbarLongPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const quickToolbarLongPressTriggeredRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const viewportRafRef = useRef<number | null>(null);
+  const viewportBaselineRef = useRef<number>(0);
+  const keyboardFocusSyncRef = useRef<string>('');
   const showDebugInfo = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('terminal_debug') === '1';
 
   // 诊断函数：打印终端状态
@@ -255,9 +281,12 @@ const Terminal = () => {
   }, [showDebugInfo]);
 
   const handleActivateTerminal = useCallback((terminalId: string) => {
-    if (activeTabId !== terminalId) {
+    const didSwitchTab = activeTabId !== terminalId;
+    if (didSwitchTab) {
       setActiveTabId(terminalId);
     }
+    setIsTerminalFocused(true);
+    return didSwitchTab;
   }, [activeTabId, setActiveTabId]);
 
   const notifyRestoreInProgress = useCallback(() => {
@@ -370,45 +399,135 @@ const Terminal = () => {
 
   // 监听虚拟键盘事件
   useEffect(() => {
-    if (!isMobile) return;
+    if (!isMobile) {
+      setKeyboardHeight(0);
+      setIsKeyboardVisible(false);
+      setIsTerminalFocused(false);
+      viewportBaselineRef.current = 0;
+      if (viewportRafRef.current !== null) {
+        cancelAnimationFrame(viewportRafRef.current);
+        viewportRafRef.current = null;
+      }
+      return;
+    }
 
-    // 使用 Visual Viewport API 监听键盘
-    const handleViewportResize = () => {
+    const KEYBOARD_SHOW_THRESHOLD = 60;
+    const KEYBOARD_HIDE_THRESHOLD = 40;
+    const HEIGHT_JITTER_THRESHOLD = 4;
+
+    const applyViewportState = () => {
       if (!window.visualViewport) return;
 
       const viewport = window.visualViewport;
-      const keyboardHeight = window.innerHeight - viewport.height;
+      const currentHeight = Math.round(viewport.height + viewport.offsetTop);
+      const isZooming = viewport.scale > 1.05;
 
-      setKeyboardHeight(keyboardHeight);
-      setIsKeyboardVisible(keyboardHeight > 100); // 键盘高度超过 100px 认为是弹出状态
+      if (viewportBaselineRef.current === 0) {
+        viewportBaselineRef.current = currentHeight;
+      }
+      if (!isZooming && currentHeight > viewportBaselineRef.current && Math.max(0, viewportBaselineRef.current - currentHeight) < KEYBOARD_HIDE_THRESHOLD) {
+        viewportBaselineRef.current = currentHeight;
+      }
 
-      console.log('[Terminal] Keyboard height:', keyboardHeight);
-      console.log('[Terminal] Viewport height:', viewport.height);
+      const baseline = viewportBaselineRef.current;
+      const nextKeyboardHeight = Math.max(0, baseline - currentHeight);
+
+      setKeyboardHeight((prev) =>
+        Math.abs(prev - nextKeyboardHeight) > HEIGHT_JITTER_THRESHOLD ? nextKeyboardHeight : prev,
+      );
+
+      setIsKeyboardVisible((prev) => {
+        if (isZooming) {
+          return false;
+        }
+        if (prev) {
+          return nextKeyboardHeight > KEYBOARD_HIDE_THRESHOLD;
+        }
+        return nextKeyboardHeight > KEYBOARD_SHOW_THRESHOLD;
+      });
+
+      if (showDebugInfo) {
+        console.log('[Terminal] Keyboard height:', nextKeyboardHeight);
+        console.log('[Terminal] Viewport height:', viewport.height);
+        console.log('[Terminal] Viewport offsetTop:', viewport.offsetTop);
+        console.log('[Terminal] Viewport scale:', viewport.scale);
+        console.log('[Terminal] Viewport baseline:', baseline);
+      }
+    };
+
+    const scheduleViewportUpdate = () => {
+      if (viewportRafRef.current !== null) {
+        return;
+      }
+      viewportRafRef.current = requestAnimationFrame(() => {
+        viewportRafRef.current = null;
+        applyViewportState();
+      });
     };
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportResize);
-      window.visualViewport.addEventListener('scroll', handleViewportResize);
+      window.visualViewport.addEventListener('resize', scheduleViewportUpdate);
+      window.visualViewport.addEventListener('scroll', scheduleViewportUpdate);
+      scheduleViewportUpdate();
 
       return () => {
-        window.visualViewport?.removeEventListener('resize', handleViewportResize);
-        window.visualViewport?.removeEventListener('scroll', handleViewportResize);
+        window.visualViewport?.removeEventListener('resize', scheduleViewportUpdate);
+        window.visualViewport?.removeEventListener('scroll', scheduleViewportUpdate);
+        if (viewportRafRef.current !== null) {
+          cancelAnimationFrame(viewportRafRef.current);
+          viewportRafRef.current = null;
+        }
       };
-    } else {
-      // 降级方案：监听 window resize
-      const handleWindowResize = () => {
-        const keyboardHeight = Math.max(0, window.screen.height - window.innerHeight - 100);
-        setKeyboardHeight(keyboardHeight);
-        setIsKeyboardVisible(keyboardHeight > 100);
-      };
-
-      window.addEventListener('resize', handleWindowResize);
-      return () => window.removeEventListener('resize', handleWindowResize);
     }
-  }, [isMobile]);
+
+    // 降级方案：监听 window resize
+    const handleWindowResize = () => {
+      const nextKeyboardHeight = Math.max(0, window.screen.height - window.innerHeight - 100);
+      setKeyboardHeight((prev) =>
+        Math.abs(prev - nextKeyboardHeight) > HEIGHT_JITTER_THRESHOLD ? nextKeyboardHeight : prev,
+      );
+      setIsKeyboardVisible((prev) =>
+        prev ? nextKeyboardHeight > KEYBOARD_HIDE_THRESHOLD : nextKeyboardHeight > KEYBOARD_SHOW_THRESHOLD,
+      );
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    handleWindowResize();
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [isMobile, showDebugInfo]);
+
+  useEffect(() => {
+    if (!isKeyboardVisible && !isTerminalFocused) {
+      setIsQuickToolbarExpanded(false);
+      setShowMoreKeys(false);
+      setLongPressKey(null);
+    }
+  }, [isKeyboardVisible, isTerminalFocused]);
 
   // 获取当前活跃的终端
   const activeTerminal = terminals.find(t => t.id === activeTabId);
+  const QUICK_TOOLBAR_HEIGHT = 64;
+  const mobileToolbarOffset = isMobile && (isKeyboardVisible || isTerminalFocused) ? QUICK_TOOLBAR_HEIGHT : 0;
+  const keyboardOffset = isMobile && isKeyboardVisible ? Math.max(0, keyboardHeight) : 0;
+  const terminalWorkspacePaddingBottom = keyboardOffset + mobileToolbarOffset;
+
+  useEffect(() => {
+    if (!isMobile || !activeTerminal || !isKeyboardVisible || !isTerminalFocused) {
+      keyboardFocusSyncRef.current = '';
+      return;
+    }
+
+    const syncKey = `${activeTerminal.id}:${isKeyboardVisible}:${isTerminalFocused}`;
+    if (keyboardFocusSyncRef.current === syncKey) {
+      return;
+    }
+
+    keyboardFocusSyncRef.current = syncKey;
+    requestAnimationFrame(() => {
+      activeTerminal.term.focus();
+      activeTerminal.term.scrollToBottom();
+    });
+  }, [isMobile, activeTerminal, isKeyboardVisible, isTerminalFocused]);
 
   // 兜底：有终端但 activeTabId 无效时，自动激活第一个终端
   useEffect(() => {
@@ -488,13 +607,6 @@ const Terminal = () => {
     }
   };
 
-  const handleFocusTerminal = () => {
-    const terminal = terminals.find(t => t.id === activeTabId);
-    if (terminal) {
-      terminal.term.focus();
-    }
-  };
-
   // 触觉反馈函数
   const triggerHaptic = () => {
     if ('vibrate' in navigator) {
@@ -541,6 +653,48 @@ const Terminal = () => {
     }
   };
 
+  const collapseQuickToolbar = useCallback(() => {
+    setIsQuickToolbarExpanded(false);
+    setShowMoreKeys(false);
+    setLongPressKey(null);
+  }, []);
+
+  const handleQuickToolbarLongPressStart = () => {
+    quickToolbarLongPressTriggeredRef.current = false;
+    if (quickToolbarLongPressTimerRef.current) {
+      clearTimeout(quickToolbarLongPressTimerRef.current);
+    }
+
+    quickToolbarLongPressTimerRef.current = setTimeout(() => {
+      quickToolbarLongPressTriggeredRef.current = true;
+      setIsQuickToolbarExpanded(true);
+      triggerHaptic();
+    }, 500);
+  };
+
+  const handleQuickToolbarLongPressEnd = () => {
+    if (quickToolbarLongPressTimerRef.current) {
+      clearTimeout(quickToolbarLongPressTimerRef.current);
+      quickToolbarLongPressTimerRef.current = null;
+    }
+  };
+
+  const handleQuickToolbarButtonClick = () => {
+    if (quickToolbarLongPressTriggeredRef.current) {
+      quickToolbarLongPressTriggeredRef.current = false;
+      return;
+    }
+
+    if (isQuickToolbarExpanded) {
+      collapseQuickToolbar();
+      return;
+    }
+
+    if (showScrollToBottom) {
+      scrollToBottom();
+    }
+  };
+
   // 长按开始
   const handleLongPressStart = (key: string, description: string) => {
     longPressTimerRef.current = setTimeout(() => {
@@ -564,13 +718,16 @@ const Terminal = () => {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
       }
+      if (quickToolbarLongPressTimerRef.current) {
+        clearTimeout(quickToolbarLongPressTimerRef.current);
+      }
     };
   }, []);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="app-shell min-h-[var(--app-h)] h-full flex flex-col">
       {/* 主内容区域 */}
-      <div className="flex-1 flex flex-col p-4 md:p-8 space-y-4 md:space-y-6 overflow-hidden">
+      <div className="flex-1 flex flex-col p-4 md:p-8 space-y-4 md:space-y-6 overflow-hidden safe-area-top">
         {/* Header */}
         <header className="flex justify-between items-start gap-3 shrink-0">
           <div className="flex-1 min-w-0">
@@ -701,16 +858,6 @@ const Terminal = () => {
               </>
             )}
           </div>
-          {isMobile && (
-            <ActionButton
-              variant="secondary"
-              onClick={handleFocusTerminal}
-              title="Focus Terminal (Show Keyboard)"
-              disabled={!activeTabId}
-            >
-              <Keyboard size={18} />
-            </ActionButton>
-          )}
           <ActionButton variant="secondary" onClick={handleCloseAllAndRestart} title="Close All & Restart">
             <X size={18} />
           </ActionButton>
@@ -740,7 +887,10 @@ const Terminal = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+      <div
+        className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0"
+        style={isMobile ? { paddingBottom: `${terminalWorkspacePaddingBottom}px` } : undefined}
+      >
         {/* Tabs - 移动端在上方，桌面端在右侧 */}
         {terminals.length > 1 && (
           <div className={`
@@ -786,29 +936,9 @@ const Terminal = () => {
                 key={activeTerminal.id}
                 terminal={activeTerminal}
                 onActivate={() => handleActivateTerminal(activeTerminal.id)}
+                onFocusChange={setIsTerminalFocused}
               />
 
-              {/* 滚动到底部按钮 */}
-              {isMobile && showScrollToBottom && (
-                <button
-                  onClick={scrollToBottom}
-                  className="absolute bottom-4 right-4 p-3 bg-green-500/80 hover:bg-green-500 rounded-full shadow-lg transition-all z-50 animate-fade-in"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="text-white"
-                  >
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-              )}
             </div>
           )}
 
@@ -817,170 +947,193 @@ const Terminal = () => {
       </div>
       </div>
 
-      {/* 移动端虚拟键盘工具栏 - 固定在底部 */}
-      {isMobile && isKeyboardVisible && (
-        <div className="bg-black/90 border-t border-white/10 shrink-0 safe-area-bottom">
+      {/* 移动端快捷键统一入口 */}
+      {isMobile && (isKeyboardVisible || isTerminalFocused) && (
+        <div
+          className="fixed left-0 right-0 z-50 bg-transparent safe-area-bottom safe-area-left safe-area-right"
+          style={{ bottom: isKeyboardVisible ? `${Math.max(keyboardHeight, 0)}px` : '0px' }}
+        >
           {/* 长按提示 */}
-          {longPressKey && (
+          {longPressKey && isQuickToolbarExpanded && (
             <div className="px-4 py-2 bg-blue-500/20 border-b border-blue-500/30 text-xs text-blue-300">
               {longPressKey}
             </div>
           )}
 
-          {/* 主工具栏 */}
-          <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto">
-            {/* 编辑组 */}
-            <div className="flex items-center gap-2 pr-2 border-r border-white/10">
-              <button
-                onClick={async () => {
-                  triggerHaptic();
-                  const terminal = terminals.find(t => t.id === activeTabId);
-                  if (!terminal) return;
-
-                  try {
-                    const selection = terminal.term.getSelection();
-                    if (selection) {
-                      await navigator.clipboard.writeText(selection);
-                    }
-                  } catch (error) {
-                    console.error('[Terminal] Failed to copy:', error);
-                  }
-
-                  // 恢复焦点
-                  setTimeout(() => {
-                    terminal.term.focus();
-                  }, 50);
-                }}
-                onTouchStart={() => handleLongPressStart('Copy', '复制选中文本到剪贴板')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 rounded text-xs font-mono text-green-400 whitespace-nowrap transition-colors border border-green-500/30"
-              >
-                Copy
-              </button>
-
-              <button
-                onClick={async () => {
-                  triggerHaptic();
-                  const terminal = terminals.find(t => t.id === activeTabId);
-                  if (!terminal) return;
-
-                  try {
-                    const text = await navigator.clipboard.readText();
-                    if (text) {
-                      sendInput(terminal.id, text);
-                    }
-                  } catch (error) {
-                    console.error('[Terminal] Failed to paste:', error);
-                  }
-
-                  // 恢复焦点
-                  setTimeout(() => {
-                    terminal.term.focus();
-                  }, 50);
-                }}
-                onTouchStart={() => handleLongPressStart('Paste', '从剪贴板粘贴文本')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 rounded text-xs font-mono text-blue-400 whitespace-nowrap transition-colors border border-blue-500/30"
-              >
-                Paste
-              </button>
-            </div>
-
-            {/* 特殊按键组 */}
-            <div className="flex items-center gap-2 pr-2 border-r border-white/10">
-              <button
-                onClick={() => {
-                  setIsShiftPressed(!isShiftPressed);
-                  triggerHaptic();
-                }}
-                onTouchStart={() => handleLongPressStart('Shift', '切换大小写或组合键')}
-                onTouchEnd={handleLongPressEnd}
-                className={`px-3 py-1.5 rounded text-xs font-mono whitespace-nowrap transition-colors ${isShiftPressed
-                  ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/50'
-                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
-                  }`}
-              >
-                Shift
-              </button>
-
-              <button
-                onClick={() => sendKeyToTerminal('Tab')}
-                onTouchStart={() => handleLongPressStart('Tab', '制表符，用于自动补全')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs font-mono text-gray-300 whitespace-nowrap transition-colors"
-              >
-                Tab
-              </button>
-
-              <button
-                onClick={() => sendKeyToTerminal('Esc')}
-                onTouchStart={() => handleLongPressStart('Esc', '退出当前模式或取消操作')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs font-mono text-gray-300 whitespace-nowrap transition-colors"
-              >
-                Esc
-              </button>
-            </div>
-
-            {/* 导航组 */}
-            <div className="flex items-center gap-2 pr-2 border-r border-white/10">
-              {['↑', '↓', '←', '→'].map((key) => (
-                <button
-                  key={key}
-                  onClick={() => sendKeyToTerminal(isShiftPressed ? `Shift+${key}` : key)}
-                  onTouchStart={() => handleLongPressStart(key, isShiftPressed ? '选择文本' : '移动光标')}
-                  onTouchEnd={handleLongPressEnd}
-                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs font-mono text-gray-300 whitespace-nowrap transition-colors"
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
-
-            {/* 控制组 */}
-            <div className="flex items-center gap-2 pr-2 border-r border-white/10">
-              <button
-                onClick={() => sendKeyToTerminal('Ctrl+C')}
-                onTouchStart={() => handleLongPressStart('Ctrl+C', '中断当前命令')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 rounded text-xs font-mono text-red-400 whitespace-nowrap transition-colors border border-red-500/30"
-              >
-                Ctrl+C
-              </button>
-
-              <button
-                onClick={() => sendKeyToTerminal('Ctrl+D')}
-                onTouchStart={() => handleLongPressStart('Ctrl+D', '退出当前 shell 或发送 EOF')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs font-mono text-gray-300 whitespace-nowrap transition-colors"
-              >
-                Ctrl+D
-              </button>
-
-              <button
-                onClick={() => sendKeyToTerminal('Ctrl+L')}
-                onTouchStart={() => handleLongPressStart('Ctrl+L', '清屏')}
-                onTouchEnd={handleLongPressEnd}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded text-xs font-mono text-gray-300 whitespace-nowrap transition-colors"
-              >
-                Ctrl+L
-              </button>
-            </div>
-
-            {/* 更多按钮 */}
+          <div className="flex items-center gap-2 px-4 py-2">
             <button
-              onClick={() => {
-                setShowMoreKeys(!showMoreKeys);
-                triggerHaptic();
-              }}
-              className="px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 rounded text-xs font-mono text-purple-400 whitespace-nowrap transition-colors border border-purple-500/30"
+              onClick={handleQuickToolbarButtonClick}
+              onTouchStart={handleQuickToolbarLongPressStart}
+              onTouchEnd={handleQuickToolbarLongPressEnd}
+              onTouchCancel={handleQuickToolbarLongPressEnd}
+              className={`relative w-12 h-12 rounded-full flex items-center justify-center border border-white/25 shadow-[0_12px_35px_rgba(15,23,42,0.45)] backdrop-blur-xl transition-colors shrink-0 ${
+                isQuickToolbarExpanded
+                  ? 'bg-violet-400/25 hover:bg-violet-400/35'
+                  : 'bg-white/12 hover:bg-white/20'
+              }`}
+              title={isQuickToolbarExpanded ? '收起快捷键栏' : '长按展开快捷键栏'}
             >
-              {showMoreKeys ? '收起' : '更多'}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/25 via-white/0 to-sky-300/20 pointer-events-none" />
+              <Keyboard size={19} className="text-white relative" />
             </button>
+
+            {/* 主工具栏 */}
+            {isQuickToolbarExpanded && (
+              <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto">
+                {/* 编辑组 */}
+                <div className="flex items-center gap-2 pr-2 border-r border-white/10">
+                  <button
+                    onClick={async () => {
+                      triggerHaptic();
+                      const terminal = terminals.find(t => t.id === activeTabId);
+                      if (!terminal) return;
+
+                      try {
+                        const selection = terminal.term.getSelection();
+                        if (selection) {
+                          await navigator.clipboard.writeText(selection);
+                        }
+                      } catch (error) {
+                        console.error('[Terminal] Failed to copy:', error);
+                      }
+
+                      // 恢复焦点
+                      setTimeout(() => {
+                        terminal.term.focus();
+                      }, 50);
+                    }}
+                    onTouchStart={() => handleLongPressStart('Copy', '复制选中文本到剪贴板')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-green-500/90 hover:bg-green-500 rounded text-xs font-mono text-white whitespace-nowrap transition-colors border border-green-500/50 shadow-lg"
+                  >
+                    Copy
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      triggerHaptic();
+                      const terminal = terminals.find(t => t.id === activeTabId);
+                      if (!terminal) return;
+
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (text) {
+                          sendInput(terminal.id, text);
+                        }
+                      } catch (error) {
+                        console.error('[Terminal] Failed to paste:', error);
+                      }
+
+                      // 恢复焦点
+                      setTimeout(() => {
+                        terminal.term.focus();
+                      }, 50);
+                    }}
+                    onTouchStart={() => handleLongPressStart('Paste', '从剪贴板粘贴文本')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-blue-500/90 hover:bg-blue-500 rounded text-xs font-mono text-white whitespace-nowrap transition-colors border border-blue-500/50 shadow-lg"
+                  >
+                    Paste
+                  </button>
+                </div>
+
+                {/* 特殊按键组 */}
+                <div className="flex items-center gap-2 pr-2 border-r border-white/10">
+                  <button
+                    onClick={() => {
+                      setIsShiftPressed(!isShiftPressed);
+                      triggerHaptic();
+                    }}
+                    onTouchStart={() => handleLongPressStart('Shift', '切换大小写或组合键')}
+                    onTouchEnd={handleLongPressEnd}
+                    className={`px-3 py-1.5 rounded text-xs font-mono whitespace-nowrap transition-colors shadow-lg ${isShiftPressed
+                      ? 'bg-yellow-500/90 text-white border border-yellow-500/50'
+                      : 'bg-white/90 text-gray-900 hover:bg-white'
+                      }`}
+                  >
+                    Shift
+                  </button>
+
+                  <button
+                    onClick={() => sendKeyToTerminal('Tab')}
+                    onTouchStart={() => handleLongPressStart('Tab', '制表符，用于自动补全')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
+                  >
+                    Tab
+                  </button>
+
+                  <button
+                    onClick={() => sendKeyToTerminal('Esc')}
+                    onTouchStart={() => handleLongPressStart('Esc', '退出当前模式或取消操作')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
+                  >
+                    Esc
+                  </button>
+                </div>
+
+                {/* 导航组 */}
+                <div className="flex items-center gap-2 pr-2 border-r border-white/10">
+                  {['↑', '↓', '←', '→'].map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => sendKeyToTerminal(isShiftPressed ? `Shift+${key}` : key)}
+                      onTouchStart={() => handleLongPressStart(key, isShiftPressed ? '选择文本' : '移动光标')}
+                      onTouchEnd={handleLongPressEnd}
+                      className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
+                    >
+                      {key}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 控制组 */}
+                <div className="flex items-center gap-2 pr-2 border-r border-white/10">
+                  <button
+                    onClick={() => sendKeyToTerminal('Ctrl+C')}
+                    onTouchStart={() => handleLongPressStart('Ctrl+C', '中断当前命令')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-red-500/90 hover:bg-red-500 rounded text-xs font-mono text-white whitespace-nowrap transition-colors border border-red-500/50 shadow-lg"
+                  >
+                    Ctrl+C
+                  </button>
+
+                  <button
+                    onClick={() => sendKeyToTerminal('Ctrl+D')}
+                    onTouchStart={() => handleLongPressStart('Ctrl+D', '退出当前 shell 或发送 EOF')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
+                  >
+                    Ctrl+D
+                  </button>
+
+                  <button
+                    onClick={() => sendKeyToTerminal('Ctrl+L')}
+                    onTouchStart={() => handleLongPressStart('Ctrl+L', '清屏')}
+                    onTouchEnd={handleLongPressEnd}
+                    className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
+                  >
+                    Ctrl+L
+                  </button>
+                </div>
+
+                {/* 更多按钮 */}
+                <button
+                  onClick={() => {
+                    setShowMoreKeys(!showMoreKeys);
+                    triggerHaptic();
+                  }}
+                  className="px-3 py-1.5 bg-purple-500/90 hover:bg-purple-500 rounded text-xs font-mono text-white whitespace-nowrap transition-colors border border-purple-500/50 shadow-lg"
+                >
+                  {showMoreKeys ? '收起' : '更多'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 扩展工具栏 */}
-          {showMoreKeys && (
+          {isQuickToolbarExpanded && showMoreKeys && (
             <div className="flex items-center gap-2 px-4 py-2 overflow-x-auto border-t border-white/10">
               <button
                 onClick={() => sendKeyToTerminal('Ctrl+Z')}

@@ -9,7 +9,7 @@ const Executions = () => {
   const [activeTab, setActiveTab] = useState<TabType>('process');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pt-6">
       {/* 页面标题 */}
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">

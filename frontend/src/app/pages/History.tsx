@@ -177,7 +177,7 @@ const History = () => {
     const avatars = ['blackpanther', 'harleyquinn', 'captainamerica', 'wonderwoman', 'spiderman', 'blackwidow'];
 
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 pt-6">
         <header>
           <div className="flex items-center gap-3">
             <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-600 uppercase">

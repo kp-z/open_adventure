@@ -1,5 +1,4 @@
 """Application settings and configuration."""
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -55,6 +54,31 @@ class Settings(BaseSettings):
         "http://localhost:5175",  # Vite 备用端口
         "http://127.0.0.1:5175",
     ]
+    # 可通过环境变量 CORS_ORIGIN_REGEX 覆盖自动规则
+    cors_origin_regex: Optional[str] = None
+
+    def get_effective_cors_origin_regex(self) -> Optional[str]:
+        """Return effective CORS origin regex.
+
+        Priority:
+        1. Use explicit CORS_ORIGIN_REGEX when provided.
+        2. In non-production env, auto-allow localhost + common private LAN ranges.
+        3. In production, keep strict origin list only (unless explicitly configured).
+        """
+        if self.cors_origin_regex:
+            return self.cors_origin_regex
+
+        if self.env.lower() in {"development", "dev", "test"}:
+            return (
+                r"^https?://"
+                r"(localhost|127\.0\.0\.1"
+                r"|10(?:\.\d{1,3}){3}"
+                r"|192\.168(?:\.\d{1,3}){2}"
+                r"|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})"
+                r"(?::\d{1,5})?$"
+            )
+
+        return None
 
     model_config = SettingsConfigDict(
         env_file=".env",

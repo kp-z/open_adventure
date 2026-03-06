@@ -41,7 +41,7 @@ class ErrorBoundary extends React.Component<
           padding: '2rem', 
           color: 'white', 
           backgroundColor: '#0f111a',
-          minHeight: '100vh',
+          minHeight: 'var(--app-h)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

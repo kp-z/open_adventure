@@ -2,6 +2,22 @@ import { createRoot } from "react-dom/client";
 import App from "./app/App.tsx";
 import "./styles/index.css";
 
+// 在应用渲染前同步 theme-color，避免与页面背景色不一致
+const syncInitialThemeColor = () => {
+  const mode = localStorage.getItem('open-adventure-mode');
+  const themeColor = mode === 'adventure' ? '#0a0a14' : '#0f111a';
+
+  let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (!metaThemeColor) {
+    metaThemeColor = document.createElement('meta');
+    metaThemeColor.setAttribute('name', 'theme-color');
+    document.head.appendChild(metaThemeColor);
+  }
+  metaThemeColor.setAttribute('content', themeColor);
+};
+
+syncInitialThemeColor();
+
 // 注册 Service Worker（PWA 支持）
 if ('serviceWorker' in navigator) {
   // 使用 try-catch 确保注册失败不影响应用启动

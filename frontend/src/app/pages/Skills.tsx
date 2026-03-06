@@ -477,7 +477,7 @@ const Skills = () => {
 
   if (mode === 'adventure') {
     return (
-      <div className="space-y-8 pb-20">
+      <div className="space-y-8 pb-20 pt-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600 uppercase">

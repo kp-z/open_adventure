@@ -16,7 +16,6 @@ import {
   Trophy,
   Search,
   User,
-  Menu,
   X,
   Target,
   Sparkles,
@@ -488,7 +487,7 @@ export const Layout = () => {
 
   return (
     <div
-      className={`min-h-screen flex text-white overflow-hidden transition-colors duration-500 ${mode === "adventure" ? "bg-[#0a0a14]" : "bg-[#0f111a]"}`}
+      className={`app-shell min-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} ${mode === "adventure" ? "bg-[#0a0a14]" : "bg-[#0f111a]"}`}
     >
       {/* 桌面端侧边栏 - 仅在 ≥md 显示，保持原样 */}
       <aside
@@ -610,7 +609,7 @@ export const Layout = () => {
               exit={{ x: '-100%' }}
               transition={{ type: 'tween', duration: 0.3 }}
               className={`
-                md:hidden fixed inset-y-0 left-0 w-64 z-50 border-r border-white/5 flex flex-col
+                md:hidden fixed inset-y-0 left-0 w-64 z-50 border-r border-white/5 flex flex-col safe-area-top
                 ${mode === "adventure" ? "bg-[#121225]" : "bg-[#0a0b14]"}
               `}
             >
@@ -699,7 +698,7 @@ export const Layout = () => {
       </AnimatePresence>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      <main className={`flex-1 flex flex-col min-w-0 min-h-0 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'}`}>
         {/* TopBar - 仅桌面端显示 */}
         <header
           className={`
@@ -831,7 +830,7 @@ export const Layout = () => {
         </header>
 
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
-        <div className={`flex-1 overflow-y-auto relative ${isTerminalPage ? '' : 'p-4 md:p-8'} pb-24 md:pb-4`}>
+        <div className={`flex-1 overflow-y-auto relative safe-area-top ${isTerminalPage ? '' : 'p-4 md:p-8'} pb-24 md:pb-4 safe-area-bottom`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={mode}
@@ -848,7 +847,10 @@ export const Layout = () => {
       </main>
 
       {/* 移动端底部导航栏 - iOS 液态玻璃风格浮动导航栏 */}
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 safe-area-bottom">
+      <nav
+        className="md:hidden fixed left-4 right-4 z-50 safe-area-left safe-area-right"
+        style={{ bottom: 'calc(var(--safe-bottom) + 1rem)' }}
+      >
         {/* 二级菜单和通知弹出层 */}
         <AnimatePresence>
           {(activeBottomMenu || showNotifications) && (
@@ -1013,7 +1015,7 @@ export const Layout = () => {
 
         {/* 主导航栏 */}
         <div className={`
-          flex items-center justify-between gap-1 px-2 h-16 rounded-3xl
+          grid grid-cols-5 items-center gap-1 px-2 h-16 rounded-3xl
           backdrop-blur-2xl backdrop-saturate-150
           border border-white/20 shadow-2xl
           ${mode === "adventure"
@@ -1021,21 +1023,6 @@ export const Layout = () => {
             : "bg-white/10"
           }
         `}>
-          {/* 菜单按钮 */}
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className={`
-              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
-              ${isSidebarOpen
-                ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
-                : "text-gray-400 hover:text-white"
-              }
-            `}
-          >
-            <Menu size={20} className="relative z-10" />
-            <span className="text-[10px] font-medium relative z-10">菜单</span>
-          </button>
-
           {/* Dashboard */}
           <NavLink
             to="/"
@@ -1045,7 +1032,7 @@ export const Layout = () => {
               setShowNotifications(false);
             }}
             className={({ isActive }) => `
-              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              relative flex flex-col items-center justify-center gap-1 p-2 w-full min-w-0 rounded-2xl transition-all duration-300
               ${isActive && !activeBottomMenu && !showNotifications
                 ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 : "text-gray-400 hover:text-white"
@@ -1055,7 +1042,7 @@ export const Layout = () => {
             {({ isActive }) => (
               <>
                 {mode === "adventure" ? <Sword size={20} className="relative z-10" /> : <LayoutDashboard size={20} className="relative z-10" />}
-                <span className="text-[10px] font-medium relative z-10">{t("dashboard")}</span>
+                <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">{t("dashboard")}</span>
               </>
             )}
           </NavLink>
@@ -1067,7 +1054,7 @@ export const Layout = () => {
               setShowNotifications(false);
             }}
             className={`
-              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              relative flex flex-col items-center justify-center gap-1 p-2 w-full min-w-0 rounded-2xl transition-all duration-300
               ${activeLibraryItem || activeBottomMenu === 'library'
                 ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 : "text-gray-400 hover:text-white"
@@ -1079,7 +1066,7 @@ export const Layout = () => {
             ) : (
               mode === "adventure" ? <BookOpen size={20} className="relative z-10" /> : <Wrench size={20} className="relative z-10" />
             )}
-            <span className="text-[10px] font-medium relative z-10">
+            <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">
               {activeLibraryItem ? activeLibraryItem.name : t("library")}
             </span>
           </button>
@@ -1091,7 +1078,7 @@ export const Layout = () => {
               setShowNotifications(false);
             }}
             className={`
-              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              relative flex flex-col items-center justify-center gap-1 p-2 w-full min-w-0 rounded-2xl transition-all duration-300
               ${activeAutomationItem || activeBottomMenu === 'automation'
                 ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 : "text-gray-400 hover:text-white"
@@ -1103,7 +1090,7 @@ export const Layout = () => {
             ) : (
               mode === "adventure" ? <Map size={20} className="relative z-10" /> : <GitBranch size={20} className="relative z-10" />
             )}
-            <span className="text-[10px] font-medium relative z-10">
+            <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">
               {activeAutomationItem ? activeAutomationItem.name : t("automation")}
             </span>
           </button>
@@ -1116,7 +1103,7 @@ export const Layout = () => {
               setShowNotifications(false);
             }}
             className={({ isActive }) => `
-              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              relative flex flex-col items-center justify-center gap-1 p-2 w-full min-w-0 rounded-2xl transition-all duration-300
               ${isActive && !activeBottomMenu && !showNotifications
                 ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 : "text-gray-400 hover:text-white"
@@ -1124,7 +1111,7 @@ export const Layout = () => {
             `}
           >
             <Terminal size={20} className="relative z-10" />
-            <span className="text-[10px] font-medium relative z-10">终端</span>
+            <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">终端</span>
           </NavLink>
 
           {/* 通知按钮 */}
@@ -1134,7 +1121,7 @@ export const Layout = () => {
               setActiveBottomMenu(null);
             }}
             className={`
-              relative flex flex-col items-center justify-center gap-1 p-2 flex-1 rounded-2xl transition-all duration-300
+              relative flex flex-col items-center justify-center gap-1 p-2 w-full min-w-0 rounded-2xl transition-all duration-300
               ${showNotifications
                 ? "text-white bg-gradient-to-br from-white/40 via-white/20 to-white/10 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
                 : "text-gray-400 hover:text-white"
@@ -1142,11 +1129,11 @@ export const Layout = () => {
             `}
           >
             <Bell size={20} className="relative z-10" />
-            <span className="text-[10px] font-medium relative z-10">通知</span>
+            <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">通知</span>
 
             {/* 通知徽章 */}
             {notifications.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-[#1a1b26] z-20">
+              <span className="absolute -top-1 right-0 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-[#1a1b26] z-20">
                 {notifications.length > 99 ? '99+' : notifications.length}
               </span>
             )}

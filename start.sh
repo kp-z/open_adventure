@@ -531,7 +531,7 @@ echo "Starting frontend server..."
 
 if [ "$DAEMON_MODE" = true ]; then
     # 后台模式：前端也在后台运行
-    VITE_API_BASE_URL="http://localhost:${BACKEND_PORT}/api" npm run dev -- --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
+    npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
     FRONTEND_PID=$!
     echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
 
@@ -664,7 +664,7 @@ else
     trap cleanup SIGINT SIGTERM
 
     # 启动前端（前台运行）
-    VITE_API_BASE_URL="http://localhost:${BACKEND_PORT}/api" npm run dev -- --port "$FRONTEND_PORT"
+    npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
 
     # 当前端正常退出时，也停止后端
     cleanup

@@ -459,7 +459,7 @@ const Agents = () => {
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-4 md:space-y-6 pt-6">
       {/* 页面标题和操作 - 响应式布局 */}
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">

@@ -111,6 +111,7 @@ app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
+    allow_origin_regex=settings.get_effective_cors_origin_regex(),
     allow_credentials=False,  # 与现有行为保持一致
     allow_methods=["*"],
     allow_headers=["*"],

@@ -104,7 +104,7 @@ const Teams = () => {
 
   if (mode === 'adventure') {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 pt-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-3">

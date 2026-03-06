@@ -270,7 +270,7 @@ const Dashboard = () => {
 
   if (mode === 'adventure') {
     return (
-      <div className="space-y-6 md:space-y-8">
+      <div className="space-y-6 md:space-y-8 pt-6">
         <header className="flex flex-col gap-2">
           <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-500 to-yellow-600 uppercase">
             指挥中心
