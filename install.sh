@@ -178,7 +178,7 @@ precheck() {
 
   check_path_exists "$BACKEND_DIR" "backend 目录"
   check_path_exists "$FRONTEND_DIR" "frontend 目录"
-  check_path_exists "$REPO_ROOT/requirements.txt" "requirements.txt"
+  check_path_exists "$BACKEND_DIR/requirements.txt" "backend/requirements.txt"
   check_path_exists "$FRONTEND_DIR/package.json" "frontend package.json"
 
   check_command "python3" "python3 --version"
@@ -279,7 +279,7 @@ install_backend() {
     log_pass "backend/venv 已存在"
   fi
 
-  run_cmd "cd \"$BACKEND_DIR\" && source venv/bin/activate && pip install -r ../requirements.txt"
+  run_cmd "cd \"$BACKEND_DIR\" && source venv/bin/activate && pip install -r requirements.txt"
   log_pass "后端依赖安装完成"
 
   if [ ! -f "$BACKEND_DIR/.env" ]; then

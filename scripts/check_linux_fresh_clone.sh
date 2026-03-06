@@ -125,7 +125,7 @@ check_python_fastapi() {
     if "$py_cmd" -c "import fastapi" >/dev/null 2>&1; then
         print_result "PASS" "Python 依赖检查" "fastapi 可导入" ""
     else
-        print_result "FAIL" "Python 依赖检查" "fastapi 导入失败" "在 backend 目录执行: source venv/bin/activate && pip install -r ../requirements.txt"
+        print_result "FAIL" "Python 依赖检查" "fastapi 导入失败" "在 backend 目录执行: source venv/bin/activate && pip install -r requirements.txt"
     fi
 }
 

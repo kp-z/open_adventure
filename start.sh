@@ -58,13 +58,21 @@ FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 BACKEND_PORT=8000
 FRONTEND_PORT=5173
 
-# 检查是否为后台运行模式
+# 检查运行模式参数
 DAEMON_MODE=false
 NON_INTERACTIVE=false
+FORCE_RESET=false
 
-if [[ "$1" == "-d" ]] || [[ "$1" == "--daemon" ]]; then
-    DAEMON_MODE=true
-fi
+for arg in "$@"; do
+    case "$arg" in
+        -d|--daemon)
+            DAEMON_MODE=true
+            ;;
+        --reset-all)
+            FORCE_RESET=true
+            ;;
+    esac
+done
 
 # 检查是否为非交互模式（用于 systemd 等自动化部署）
 if [ -n "$NON_INTERACTIVE_MODE" ] || [ ! -t 0 ]; then
@@ -74,6 +82,9 @@ fi
 echo "🚀 Starting Open Adventure..."
 if [ "$DAEMON_MODE" = true ]; then
     echo "📌 Running in daemon mode (background)"
+fi
+if [ "$FORCE_RESET" = true ]; then
+    echo "🔄 Running in force reset mode (--reset-all)"
 fi
 echo ""
 
@@ -87,14 +98,21 @@ else
     echo ""
 fi
 
-# 检查 backend 和 frontend 目录
+# 检查后端目录
 if [ ! -d "backend" ]; then
     echo "❌ backend directory not found"
     exit 1
 fi
 
+# 检查前端目录
 if [ ! -d "frontend" ]; then
     echo "❌ frontend directory not found"
+    exit 1
+fi
+
+# 检查 install.sh
+if [ ! -f "$SCRIPT_DIR/install.sh" ]; then
+    echo "❌ install.sh not found"
     exit 1
 fi
 
@@ -126,52 +144,23 @@ check_python_deps() {
 }
 
 install_python_deps() {
-    local force_reinstall="$1"
-
-    if [ "$force_reinstall" = "true" ]; then
-        echo "Reinstalling Python dependencies..."
-    else
-        echo "Installing Python dependencies..."
-    fi
-
-    # 优先使用 requirements.txt（避免 setuptools 包发现问题）
     if [ -f "requirements.txt" ]; then
-        if [ "$force_reinstall" = "true" ]; then
-            pip install --force-reinstall -q -r requirements.txt
-        else
-            pip install -q -r requirements.txt
-        fi
-    elif [ -f "../requirements.txt" ]; then
-        if [ "$force_reinstall" = "true" ]; then
-            pip install --force-reinstall -q -r ../requirements.txt
-        else
-            pip install -q -r ../requirements.txt
-        fi
-    elif [ -f "pyproject.toml" ]; then
-        # 回退到 pyproject.toml（可能有包发现问题）
-        echo "⚠️  Using pyproject.toml (may have package discovery issues)"
-        pip install -q -e .
+        pip install -q -r requirements.txt
     else
-        echo "❌ No dependency file found (requirements.txt or pyproject.toml)"
+        echo "❌ backend/requirements.txt not found"
         exit 1
-    fi
-
-    if [ "$force_reinstall" = "true" ]; then
-        echo "✅ Python dependencies reinstalled"
-    else
-        echo "✅ Python dependencies installed"
     fi
 }
 
 if ! check_python_deps; then
-    install_python_deps "false"
+    echo "Installing Python dependencies..."
+    install_python_deps
 
     # 再次验证安装
     if ! check_python_deps; then
         echo "❌ Failed to install Python dependencies"
         echo "Please check the error messages above and try manually:"
         echo "  cd backend && pip install -r requirements.txt"
-        echo "  or: cd backend && pip install -e ."
         exit 1
     fi
 fi
@@ -370,6 +359,29 @@ resolve_port_conflict() {
     done
 }
 
+# 强制全量重置模式：清理进程、依赖和配置
+if [ "$FORCE_RESET" = true ]; then
+    echo ""
+    echo "⚠️  Force reset mode enabled: cleaning runtime, dependencies, and config files..."
+
+    # 先尽力停止已有服务进程
+    cleanup_backend || true
+    cleanup_frontend || true
+
+    # 删除 PID 文件
+    rm -f "$BACKEND_PID_FILE" "$FRONTEND_PID_FILE"
+
+    # 删除后端虚拟环境与前端依赖
+    rm -rf "$SCRIPT_DIR/backend/venv"
+    rm -rf "$SCRIPT_DIR/frontend/node_modules"
+
+    # 删除配置文件（下次启动自动从 example 重建）
+    rm -f "$SCRIPT_DIR/backend/.env"
+    rm -f "$SCRIPT_DIR/frontend/.env.local"
+
+    echo "✅ Force reset cleanup completed"
+fi
+
 # 检查端口占用
 echo "Checking port availability..."
 resolve_port_conflict "backend" "BACKEND_PORT" "cleanup_backend"
@@ -384,7 +396,7 @@ if ! python -c "from app.core.security import create_access_token" 2>/dev/null; 
     echo "Attempting to fix by reinstalling dependencies..."
     echo ""
 
-    install_python_deps "true"
+    pip install --force-reinstall -q -r requirements.txt
 
     if ! python -c "from app.core.security import create_access_token" 2>/dev/null; then
         echo "❌ Still failed after reinstalling dependencies"
