@@ -128,7 +128,7 @@ const Workflows = () => {
   }
 
   return (
-    <div className="space-y-4 md:space-y-8 relative">
+    <div className="space-y-4 md:space-y-8 relative pt-6">
       <AnimatePresence>
         {isEditorOpen && <WorkflowEditor workflow={selectedWorkflow} onClose={handleCloseEditor} />}
       </AnimatePresence>

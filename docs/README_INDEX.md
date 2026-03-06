@@ -45,10 +45,12 @@
 ### 📢 release-notes/
 版本发布说明
 - `RELEASE_NOTES_v0.1.1.md` - v0.1.1 版本发布说明
+- `RELEASE_NOTES_v1.3.2.md` - v1.3.2 版本发布说明
 
 ### 📦 releases/
 发布包文件
 - `open-adventure-v0.1.1-macos-arm64.tar.gz` - v0.1.1 macOS ARM64 版本
+- `open_adventure-v1.3.2-linux-x86_64-source.tar.gz` - v1.3.2 Linux x86_64 源码压缩包
 
 ### 📋 logs/
 日志文件（14 个文件）

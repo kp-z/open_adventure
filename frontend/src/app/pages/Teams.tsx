@@ -237,7 +237,7 @@ const Teams = () => {
   }
 
   return (
-    <div className="space-y-4 md:space-y-8">
+    <div className="space-y-4 md:space-y-8 pt-6">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">

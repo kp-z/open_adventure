@@ -340,7 +340,7 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-8 lg:[--dashboard-row-h:clamp(320px,calc((100vh-220px)/3),520px)]">
+    <div className="space-y-8 lg:[--dashboard-row-h:clamp(320px,calc((100vh-220px)/3),520px)] pt-6">
       <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">DASHBOARD</h1>
