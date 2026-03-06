@@ -238,23 +238,54 @@ cd /Users/kp/项目/Proj/open_adventure
 ./scripts/build_binary.sh
 ```
 
-**Linux x86_64 版本**：
+**Linux 版本（必须构建两个版本）**：
+
+为了解决 GLIBC 兼容性问题，必须使用 Docker 在不同的 Linux 版本上构建：
+
+**Linux 兼容版（Ubuntu 20.04 基础）**：
 ```bash
-# 在 Linux 环境中运行
-cd /path/to/open_adventure
-./scripts/build_binary.sh
+# 使用 Docker 在 Ubuntu 20.04 环境中构建（GLIBC 2.31）
+cd /Users/kp/项目/Proj/open_adventure
+docker run --rm -v "$(pwd):/workspace" -w /workspace \
+  ubuntu:20.04 bash -c "
+    apt-get update && \
+    apt-get install -y python3.9 python3.9-venv python3-pip && \
+    ./scripts/build_binary.sh
+  "
+# 构建产物：docs/releases/open_adventure-v{版本号}-linux-x86_64-compat.tar.gz
+```
+
+**Linux 最新版（Ubuntu 24.04 基础）**：
+```bash
+# 使用 Docker 在 Ubuntu 24.04 环境中构建（GLIBC 2.38+）
+cd /Users/kp/项目/Proj/open_adventure
+docker run --rm -v "$(pwd):/workspace" -w /workspace \
+  ubuntu:24.04 bash -c "
+    apt-get update && \
+    apt-get install -y python3 python3-venv python3-pip && \
+    ./scripts/build_binary.sh
+  "
+# 构建产物：docs/releases/open_adventure-v{版本号}-linux-x86_64-latest.tar.gz
 ```
 
 **二进制构建特点**：
 - ✅ 源码保护：所有 Python 代码编译为字节码，无法直接查看
 - ✅ 独立运行：包含 Python 解释器和所有依赖
 - ✅ 用户友好：无需安装 Python 环境
+- ✅ 兼容性保证：兼容版支持 Ubuntu 20.04+、Debian 11+、CentOS 8+ 等
 - ⚠️ 体积较大：约 30-40MB（压缩后）
 
 **构建产物**：
 - 压缩包位置：`docs/releases/open_adventure-v{版本号}-{平台}-{架构}.tar.gz`
-- 压缩包命名：`open_adventure-v{版本号}-macos-arm64.tar.gz`
-- 压缩包命名：`open_adventure-v{版本号}-linux-x86_64.tar.gz`
+- macOS 版本：`open_adventure-v{版本号}-macos-arm64.tar.gz`
+- Linux 兼容版：`open_adventure-v{版本号}-linux-x86_64-compat.tar.gz`（推荐，兼容性最好）
+- Linux 最新版：`open_adventure-v{版本号}-linux-x86_64-latest.tar.gz`（适合最新系统）
+
+**GLIBC 兼容性说明**：
+- **兼容版（compat）**：基于 Ubuntu 20.04（GLIBC 2.31），兼容大多数 Linux 发行版
+  - Ubuntu 20.04+、Debian 11+、CentOS 8+、Fedora 32+、openSUSE 15.2+
+- **最新版（latest）**：基于 Ubuntu 24.04（GLIBC 2.38+），仅适合最新系统
+  - Ubuntu 24.04+、Debian 13+、Fedora 39+
 
 ##### 源码打包（可选）
 
@@ -376,21 +407,26 @@ git push origin v{版本号}
 
 #### 6. 创建 GitHub Release
 
-**必须同时上传 macOS 和 Linux 版本**
+**必须同时上传 macOS 和两个 Linux 版本（共 3 个平台）**
 
 ```bash
 gh release create v{版本号} \
   --title "v{版本号} - {简要标题}" \
   --notes-file docs/release-notes/RELEASE_NOTES_v{版本号}.md \
   docs/releases/open-adventure-v{版本号}-macos-arm64.tar.gz \
-  docs/releases/open-adventure-v{版本号}-linux-x86_64.tar.gz
+  docs/releases/open-adventure-v{版本号}-linux-x86_64-compat.tar.gz \
+  docs/releases/open-adventure-v{版本号}-linux-x86_64-latest.tar.gz
 ```
 
 **GitHub Release 规范**：
 - 标题格式：`v{版本号} - {简要描述}`
 - 必须使用 Release Notes 文件作为说明
-- 必须同时上传 macOS 和 Linux 两个平台的压缩包
+- **必须同时上传 3 个平台的压缩包**：
+  - macOS ARM64 版本
+  - Linux 兼容版（Ubuntu 20.04 基础，推荐）
+  - Linux 最新版（Ubuntu 24.04 基础）
 - 压缩包命名必须包含平台和架构信息
+- Release Notes 中应说明各 Linux 版本的适用系统
 
 ### 发布后验证
 
