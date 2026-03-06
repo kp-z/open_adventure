@@ -248,11 +248,15 @@ mkdir -p "$PROJECT_ROOT/docs/releases"
 
 # 打包（根据模式选择不同的打包方式）
 if [ "$ONEFILE_MODE" = true ]; then
-    # onefile 模式：重命名目录后打包
-    cd "$ACTUAL_DIST_DIR"
-    mv open-adventure-package open-adventure
+    # onefile 模式：使用临时目录组装 open-adventure 目录后打包
+    PACKAGE_STAGING_DIR="$ACTUAL_DIST_DIR/package-staging"
+    rm -rf "$PACKAGE_STAGING_DIR"
+    mkdir -p "$PACKAGE_STAGING_DIR/open-adventure"
+    cp "$PACKAGE_DIR/open-adventure" "$PACKAGE_STAGING_DIR/open-adventure/open-adventure"
+    cp "$PACKAGE_DIR/start.sh" "$PACKAGE_STAGING_DIR/open-adventure/start.sh"
+    cd "$PACKAGE_STAGING_DIR"
     tar -czf "$TARBALL_PATH" open-adventure/
-    mv open-adventure open-adventure-package
+    rm -rf "$PACKAGE_STAGING_DIR"
 else
     # onedir 模式：打包 open-adventure 目录
     cd "$ACTUAL_DIST_DIR"

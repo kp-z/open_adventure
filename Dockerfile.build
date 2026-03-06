@@ -13,10 +13,10 @@ RUN apt-get update && apt-get install -y \
 # 设置工作目录
 WORKDIR /app
 
-# 复制必要文件
-COPY backend/pyproject.toml /app/backend/pyproject.toml
+# 先复制项目文件（由 .dockerignore 排除本地 venv/node_modules 等）
+COPY . /app/
 
-# 创建虚拟环境并安装依赖
+# 创建容器内专用虚拟环境并安装依赖
 RUN cd /app/backend && \
     python -m venv venv && \
     . venv/bin/activate && \
@@ -24,12 +24,9 @@ RUN cd /app/backend && \
     pip install . && \
     pip install pyinstaller
 
-# 复制所有项目文件
-COPY . /app/
-
 # 设置脚本执行权限
 RUN chmod +x /app/scripts/build_binary.sh
 
 # 构建命令
-CMD ["/bin/bash", "-c", "cd /app && ./scripts/build_binary.sh && cp docs/releases/*.tar.gz /output/ 2>/dev/null || true"]
+CMD ["/bin/bash", "-lc", "cd /app && ./scripts/build_binary.sh && cp docs/releases/*.tar.gz /output/ 2>/dev/null || true"]
 

@@ -1,0 +1,9 @@
+backend/venv
+venv
+frontend/node_modules
+node_modules
+.git
+backend/build
+backend/dist
+dist
+docs/releases/test-linux-v1.3.2

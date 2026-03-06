@@ -38,44 +38,43 @@ if db_template.exists():
 else:
     print("⚠️  警告: 数据库模板不存在")
 
-# 隐藏导入（PyInstaller 可能检测不到的模块）
+# 隐藏导入（只保留运行时确实需要的模块，避免引用不存在的旧路径）
 hiddenimports = [
-    # app 模块及其子模块
     'app',
     'app.main',
+    'app.api',
+    'app.api.routers',
+    'app.api.dashboard',
+    'app.api.auth',
+    'app.api.terminal',
+    'app.api.websocket',
+    'app.api.websocket.terminal',
     'app.core',
-    'app.core.config',
     'app.core.database',
+    'app.core.logging',
     'app.models',
     'app.repositories',
     'app.services',
-    'app.api',
-    'app.api.routers',
     'app.adapters',
     'app.adapters.claude',
-    # uvicorn 相关
     'uvicorn',
+    'uvicorn.config',
+    'uvicorn.server',
+    'uvicorn.main',
     'uvicorn.logging',
-    'uvicorn.loops',
     'uvicorn.loops.auto',
-    'uvicorn.protocols',
-    'uvicorn.protocols.http',
     'uvicorn.protocols.http.auto',
-    'uvicorn.protocols.websockets',
     'uvicorn.protocols.websockets.auto',
-    'uvicorn.lifespan',
     'uvicorn.lifespan.on',
-    # FastAPI 相关
     'fastapi',
     'fastapi.staticfiles',
-    # SQLAlchemy 相关
+    'starlette.middleware.base',
     'sqlalchemy',
     'sqlalchemy.ext.asyncio',
     'sqlalchemy.ext.asyncio.engine',
     'sqlalchemy.ext.asyncio.session',
     'aiosqlite',
     'greenlet',
-    # 其他依赖
     'anthropic',
     'pydantic',
     'pydantic_settings',
