@@ -1427,7 +1427,7 @@ async def agent_terminal(
 async def unified_agent_session(
     websocket: WebSocket,
     agent_id: int,
-    mode: str = Query(default="chat", regex="^(chat|terminal)$"),
+    mode: str = Query(default="chat", pattern="^(chat|terminal)$"),
     session_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
@@ -1679,7 +1679,7 @@ async def get_agent_process_status(agent_id: int):
 async def api_agent_session(
     websocket: WebSocket,
     agent_id: int,
-    mode: str = Query(default="api", regex="^(chat|api)$"),
+    mode: str = Query(default="api", pattern="^(chat|api)$"),
     session_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):

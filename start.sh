@@ -118,16 +118,35 @@ check_python_deps() {
     python -c "import fastapi" 2>/dev/null && \
     python -c "import uvicorn" 2>/dev/null && \
     python -c "import sqlalchemy" 2>/dev/null && \
-    python -c "import psutil" 2>/dev/null
+    python -c "import psutil" 2>/dev/null && \
+    python -c "from jose import jwt" 2>/dev/null && \
+    python -c "from passlib.context import CryptContext" 2>/dev/null && \
+    python -c "import anthropic" 2>/dev/null && \
+    python -c "import pydantic_settings" 2>/dev/null
 }
 
-if ! check_python_deps; then
-    echo "Installing Python dependencies..."
+install_python_deps() {
+    local force_reinstall="$1"
+
+    if [ "$force_reinstall" = "true" ]; then
+        echo "Reinstalling Python dependencies..."
+    else
+        echo "Installing Python dependencies..."
+    fi
+
     # 优先使用 requirements.txt（避免 setuptools 包发现问题）
     if [ -f "requirements.txt" ]; then
-        pip install -q -r requirements.txt
+        if [ "$force_reinstall" = "true" ]; then
+            pip install --force-reinstall -q -r requirements.txt
+        else
+            pip install -q -r requirements.txt
+        fi
     elif [ -f "../requirements.txt" ]; then
-        pip install -q -r ../requirements.txt
+        if [ "$force_reinstall" = "true" ]; then
+            pip install --force-reinstall -q -r ../requirements.txt
+        else
+            pip install -q -r ../requirements.txt
+        fi
     elif [ -f "pyproject.toml" ]; then
         # 回退到 pyproject.toml（可能有包发现问题）
         echo "⚠️  Using pyproject.toml (may have package discovery issues)"
@@ -136,7 +155,16 @@ if ! check_python_deps; then
         echo "❌ No dependency file found (requirements.txt or pyproject.toml)"
         exit 1
     fi
-    echo "✅ Python dependencies installed"
+
+    if [ "$force_reinstall" = "true" ]; then
+        echo "✅ Python dependencies reinstalled"
+    else
+        echo "✅ Python dependencies installed"
+    fi
+}
+
+if ! check_python_deps; then
+    install_python_deps "false"
 
     # 再次验证安装
     if ! check_python_deps; then
@@ -346,6 +374,31 @@ resolve_port_conflict() {
 echo "Checking port availability..."
 resolve_port_conflict "backend" "BACKEND_PORT" "cleanup_backend"
 resolve_port_conflict "frontend" "FRONTEND_PORT" "cleanup_frontend"
+
+# 后端启动前最终依赖验证（防止缺包导致启动失败）
+echo "Verifying backend dependencies..."
+if ! python -c "from app.core.security import create_access_token" 2>/dev/null; then
+    echo "❌ Backend dependency verification failed"
+    echo ""
+    echo "Missing or broken dependencies detected."
+    echo "Attempting to fix by reinstalling dependencies..."
+    echo ""
+
+    install_python_deps "true"
+
+    if ! python -c "from app.core.security import create_access_token" 2>/dev/null; then
+        echo "❌ Still failed after reinstalling dependencies"
+        echo ""
+        echo "Please try manual fix:"
+        echo "  cd backend"
+        echo "  source venv/bin/activate"
+        echo "  pip install -r requirements.txt"
+        echo "  python -c 'from app.core.security import create_access_token'"
+        exit 1
+    fi
+
+    echo "✅ Dependencies fixed"
+fi
 
 # 启动后端服务器（后台运行）
 echo "Starting backend server on port $BACKEND_PORT..."
