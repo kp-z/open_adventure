@@ -148,7 +148,11 @@ scripts/
 - 所有回复必须使用中文
 
 ### 回复格式
-- 每次回复开头必须添加"小张人呢？"
+- 每次回复结尾必须添加"小张人呢？"
+- 不需要在回复开头添加这句话
+- 在结尾的"小张人呢？"之前，可以先加一句**不超过 10 个字**的总结性短句
+- 如果添加总结性短句，格式必须为：`[10字内总结]。小张人呢？`
+- 如果不需要总结，可直接以"小张人呢？"结尾
 
 ### 工作流程
 1. 接收用户指令
@@ -242,14 +246,14 @@ cd /Users/kp/项目/Proj/open_adventure
 
 为了解决 GLIBC 兼容性问题，必须使用 Docker 在不同的 Linux 版本上构建：
 
-**Linux 兼容版（Ubuntu 20.04 基础）**：
+**Linux 兼容版（Ubuntu 22.04 基础）**：
 ```bash
-# 使用 Docker 在 Ubuntu 20.04 环境中构建（GLIBC 2.31）
+# 使用 Docker 在 Ubuntu 22.04 环境中构建（GLIBC 2.35）
 cd /Users/kp/项目/Proj/open_adventure
 docker run --rm -v "$(pwd):/workspace" -w /workspace \
-  ubuntu:20.04 bash -c "
+  ubuntu:22.04 bash -c "
     apt-get update && \
-    apt-get install -y python3.9 python3.9-venv python3-pip && \
+    apt-get install -y python3 python3-venv python3-pip && \
     ./scripts/build_binary.sh
   "
 # 构建产物：docs/releases/open_adventure-v{版本号}-linux-x86_64-compat.tar.gz
@@ -272,18 +276,18 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace \
 - ✅ 源码保护：所有 Python 代码编译为字节码，无法直接查看
 - ✅ 独立运行：包含 Python 解释器和所有依赖
 - ✅ 用户友好：无需安装 Python 环境
-- ✅ 兼容性保证：兼容版支持 Ubuntu 20.04+、Debian 11+、CentOS 8+ 等
+- ✅ 兼容性保证：兼容版支持 Ubuntu 22.04+、Debian 12+、CentOS Stream 9+ 等
 - ⚠️ 体积较大：约 30-40MB（压缩后）
 
 **构建产物**：
 - 压缩包位置：`docs/releases/open_adventure-v{版本号}-{平台}-{架构}.tar.gz`
 - macOS 版本：`open_adventure-v{版本号}-macos-arm64.tar.gz`
-- Linux 兼容版：`open_adventure-v{版本号}-linux-x86_64-compat.tar.gz`（推荐，兼容性最好）
+- Linux 兼容版：`open_adventure-v{版本号}-linux-x86_64-compat.tar.gz`（基于 Ubuntu 22.04，兼容性较好）
 - Linux 最新版：`open_adventure-v{版本号}-linux-x86_64-latest.tar.gz`（适合最新系统）
 
 **GLIBC 兼容性说明**：
-- **兼容版（compat）**：基于 Ubuntu 20.04（GLIBC 2.31），兼容大多数 Linux 发行版
-  - Ubuntu 20.04+、Debian 11+、CentOS 8+、Fedora 32+、openSUSE 15.2+
+- **兼容版（compat）**：基于 Ubuntu 22.04（GLIBC 2.35），兼容较新的主流 Linux 发行版
+  - Ubuntu 22.04+、Debian 12+、CentOS Stream 9+、Fedora 36+、openSUSE Leap 15.5+
 - **最新版（latest）**：基于 Ubuntu 24.04（GLIBC 2.38+），仅适合最新系统
   - Ubuntu 24.04+、Debian 13+、Fedora 39+
 
@@ -423,7 +427,7 @@ gh release create v{版本号} \
 - 必须使用 Release Notes 文件作为说明
 - **必须同时上传 3 个平台的压缩包**：
   - macOS ARM64 版本
-  - Linux 兼容版（Ubuntu 20.04 基础，推荐）
+  - Linux 兼容版（Ubuntu 22.04 基础，推荐）
   - Linux 最新版（Ubuntu 24.04 基础）
 - 压缩包命名必须包含平台和架构信息
 - Release Notes 中应说明各 Linux 版本的适用系统
