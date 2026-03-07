@@ -145,7 +145,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
   ];
 
   return (
-    <nav className={`flex flex-col gap-2 ${collapsed ? 'p-2' : 'p-4'}`}>
+    <nav className={`flex flex-col gap-2 ${collapsed ? 'px-4 py-2' : 'p-4'}`}>
       {navItems.map((item) => {
         const hasSubItems = item.subItems && item.subItems.length > 0;
         const isExpanded = expandedMenus.has(item.id || '');
@@ -241,7 +241,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                       onClick={() => toggleCollapsedMenu(item.id!)}
                       title={item.name}
                       className={`
-                        w-full flex items-center justify-center px-3 py-3 rounded-xl transition-all
+                        w-full flex items-center justify-center py-3 rounded-xl transition-all
                         ${
                           hasActiveChild
                             ? mode === "adventure"
@@ -302,7 +302,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                     to={item.path}
                     title={collapsed ? item.name : undefined}
                     className={({ isActive }) => `
-                      flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
+                      flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
                       ${
                         isActive
                           ? mode === "adventure"
@@ -325,12 +325,12 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
           </div>
         );
       })}
-      <div className={`mt-auto pt-4 border-t border-white/10 ${collapsed ? 'mx-1' : ''}`}>
+      <div className={`mt-auto pt-4 border-t border-white/10`}>
         <NavLink
           to="/settings"
           title={collapsed ? t("settings") : undefined}
           className={({ isActive }) => `
-            flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-3' : 'px-4'} py-3 rounded-xl transition-all
+            flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
             ${
               isActive
                 ? mode === "adventure"
@@ -501,7 +501,7 @@ export const Layout = () => {
         <button
           onClick={toggleMode}
           className={`
-            h-20 flex items-center px-6 gap-4 group transition-all duration-500 hover:bg-white/5
+            h-20 flex items-center ${isSidebarOpen ? 'px-6' : 'px-4 justify-center'} gap-4 group transition-all duration-500 hover:bg-white/5
             ${mode === "adventure" ? "border-b border-yellow-500/20" : "border-b border-blue-500/20"}
           `}
         >

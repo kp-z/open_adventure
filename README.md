@@ -191,10 +191,32 @@ npm run dev
 
 ### 启动应用
 
-使用预编译包：
+**基本启动**：
 ```bash
 ./start.sh
 ```
+
+**后台运行**：
+```bash
+./start.sh --daemon
+```
+
+**防止 MacBook 休眠（macOS）**：
+```bash
+./start.sh --no-sleep
+```
+
+**后台运行 + 防休眠**：
+```bash
+./start.sh --daemon --no-sleep
+```
+
+**完全重置（清理所有缓存和配置）**：
+```bash
+./start.sh --reset-all
+```
+
+> 💡 **提示**：使用 `--no-sleep` 参数可以防止 MacBook 在开发时自动休眠，适合长时间运行。详见 [防止休眠指南](docs/guides/prevent-sleep.md)
 
 或从源码启动：
 ```bash

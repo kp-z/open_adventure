@@ -31,7 +31,8 @@ export const WaterLevel: React.FC<WaterLevelProps> = ({ percentage, size = 60 })
   const color = getColor();
 
   // 考虑边框宽度，clipPath 半径需要更小
-  const clipRadius = (size / 2) - 3; // 减去边框宽度和额外的安全边距
+  // 移动端和桌面端都使用 border-2 (2px)，所以减去 2px
+  const clipRadius = (size / 2) - 2;
 
   return (
     <>

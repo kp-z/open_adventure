@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect, ReactNode, useCallback } from 'react';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
+import { SerializeAddon } from '@xterm/addon-serialize';
 import { API_CONFIG } from '../../config/api';
 import { useNotifications } from './NotificationContext';
 
@@ -17,6 +18,7 @@ export interface TerminalInstance {
   term: XTerm;
   ws: WebSocket;
   fitAddon: FitAddon;
+  serializeAddon: SerializeAddon;
   title: string;
   sessionId?: string;
   lifecycle: TerminalLifecycle;
@@ -51,6 +53,7 @@ interface TerminalContextType {
   cleanupAll: () => void;
   sendInput: (terminalId: string, data: string) => void;
   sendResize: (terminalId: string, rows: number, cols: number) => void;
+  sendRestoreReady: (terminalId: string, rows: number, cols: number) => void;
   markTerminalOpened: (terminalId: string) => void;
   syncClaudeConversations: () => Promise<ClaudeConversation[]>;
   restoreClaudeConversation: (sessionId: string) => Promise<TerminalInstance | null>;
@@ -252,6 +255,18 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     terminal.ws.send(JSON.stringify({ type: 'resize', rows, cols }));
   }, [getTerminalById]);
 
+  const sendRestoreReady = useCallback((terminalId: string, rows: number, cols: number) => {
+    const terminal = getTerminalById(terminalId);
+    if (!terminal || terminal.lifecycle === 'disposed') {
+      return;
+    }
+    if (terminal.ws.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    console.log(`[TerminalContext] Sending restore_ready: terminal=${terminalId}, rows=${rows}, cols=${cols}`);
+    terminal.ws.send(JSON.stringify({ type: 'restore_ready', rows, cols }));
+  }, [getTerminalById]);
+
   const markTerminalOpened = useCallback((terminalId: string) => {
     const terminal = getTerminalById(terminalId);
     if (!terminal || terminal.isOpened) {
@@ -327,6 +342,9 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
 
+    const serializeAddon = new SerializeAddon();
+    term.loadAddon(serializeAddon);
+
     // 构建 WebSocket URL
     let wsUrl: string;
     if (mode === 'restore' && restoreSessionId) {
@@ -354,6 +372,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       term,
       ws,
       fitAddon,
+      serializeAddon,
       title,
       sessionId: restoreSessionId,
       lifecycle: 'init',
@@ -670,6 +689,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   }, [initTerminal]);
 
   const createTerminal = (projectPath?: string, autoStartClaude?: boolean): TerminalInstance | null => {
+    console.log('[TerminalContext] createTerminal called', { projectPath, autoStartClaude, restoreSettled, isRestoring });
+
     if (!restoreSettled || isRestoring) {
       console.log('[TerminalContext] Skip createTerminal - restore not settled', { isRestoring, restoreSettled });
       return null;
@@ -682,9 +703,16 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       title = pathParts[pathParts.length - 1] || title;
     }
 
+    console.log('[TerminalContext] Creating terminal', { id, title, projectPath, autoStartClaude });
     const terminal = initTerminal({ id, title, projectPath, autoStartClaude, mode: 'create' });
-    setTerminals((prev) => [...prev, terminal]);
+    console.log('[TerminalContext] initTerminal returned', terminal.id);
+
+    setTerminals((prev) => {
+      console.log('[TerminalContext] Adding terminal to state', { currentCount: prev.length, newId: id });
+      return [...prev, terminal];
+    });
     setActiveTabId(id);
+    console.log('[TerminalContext] Terminal creation complete', id);
     return terminal;
   };
 
@@ -777,6 +805,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         cleanupAll,
         sendInput,
         sendResize,
+        sendRestoreReady,
         markTerminalOpened,
         syncClaudeConversations,
         restoreClaudeConversation,

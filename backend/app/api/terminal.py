@@ -48,8 +48,13 @@ class TerminalSession:
         self.websocket = None  # 当前连接的 WebSocket
         self.execution_id = None  # 关联的 execution ID
         self.claude_running = False  # 标记是否运行了 claude code
-        self.scrollback_buffer = []  # 保存终端输出历史
-        self.max_scrollback_lines = 10000  # 最大保存行数
+        self.scrollback_buffer = []  # 保存终端输出历史（原始字节流，包含 ANSI 序列）
+        self.max_scrollback_bytes = 1024 * 1024  # 最大保存 1MB
+        self.current_scrollback_size = 0  # 当前 scrollback 大小（字节）
+        self.terminal_rows = 24  # 终端行数
+        self.terminal_cols = 80  # 终端列数
+        self.waiting_for_restore_ready = False  # 是否等待前端 restore_ready 信号
+        self.restore_ready_timeout = None  # 超时兜底任务
 
     def is_process_alive(self) -> bool:
         """检查 PTY 进程是否还在运行"""
@@ -154,6 +159,10 @@ class TerminalSession:
         if self.master_fd:
             winsize = struct.pack('HHHH', rows, cols, 0, 0)
             fcntl.ioctl(self.master_fd, termios.TIOCSWINSZ, winsize)
+            # 记录当前终端尺寸
+            self.terminal_rows = rows
+            self.terminal_cols = cols
+            print(f"[Terminal] Resized PTY: {rows}x{cols}")
 
     def write(self, data: str):
         """Write data to the terminal"""
@@ -162,27 +171,34 @@ class TerminalSession:
             self.last_activity = datetime.now()  # 更新活动时间
 
     def save_output(self, data: bytes):
-        """保存输出到 scrollback buffer"""
+        """保存输出到 scrollback buffer（保留 ANSI 转义序列）"""
         try:
-            text = data.decode('utf-8', errors='ignore')
-            # 按行分割并保存
-            lines = text.split('\n')
-            self.scrollback_buffer.extend(lines)
+            # 保存原始字节流，包含所有 ANSI 转义序列
+            self.scrollback_buffer.append(data)
+            self.current_scrollback_size += len(data)
 
-            # 限制 buffer 大小
-            if len(self.scrollback_buffer) > self.max_scrollback_lines:
-                self.scrollback_buffer = self.scrollback_buffer[-self.max_scrollback_lines:]
+            # 限制 buffer 大小，删除最旧的数据
+            while self.current_scrollback_size > self.max_scrollback_bytes and len(self.scrollback_buffer) > 0:
+                removed = self.scrollback_buffer.pop(0)
+                self.current_scrollback_size -= len(removed)
         except Exception as e:
             print(f"[Terminal] Error saving output: {e}")
 
-    def get_scrollback(self, lines: int = 1000) -> str:
-        """获取最近的 scrollback 内容"""
+    def get_scrollback(self, max_bytes: int = 512 * 1024) -> bytes:
+        """获取最近的 scrollback 内容（原始字节流）"""
         if not self.scrollback_buffer:
-            return ""
+            return b""
 
-        # 获取最近的 N 行
-        recent_lines = self.scrollback_buffer[-lines:]
-        return '\n'.join(recent_lines)
+        # 从后往前收集数据，直到达到最大字节数
+        result = []
+        total_bytes = 0
+        for chunk in reversed(self.scrollback_buffer):
+            if total_bytes + len(chunk) > max_bytes:
+                break
+            result.insert(0, chunk)
+            total_bytes += len(chunk)
+
+        return b''.join(result)
 
     def read(self, timeout: float = 0.1) -> bytes:
         """Read data from the terminal"""
@@ -411,43 +427,13 @@ async def terminal_websocket(
             # 仅做会话恢复提示与回放，不注入额外命令，保留当前 shell 上下文
             print(f"[Terminal] ========== SESSION RECONNECT CONTEXT ==========")
             print(f"[Terminal] Session reconnect keeps existing shell context")
+            print(f"[Terminal] Waiting for frontend restore_ready signal...")
 
-            # 等待前端 xterm 准备好（给 React 渲染和 xterm.open() 一些时间）
-            print(f"[Terminal] Waiting 500ms for frontend to be ready...")
-            await asyncio.sleep(0.5)
-            print(f"[Terminal] Frontend should be ready now")
-
-            # 发送重连成功消息
-            print(f"[Terminal] Sending reconnection success message...")
-            await websocket.send_text("\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n")
-            print(f"[Terminal] ✅ Reconnection message sent")
-
-            # 回放最近终端输出，避免前端出现空白
-            try:
-                logger.info("[Terminal] Reconnect replay started: session_id=%s", session_id)
-                scrollback_text = session.get_scrollback(lines=1200)
-                replayed = bool(scrollback_text)
-
-                if scrollback_text:
-                    if not scrollback_text.endswith('\n'):
-                        scrollback_text += '\n'
-                    await websocket.send_text(scrollback_text)
-                    print(f"[Terminal] ✅ Replayed scrollback for session {session_id}")
-                else:
-                    # 避免前端黑屏误判：无回放时明确给出提示
-                    await websocket.send_text("\r\n\x1b[33mℹ Session restored (no scrollback available)\x1b[0m\r\n")
-                    # 主动触发一次换行，尽量拉起当前 shell/CLI 的可见提示符
-                    try:
-                        await asyncio.get_event_loop().run_in_executor(None, session.write, '\n')
-                    except Exception:
-                        logger.exception("[Terminal] Failed to request prompt after no-scrollback restore: session_id=%s", session_id)
-
-                logger.info("[Terminal] Reconnect replay finished: session_id=%s, replayed=%s", session_id, replayed)
-            except Exception as e:
-                logger.exception("[Terminal] Reconnect replay failed: session_id=%s", session_id)
-                print(f"[Terminal] Failed to replay scrollback for session {session_id}: {e}")
-
-            print(f"[Terminal] ========== RECONNECTION COMPLETE ==========")
+            # 标记为等待 restore_ready
+            session.waiting_for_restore_ready = True
+            session.restore_ready_timeout = asyncio.create_task(
+                asyncio.sleep(5.0)  # 5秒超时兜底
+            )
 
             # 重连时不需要这些变量，设置为 None
             initial_dir = None
@@ -821,6 +807,62 @@ async def terminal_websocket(
                                 cols,
                             )
                             continue
+                    elif msg_type == 'restore_ready':
+                        # 前端已完成首次稳定 fit，可以开始回放
+                        if hasattr(session, 'waiting_for_restore_ready') and session.waiting_for_restore_ready:
+                            print(f"[Terminal] ✅ Received restore_ready signal from frontend")
+                            session.waiting_for_restore_ready = False
+
+                            # 取消超时任务
+                            if hasattr(session, 'restore_ready_timeout'):
+                                session.restore_ready_timeout.cancel()
+
+                            # 获取前端当前的终端尺寸
+                            rows = data.get('rows', 24)
+                            cols = data.get('cols', 80)
+                            print(f"[Terminal] Frontend terminal size: rows={rows}, cols={cols}")
+
+                            # 🔧 关键修复：在回放前先调整 PTY 尺寸以匹配前端
+                            try:
+                                session.resize(rows, cols)
+                                print(f"[Terminal] ✅ Resized PTY to match frontend: {rows}x{cols}")
+                            except Exception as e:
+                                logger.error(f"[Terminal] Failed to resize PTY: {e}")
+
+                            # 发送清屏命令，确保干净的起始状态
+                            await websocket.send_text("\x1b[2J\x1b[H")
+                            print(f"[Terminal] ✅ Sent clear screen command")
+
+                            # 发送重连成功消息
+                            print(f"[Terminal] Sending reconnection success message...")
+                            await websocket.send_text("\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n")
+                            print(f"[Terminal] ✅ Reconnection message sent")
+
+                            # 回放最近终端输出（原始字节流，包含 ANSI 序列）
+                            try:
+                                logger.info("[Terminal] Reconnect replay started: session_id=%s", session_id)
+                                scrollback_bytes = session.get_scrollback(max_bytes=512 * 1024)  # 最多 512KB
+                                replayed = bool(scrollback_bytes)
+
+                                if scrollback_bytes:
+                                    # 发送原始字节流（包含所有 ANSI 转义序列）
+                                    await websocket.send_bytes(scrollback_bytes)
+                                    print(f"[Terminal] ✅ Replayed {len(scrollback_bytes)} bytes of scrollback for session {session_id}")
+                                else:
+                                    # 避免前端黑屏误判：无回放时明确给出提示
+                                    await websocket.send_text("\r\n\x1b[33mℹ Session restored (no scrollback available)\x1b[0m\r\n")
+                                    # 主动触发一次换行，尽量拉起当前 shell/CLI 的可见提示符
+                                    try:
+                                        await asyncio.get_event_loop().run_in_executor(None, session.write, '\n')
+                                    except Exception:
+                                        logger.exception("[Terminal] Failed to request prompt after no-scrollback restore: session_id=%s", session_id)
+
+                                logger.info("[Terminal] Reconnect replay finished: session_id=%s, replayed=%s", session_id, replayed)
+                            except Exception as e:
+                                logger.exception("[Terminal] Reconnect replay failed: session_id=%s", session_id)
+                                print(f"[Terminal] Failed to replay scrollback for session {session_id}: {e}")
+
+                            print(f"[Terminal] ========== RECONNECTION COMPLETE ==========")
                     else:
                         logger.warning(
                             "[Terminal] unknown msg type continue: session_id=%s, type=%r",
@@ -838,13 +880,51 @@ async def terminal_websocket(
                     continue
             print(f"[Terminal] read_from_websocket exited for session {session_id}")
 
-        # Run both tasks concurrently
+        async def handle_restore_timeout():
+            """处理 restore_ready 超时兜底"""
+            if not hasattr(session, 'waiting_for_restore_ready') or not session.waiting_for_restore_ready:
+                return
+
+            try:
+                # 等待超时任务
+                await session.restore_ready_timeout
+
+                # 如果还在等待，说明超时了
+                if session.waiting_for_restore_ready:
+                    print(f"[Terminal] ⚠️ restore_ready timeout, proceeding with fallback replay")
+                    session.waiting_for_restore_ready = False
+
+                    # 发送清屏命令
+                    await websocket.send_text("\x1b[2J\x1b[H")
+
+                    # 发送重连成功消息
+                    await websocket.send_text("\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n")
+
+                    # 回放 scrollback（原始字节流）
+                    try:
+                        scrollback_bytes = session.get_scrollback(max_bytes=512 * 1024)
+                        if scrollback_bytes:
+                            await websocket.send_bytes(scrollback_bytes)
+                            print(f"[Terminal] ✅ Fallback replayed {len(scrollback_bytes)} bytes of scrollback for session {session_id}")
+                        else:
+                            await websocket.send_text("\r\n\x1b[33mℹ Session restored (no scrollback available)\x1b[0m\r\n")
+                    except Exception as e:
+                        logger.exception("[Terminal] Fallback replay failed: session_id=%s", session_id)
+            except asyncio.CancelledError:
+                # 正常取消，前端已发送 restore_ready
+                pass
+            except Exception as e:
+                logger.exception("[Terminal] Error in restore timeout handler: session_id=%s", session_id)
+
+        # Run tasks concurrently
         print(f"[Terminal] Starting read tasks for session {session_id}...")
-        results = await asyncio.gather(
-            read_from_pty(),
-            read_from_websocket(),
-            return_exceptions=True
-        )
+        tasks = [read_from_pty(), read_from_websocket()]
+
+        # 如果是恢复模式，添加超时处理任务
+        if hasattr(session, 'waiting_for_restore_ready') and session.waiting_for_restore_ready:
+            tasks.append(handle_restore_timeout())
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
         print(f"[Terminal] Read tasks completed for session {session_id}, results: {results}")
 
     except WebSocketDisconnect:

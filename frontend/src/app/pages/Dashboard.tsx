@@ -375,17 +375,18 @@ const Dashboard = () => {
         ) : (
           <GlassCard className="md:col-span-2 lg:col-span-2 flex flex-col justify-between h-full">
           <div className="flex justify-between items-start mb-6">
-            <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-xl ${
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl shrink-0 ${
                 claudeHealth?.cli_available
                   ? 'bg-green-500/20 border border-green-500/50 text-green-500'
                   : 'bg-red-500/20 border border-red-500/50 text-red-500'
               } flex items-center justify-center`}>
-                <Activity size={24} />
+                <Activity size={20} className="md:hidden" />
+                <Activity size={24} className="hidden md:block" />
               </div>
-              <div>
-                <h2 className="text-base md:text-lg font-bold">Claude CLI Status</h2>
-                <p className={`text-xs font-medium ${
+              <div className="min-w-0">
+                <h2 className="text-xs md:text-lg font-bold truncate">Claude CLI Status</h2>
+                <p className={`text-[10px] md:text-xs font-medium truncate ${
                   claudeHealth?.cli_available
                     ? 'text-green-500'
                     : 'text-red-500'
@@ -396,8 +397,8 @@ const Dashboard = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="text-right">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right hidden md:block">
                 <p className="text-xs text-gray-400">Version</p>
                 <p className="text-sm font-mono">
                   {claudeHealth?.version || 'N/A'}
@@ -704,10 +705,10 @@ const Dashboard = () => {
             }
           `}</style>
 
-          <div className="grid grid-cols-2 gap-4 mt-auto">
-            <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Health Score</p>
-              <p className="text-2xl font-bold text-blue-400">
+          <div className="grid grid-cols-2 gap-3 md:gap-4 mt-auto">
+            <div className="bg-white/5 rounded-xl p-2 md:p-3 flex flex-col">
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Health Score</p>
+              <p className="text-xl md:text-2xl font-bold text-blue-400 leading-tight mt-auto">
                 {claudeHealth ? (
                   <>
                     {Math.round(
@@ -722,9 +723,9 @@ const Dashboard = () => {
                 )}
               </p>
             </div>
-            <div className="bg-white/5 rounded-xl p-3">
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Status</p>
-              <p className="text-2xl font-bold text-purple-400">
+            <div className="bg-white/5 rounded-xl p-2 md:p-3 flex flex-col">
+              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest mb-1">Status</p>
+              <p className="text-xl md:text-2xl font-bold text-purple-400 leading-tight truncate mt-auto">
                 {claudeHealth ? (
                   <>
                     {claudeHealth.issues.length === 0 ? 'OK' : `${claudeHealth.issues.length} Issues`}
@@ -847,9 +848,19 @@ const Dashboard = () => {
                   className="w-full text-left px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors min-h-[50px]"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-white truncate">
-                      {execution.task?.title || `Execution #${execution.id}`}
-                    </span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* 状态图标 */}
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${
+                        execution.status === 'running'
+                          ? 'bg-green-400 animate-pulse'
+                          : execution.status === 'paused'
+                            ? 'bg-yellow-400'
+                            : 'bg-gray-400'
+                      }`} />
+                      <span className="text-xs font-semibold text-white truncate">
+                        {execution.task?.title || `Execution #${execution.id}`}
+                      </span>
+                    </div>
                     <span className={`text-[10px] font-bold uppercase shrink-0 ${
                       execution.status === 'running'
                         ? 'text-blue-400'

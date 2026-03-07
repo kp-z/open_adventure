@@ -62,6 +62,7 @@ FRONTEND_PORT=5173
 DAEMON_MODE=false
 NON_INTERACTIVE=false
 FORCE_RESET=false
+PREVENT_SLEEP=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -70,6 +71,9 @@ for arg in "$@"; do
             ;;
         --reset-all)
             FORCE_RESET=true
+            ;;
+        --no-sleep)
+            PREVENT_SLEEP=true
             ;;
     esac
 done
@@ -85,6 +89,9 @@ if [ "$DAEMON_MODE" = true ]; then
 fi
 if [ "$FORCE_RESET" = true ]; then
     echo "🔄 Running in force reset mode (--reset-all)"
+fi
+if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
+    echo "☕ Preventing system sleep (macOS)"
 fi
 echo ""
 
@@ -421,7 +428,12 @@ if [ "$OS_TYPE" = "linux" ] && command -v setsid &> /dev/null; then
     setsid python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
 else
     # macOS 或不支持 setsid 的系统：直接后台运行
-    python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+    if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
+        # macOS + 防休眠模式：使用 caffeinate 包裹后端进程
+        caffeinate -i python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+    else
+        python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+    fi
 fi
 
 BACKEND_PID=$!
@@ -531,7 +543,12 @@ echo "Starting frontend server..."
 
 if [ "$DAEMON_MODE" = true ]; then
     # 后台模式：前端也在后台运行
-    npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
+    if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
+        # macOS + 防休眠模式：使用 caffeinate 包裹前端进程
+        caffeinate -i npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
+    else
+        npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
+    fi
     FRONTEND_PID=$!
     echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
 
@@ -664,7 +681,12 @@ else
     trap cleanup SIGINT SIGTERM
 
     # 启动前端（前台运行）
-    npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
+    if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
+        # macOS + 防休眠模式：使用 caffeinate 包裹前端进程
+        caffeinate -i npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
+    else
+        npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
+    fi
 
     # 当前端正常退出时，也停止后端
     cleanup
