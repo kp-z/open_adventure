@@ -246,17 +246,25 @@ cd /Users/kp/项目/Proj/open_adventure
 
 为了解决 GLIBC 兼容性问题，必须使用 Docker 在不同的 Linux 版本上构建：
 
-**Linux 兼容版（Ubuntu 22.04 基础）**：
+**Linux 兼容版（Ubuntu 20.04 基础）**：
 ```bash
-# 使用 Docker 在 Ubuntu 22.04 环境中构建（GLIBC 2.35）
+# 使用 Docker 在 Ubuntu 20.04 环境中构建（GLIBC 2.31）
 cd /Users/kp/项目/Proj/open_adventure
 docker run --rm -v "$(pwd):/workspace" -w /workspace \
-  ubuntu:22.04 bash -c "
+  ubuntu:20.04 bash -c "
+    export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
     apt-get install -y python3 python3-venv python3-pip && \
-    ./scripts/build_binary.sh
+    cd /workspace/backend && \
+    python3 -m venv venv && \
+    . venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install pyinstaller && \
+    pyinstaller open_adventure.spec --clean
   "
-# 构建产物：docs/releases/open_adventure-v{版本号}-linux-x86_64-compat.tar.gz
+# 构建产物：backend/dist/open-adventure
+# 需要手动打包为：docs/releases/open_adventure-v{版本号}-linux-x86_64-compat.tar.gz
 ```
 
 **Linux 最新版（Ubuntu 24.04 基础）**：
@@ -265,11 +273,19 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace \
 cd /Users/kp/项目/Proj/open_adventure
 docker run --rm -v "$(pwd):/workspace" -w /workspace \
   ubuntu:24.04 bash -c "
+    export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
     apt-get install -y python3 python3-venv python3-pip && \
-    ./scripts/build_binary.sh
+    cd /workspace/backend && \
+    python3 -m venv venv && \
+    . venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install pyinstaller && \
+    pyinstaller open_adventure.spec --clean
   "
-# 构建产物：docs/releases/open_adventure-v{版本号}-linux-x86_64-latest.tar.gz
+# 构建产物：backend/dist/open-adventure
+# 需要手动打包为：docs/releases/open_adventure-v{版本号}-linux-x86_64-latest.tar.gz
 ```
 
 **二进制构建特点**：
@@ -286,8 +302,9 @@ docker run --rm -v "$(pwd):/workspace" -w /workspace \
 - Linux 最新版：`open_adventure-v{版本号}-linux-x86_64-latest.tar.gz`（适合最新系统）
 
 **GLIBC 兼容性说明**：
-- **兼容版（compat）**：基于 Ubuntu 22.04（GLIBC 2.35），兼容较新的主流 Linux 发行版
-  - Ubuntu 22.04+、Debian 12+、CentOS Stream 9+、Fedora 36+、openSUSE Leap 15.5+
+- **兼容版（compat）**：基于 Ubuntu 20.04（GLIBC 2.31），兼容大部分主流 Linux 发行版
+  - Ubuntu 20.04+、Debian 11+、CentOS Stream 8+、Fedora 32+、openSUSE Leap 15.2+
+  - **注意**：GitHub Actions 使用 Docker 容器构建，runner 为 ubuntu-22.04，但构建环境为 ubuntu:20.04
 - **最新版（latest）**：基于 Ubuntu 24.04（GLIBC 2.38+），仅适合最新系统
   - Ubuntu 24.04+、Debian 13+、Fedora 39+
 
