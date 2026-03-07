@@ -14,6 +14,7 @@ lib/
 lib64/
 # 但允许前端源码中的 lib 目录
 !frontend/src/lib/
+!frontend/src/app/lib/
 parts/
 sdist/
 var/
