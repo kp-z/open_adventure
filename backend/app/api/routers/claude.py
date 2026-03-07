@@ -3,6 +3,8 @@ Claude Sync API Router
 
 提供 Claude 环境同步和健康检查的 API 端点
 """
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Dict, Any

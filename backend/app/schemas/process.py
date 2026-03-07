@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 class ProcessStatus(str, Enum):
     """Process status enumeration."""
+from __future__ import annotations
+
 
     RUNNING = "running"
     IDLE = "idle"

@@ -113,31 +113,39 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
 
     # 获取全部技能并合并 usage（优先本地真实 usage）
     skill_rows = (await db.execute(select(Skill.id, Skill.name, Skill.meta))).all()
-    skill_usage_items = []
     skill_name_to_id = {}
+    skill_name_to_usage = {}  # 用于累加同名 skill 的 usage
 
     for skill_id, skill_name, skill_meta in skill_rows:
-        skill_name_to_id[skill_name] = skill_id
+        # 记录第一个遇到的 skill_id
+        if skill_name not in skill_name_to_id:
+            skill_name_to_id[skill_name] = skill_id
+
+        # 累加 fallback usage（来自数据库 meta）
         fallback_usage = 0
         if isinstance(skill_meta, dict):
             raw = skill_meta.get("usage_count", 0)
             fallback_usage = raw if isinstance(raw, int) else 0
 
-        usage_count = local_skill_usage.get(skill_name, fallback_usage)
-        skill_usage_items.append({
-            "id": skill_id,
+        if skill_name not in skill_name_to_usage:
+            skill_name_to_usage[skill_name] = 0
+        skill_name_to_usage[skill_name] += fallback_usage
+
+    # 合并本地真实 usage（优先级更高，直接覆盖）
+    for skill_name, local_usage in local_skill_usage.items():
+        skill_name_to_usage[skill_name] = local_usage
+        if skill_name not in skill_name_to_id:
+            skill_name_to_id[skill_name] = _stable_virtual_id(1_000_000, skill_name)
+
+    # 构建最终的 skill_usage_items（去重后）
+    skill_usage_items = [
+        {
+            "id": skill_name_to_id[skill_name],
             "name": skill_name,
             "usage_count": usage_count,
-        })
-
-    # 把本地有记录但数据库未同步的 skill 也展示出来
-    for skill_name, usage_count in local_skill_usage.items():
-        if skill_name not in skill_name_to_id:
-            skill_usage_items.append({
-                "id": _stable_virtual_id(1_000_000, skill_name),
-                "name": skill_name,
-                "usage_count": usage_count,
-            })
+        }
+        for skill_name, usage_count in skill_name_to_usage.items()
+    ]
 
     popular_skills_data = sorted(
         skill_usage_items,
@@ -147,31 +155,39 @@ async def get_dashboard_stats(db: AsyncSession = Depends(get_db)):
 
     # 获取全部 agents 并合并 usage（优先本地真实 usage）
     agent_rows = (await db.execute(select(Agent.id, Agent.name, Agent.meta))).all()
-    agent_usage_items = []
     agent_name_to_id = {}
+    agent_name_to_usage = {}  # 用于累加同名 agent 的 usage
 
     for agent_id, agent_name, agent_meta in agent_rows:
-        agent_name_to_id[agent_name] = agent_id
+        # 记录第一个遇到的 agent_id
+        if agent_name not in agent_name_to_id:
+            agent_name_to_id[agent_name] = agent_id
+
+        # 累加 fallback usage（来自数据库 meta）
         fallback_usage = 0
         if isinstance(agent_meta, dict):
             raw = agent_meta.get("usage_count", 0)
             fallback_usage = raw if isinstance(raw, int) else 0
 
-        usage_count = local_agent_usage.get(agent_name, fallback_usage)
-        agent_usage_items.append({
-            "id": agent_id,
+        if agent_name not in agent_name_to_usage:
+            agent_name_to_usage[agent_name] = 0
+        agent_name_to_usage[agent_name] += fallback_usage
+
+    # 合并本地真实 usage（优先级更高，直接覆盖）
+    for agent_name, local_usage in local_agent_usage.items():
+        agent_name_to_usage[agent_name] = local_usage
+        if agent_name not in agent_name_to_id:
+            agent_name_to_id[agent_name] = _stable_virtual_id(2_000_000, agent_name)
+
+    # 构建最终的 agent_usage_items（去重后）
+    agent_usage_items = [
+        {
+            "id": agent_name_to_id[agent_name],
             "name": agent_name,
             "usage_count": usage_count,
-        })
-
-    # 把本地有记录但数据库未同步的 agent type 也展示
-    for agent_name, usage_count in local_agent_usage.items():
-        if agent_name not in agent_name_to_id:
-            agent_usage_items.append({
-                "id": _stable_virtual_id(2_000_000, agent_name),
-                "name": agent_name,
-                "usage_count": usage_count,
-            })
+        }
+        for agent_name, usage_count in agent_name_to_usage.items()
+    ]
 
     popular_agents_data = sorted(
         agent_usage_items,

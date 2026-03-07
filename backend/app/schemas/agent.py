@@ -3,6 +3,8 @@ Agent Schemas - 匹配 Claude Code 官方 Subagent 规范
 
 根据 https://code.claude.com/docs/en/sub-agents 文档定义
 """
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional, Literal
 from pydantic import BaseModel, Field, ConfigDict

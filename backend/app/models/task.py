@@ -1,6 +1,8 @@
 """
 Task and Execution Models
 """
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import String, Integer, JSON, DateTime, ForeignKey, Enum as SQLEnum, Text

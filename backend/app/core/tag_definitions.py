@@ -2,6 +2,8 @@
 标签定义模块
 定义所有可用的标签维度和标签值
 """
+from __future__ import annotations
+
 from typing import Dict, List, Set
 from enum import Enum
 

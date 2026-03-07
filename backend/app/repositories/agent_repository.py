@@ -1,6 +1,8 @@
 """
 Agent Repository - Claude Code Subagent 数据访问层
 """
+from __future__ import annotations
+
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
