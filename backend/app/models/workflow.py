@@ -4,7 +4,7 @@ Workflow Models
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy import String, Boolean, Integer, JSON, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
@@ -47,12 +47,12 @@ class Workflow(Base):
     )
 
     # Relationships
-    nodes: Mapped[list["WorkflowNode"]] = relationship(
+    nodes: Mapped[List["WorkflowNode"]] = relationship(
         "WorkflowNode",
         back_populates="workflow",
         cascade="all, delete-orphan"
     )
-    edges: Mapped[list["WorkflowEdge"]] = relationship(
+    edges: Mapped[List["WorkflowEdge"]] = relationship(
         "WorkflowEdge",
         back_populates="workflow",
         cascade="all, delete-orphan"

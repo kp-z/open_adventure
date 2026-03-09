@@ -4,7 +4,7 @@ Task and Execution Models
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from sqlalchemy import String, Integer, JSON, DateTime, ForeignKey, Enum as SQLEnum, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
@@ -70,7 +70,7 @@ class Task(Base):
     )
 
     # Relationships
-    executions: Mapped[list["Execution"]] = relationship(
+    executions: Mapped[List["Execution"]] = relationship(
         "Execution",
         back_populates="task",
         cascade="all, delete-orphan"
@@ -136,7 +136,7 @@ class Execution(Base):
 
     # Relationships
     task: Mapped["Task"] = relationship("Task", back_populates="executions")
-    node_executions: Mapped[list["NodeExecution"]] = relationship(
+    node_executions: Mapped[List["NodeExecution"]] = relationship(
         "NodeExecution",
         back_populates="execution",
         cascade="all, delete-orphan"

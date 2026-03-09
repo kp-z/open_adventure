@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""修复 Pydantic 模型中的类型注解，使其兼容 Python 3.8"""
+"""修复 Pydantic 模型和 SQLAlchemy 模型中的类型注解，使其兼容 Python 3.8"""
 import re
 from pathlib import Path
 
@@ -15,6 +15,9 @@ files = [
     "app/schemas/process.py",
     "app/schemas/workflow.py",
     "app/api/routers/claude.py",
+    # SQLAlchemy 模型
+    "app/models/workflow.py",
+    "app/models/task.py",
 ]
 
 backend_dir = Path(__file__).parent.parent
