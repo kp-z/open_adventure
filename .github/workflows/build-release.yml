@@ -123,11 +123,16 @@ jobs:
 
               # 安装系统依赖
               apt-get update
-              apt-get install -y python3 python3-venv python3-pip
+              apt-get install -y software-properties-common
 
-              # 创建虚拟环境
+              # 添加 deadsnakes PPA 以安装 Python 3.11
+              add-apt-repository ppa:deadsnakes/ppa -y
+              apt-get update
+              apt-get install -y python3.11 python3.11-venv python3.11-dev
+
+              # 创建虚拟环境（使用 Python 3.11）
               cd /workspace/backend
-              python3 -m venv venv
+              python3.11 -m venv venv
               . venv/bin/activate
 
               # 安装 Python 依赖
