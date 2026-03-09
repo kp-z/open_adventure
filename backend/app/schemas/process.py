@@ -1,16 +1,16 @@
 """Process-related schemas for Claude Code process monitoring."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
 
 class ProcessStatus(str, Enum):
     """Process status enumeration."""
-from __future__ import annotations
-
 
     RUNNING = "running"
     IDLE = "idle"
@@ -58,7 +58,7 @@ class ClaudeProcessInfo(BaseModel):
 class ProcessListResponse(BaseModel):
     """Response for listing processes."""
 
-    processes: list[ClaudeProcessInfo] = Field(default_factory=list)
+    processes: List[ClaudeProcessInfo] = Field(default_factory=list)
     total: int = Field(0, description="Total number of processes")
 
 

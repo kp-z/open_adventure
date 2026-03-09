@@ -457,6 +457,8 @@ gh release create v{版本号} \
 - [ ] 确认 Release Notes 显示正确
 
 #### 2. 验证压缩包
+
+**源码版本测试**：
 ```bash
 # 下载并解压测试
 wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/open-adventure-v{版本号}-macos-arm64.tar.gz
@@ -465,10 +467,33 @@ cd open-adventure
 ./start.sh
 ```
 
+**二进制版本测试**：
+```bash
+# 下载并解压测试
+wget https://github.com/kp-z/open_adventure/releases/download/v{版本号}/open-adventure-v{版本号}-macos-arm64.tar.gz
+tar -xzf open-adventure-v{版本号}-macos-arm64.tar.gz
+cd open-adventure
+
+# 前台运行测试
+./open-adventure
+
+# 后台运行测试（推荐用于服务器）
+./open-adventure --daemon
+
+# 查看后台服务状态
+cat ~/.open_adventure/open_adventure.pid
+tail -f ~/.open_adventure/open_adventure.log
+
+# 停止后台服务
+kill $(cat ~/.open_adventure/open_adventure.pid)
+```
+
 - [ ] 压缩包可以正常解压
 - [ ] 启动脚本可以正常运行
 - [ ] 前端和后端都能正常启动
 - [ ] 核心功能可以正常使用
+- [ ] 二进制版本的 `--daemon` 模式正常工作
+- [ ] 后台服务可以正常停止
 
 #### 3. 更新文档索引
 - [ ] 更新 `docs/README_INDEX.md` 中的 release-notes 部分

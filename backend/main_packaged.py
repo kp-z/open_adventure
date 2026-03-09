@@ -77,6 +77,7 @@ def parse_args():
     parser.add_argument("--port", type=int, default=None, help="服务端口 (默认: 8000)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="监听地址 (默认: 0.0.0.0)")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+    parser.add_argument("-d", "--daemon", action="store_true", help="后台运行模式")
     return parser.parse_args()
 
 
@@ -95,6 +96,77 @@ if __name__ == "__main__":
 
     # 解析命令行参数
     args = parse_args()
+
+    # 后台运行模式
+    if args.daemon:
+        import subprocess
+        import signal
+
+        # 获取当前可执行文件路径
+        exe_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
+
+        # 构建后台运行命令（去掉 --daemon 参数）
+        daemon_args = [exe_path]
+        if args.port:
+            daemon_args.extend(["--port", str(args.port)])
+        if args.host != "0.0.0.0":
+            daemon_args.extend(["--host", args.host])
+        daemon_args.append("--no-browser")  # 后台模式强制不打开浏览器
+
+        # 创建 PID 文件目录
+        user_dir = Path.home() / ".open_adventure"
+        user_dir.mkdir(parents=True, exist_ok=True)
+        pid_file = user_dir / "open_adventure.pid"
+        log_file = user_dir / "open_adventure.log"
+
+        # 检查是否已有进程在运行
+        if pid_file.exists():
+            try:
+                with open(pid_file, 'r') as f:
+                    old_pid = int(f.read().strip())
+                # 检查进程是否存在
+                os.kill(old_pid, 0)
+                print(f"⚠️  Open Adventure 已在运行 (PID: {old_pid})")
+                print(f"如需重启，请先运行: kill {old_pid}")
+                sys.exit(1)
+            except (OSError, ValueError):
+                # 进程不存在，删除旧的 PID 文件
+                pid_file.unlink()
+
+        # 启动后台进程
+        print(f"🚀 启动后台服务...")
+        print(f"📝 日志文件: {log_file}")
+
+        with open(log_file, 'w') as log:
+            process = subprocess.Popen(
+                daemon_args,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True  # 创建新会话，脱离终端
+            )
+
+        # 保存 PID
+        with open(pid_file, 'w') as f:
+            f.write(str(process.pid))
+
+        # 等待服务启动
+        port = args.port or int(os.environ.get("PORT", 8000))
+        print(f"⏳ 等待服务启动...")
+        time.sleep(3)
+
+        # 验证服务是否启动成功
+        try:
+            import urllib.request
+            urllib.request.urlopen(f"http://localhost:{port}/api/system/health", timeout=5)
+            print(f"✅ 服务已启动 (PID: {process.pid})")
+            print(f"🌐 访问地址: http://localhost:{port}/")
+            print(f"\n停止服务: kill {process.pid}")
+            print(f"查看日志: tail -f {log_file}")
+        except Exception as e:
+            print(f"⚠️  服务可能未正常启动，请查看日志: {log_file}")
+            print(f"错误: {e}")
+
+        sys.exit(0)
 
     # 初始化数据库
     init_database()

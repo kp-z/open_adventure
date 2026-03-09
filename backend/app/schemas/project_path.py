@@ -4,7 +4,7 @@ Project Path Schemas
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -42,4 +42,4 @@ class ProjectPathResponse(ProjectPathBase):
 class ProjectPathListResponse(BaseModel):
     """Schema for project path list response"""
     total: int
-    items: list[ProjectPathResponse]
+    items: List[ProjectPathResponse]

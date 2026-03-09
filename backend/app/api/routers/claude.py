@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/claude", tags=["claude"])
 class ClaudeSettingsUpdate(BaseModel):
     """Claude settings.json 更新模型"""
     env: Dict[str, str] | None = None
-    permissions: Dict[str, list[str]] | None = None
+    permissions: Dict[str, List[str]] | None = None
     model: str | None = None
     enabledPlugins: Dict[str, bool] | None = None
     language: str | None = None

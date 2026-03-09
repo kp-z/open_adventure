@@ -4,7 +4,7 @@ Skill Schemas
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.skill import SkillSource
@@ -16,7 +16,7 @@ class SkillBase(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=200)
     type: str = Field(..., min_length=1, max_length=50)
     description: str = Field(..., min_length=1, max_length=2000)
-    tags: list[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     source: SkillSource = Field(default=SkillSource.GLOBAL)
     enabled: bool = Field(default=True)
     meta: Optional[dict] = Field(default=None, description="元数据，project scope 需包含 project_path")
@@ -24,8 +24,8 @@ class SkillBase(BaseModel):
 
 class SkillCreate(SkillBase):
     """Schema for creating a skill"""
-    references: Optional[dict[str, str]] = Field(default=None, description="Reference files (filename: content)")
-    scripts: Optional[dict[str, str]] = Field(default=None, description="Script files (filename: content)")
+    references: Optional[Dict[str, str]] = Field(default=None, description="Reference files (filename: content)")
+    scripts: Optional[Dict[str, str]] = Field(default=None, description="Script files (filename: content)")
     scope: Literal["user", "project"] = Field("user", description="创建位置：user 或 project")
 
 
@@ -35,7 +35,7 @@ class SkillUpdate(BaseModel):
     full_name: Optional[str] = Field(None, min_length=1, max_length=200)
     type: Optional[str] = Field(None, min_length=1, max_length=50)
     description: Optional[str] = Field(None, min_length=1, max_length=2000)
-    tags: Optional[list[str]] = None
+    tags: Optional[List[str]] = None
     source: Optional[SkillSource] = None
     enabled: Optional[bool] = None
     meta: Optional[dict] = None
@@ -64,4 +64,4 @@ class SkillResponse(SkillBase):
 class SkillListResponse(BaseModel):
     """Schema for skill list response"""
     total: int
-    items: list[SkillResponse]
+    items: List[SkillResponse]

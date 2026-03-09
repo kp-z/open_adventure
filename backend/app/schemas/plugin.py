@@ -4,7 +4,7 @@ Plugin Schemas
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.plugin import PluginStatus
@@ -55,4 +55,4 @@ class PluginResponse(PluginBase):
 class PluginListResponse(BaseModel):
     """Schema for plugin list response"""
     total: int
-    items: list[PluginResponse]
+    items: List[PluginResponse]

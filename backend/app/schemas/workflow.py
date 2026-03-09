@@ -4,7 +4,7 @@ Workflow Schemas
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.workflow import WorkflowNodeType
@@ -15,8 +15,8 @@ class WorkflowNodeBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     type: WorkflowNodeType
     agent_team_id: Optional[int] = None
-    preferred_agent_ids: list[int] = Field(default_factory=list)
-    capability_filter_ids: list[int] = Field(default_factory=list)
+    preferred_agent_ids: List[int] = Field(default_factory=list)
+    capability_filter_ids: List[int] = Field(default_factory=list)
     config: Optional[dict] = None
     position_x: Optional[int] = None
     position_y: Optional[int] = None
@@ -66,8 +66,8 @@ class WorkflowBase(BaseModel):
 
 class WorkflowCreate(WorkflowBase):
     """Schema for creating a workflow"""
-    nodes: list[WorkflowNodeCreate] = Field(default_factory=list)
-    edges: list[WorkflowEdgeCreate] = Field(default_factory=list)
+    nodes: List[WorkflowNodeCreate] = Field(default_factory=list)
+    edges: List[WorkflowEdgeCreate] = Field(default_factory=list)
 
 
 class WorkflowUpdate(BaseModel):
@@ -82,8 +82,8 @@ class WorkflowUpdate(BaseModel):
 class WorkflowResponse(WorkflowBase):
     """Schema for workflow response"""
     id: int
-    nodes: list[WorkflowNodeResponse] = Field(default_factory=list)
-    edges: list[WorkflowEdgeResponse] = Field(default_factory=list)
+    nodes: List[WorkflowNodeResponse] = Field(default_factory=list)
+    edges: List[WorkflowEdgeResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -93,7 +93,7 @@ class WorkflowResponse(WorkflowBase):
 class WorkflowListResponse(BaseModel):
     """Schema for workflow list response"""
     total: int
-    items: list[WorkflowResponse]
+    items: List[WorkflowResponse]
 
 
 class WorkflowTemplateBase(BaseModel):
@@ -131,4 +131,4 @@ class WorkflowTemplateResponse(WorkflowTemplateBase):
 class WorkflowTemplateListResponse(BaseModel):
     """Schema for workflow template list response"""
     total: int
-    items: list[WorkflowTemplateResponse]
+    items: List[WorkflowTemplateResponse]

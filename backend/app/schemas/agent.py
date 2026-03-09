@@ -6,7 +6,7 @@ Agent Schemas - 匹配 Claude Code 官方 Subagent 规范
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Literal
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -19,20 +19,20 @@ class AgentHook(BaseModel):
 class AgentHookMatcher(BaseModel):
     """子代理钩子匹配器"""
     matcher: Optional[str] = Field(None, description="工具名称匹配模式")
-    hooks: list[AgentHook] = Field(default_factory=list)
+    hooks: List[AgentHook] = Field(default_factory=list)
 
 
 class AgentHooks(BaseModel):
     """子代理钩子配置"""
-    PreToolUse: Optional[list[AgentHookMatcher]] = Field(None, description="工具使用前钩子")
-    PostToolUse: Optional[list[AgentHookMatcher]] = Field(None, description="工具使用后钩子")
-    Stop: Optional[list[AgentHookMatcher]] = Field(None, description="停止时钩子")
+    PreToolUse: Optional[List[AgentHookMatcher]] = Field(None, description="工具使用前钩子")
+    PostToolUse: Optional[List[AgentHookMatcher]] = Field(None, description="工具使用后钩子")
+    Stop: Optional[List[AgentHookMatcher]] = Field(None, description="停止时钩子")
 
 
 class AgentOverrideInfo(BaseModel):
     """子代理覆盖信息"""
     count: int = Field(..., description="同名 agent 数量")
-    scopes: list[str] = Field(default_factory=list, description="所有同名 agent 的作用域")
+    scopes: List[str] = Field(default_factory=list, description="所有同名 agent 的作用域")
     active_scope: str = Field(..., description="当前激活的作用域")
 
 
@@ -57,11 +57,11 @@ class AgentBase(BaseModel):
     )
 
     # 工具控制
-    tools: list[str] = Field(
+    tools: List[str] = Field(
         default_factory=list,
         description="允许使用的工具列表，为空则继承所有"
     )
-    disallowed_tools: list[str] = Field(
+    disallowed_tools: List[str] = Field(
         default_factory=list,
         description="禁止使用的工具列表"
     )
@@ -74,7 +74,7 @@ class AgentBase(BaseModel):
 
     # 高级配置
     max_turns: Optional[int] = Field(None, description="最大轮次限制")
-    skills: list[str] = Field(default_factory=list, description="预加载的技能列表")
+    skills: List[str] = Field(default_factory=list, description="预加载的技能列表")
     mcp_servers: list = Field(default_factory=list, description="MCP 服务器配置")
     hooks: Optional[dict] = Field(None, description="生命周期钩子")
     memory: Optional[str] = Field(None, description="持久化内存作用域：user, project, local")
@@ -108,11 +108,11 @@ class AgentCreate(BaseModel):
     description: str = Field(..., min_length=1, max_length=100000)
     system_prompt: Optional[str] = Field(None, max_length=100000)
     model: Optional[str] = Field("inherit", max_length=50)
-    tools: list[str] = Field(default_factory=list)
-    disallowed_tools: list[str] = Field(default_factory=list)
+    tools: List[str] = Field(default_factory=list)
+    disallowed_tools: List[str] = Field(default_factory=list)
     permission_mode: Optional[str] = Field("default")
     max_turns: Optional[int] = Field(None)
-    skills: list[str] = Field(default_factory=list)
+    skills: List[str] = Field(default_factory=list)
     mcp_servers: list = Field(default_factory=list)
     hooks: Optional[dict] = Field(None)
     memory: Optional[str] = Field(None)
@@ -128,11 +128,11 @@ class AgentUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=100000)
     system_prompt: Optional[str] = Field(None, max_length=100000)
     model: Optional[str] = Field(None, max_length=50)
-    tools: Optional[list[str]] = None
-    disallowed_tools: Optional[list[str]] = None
+    tools: Optional[List[str]] = None
+    disallowed_tools: Optional[List[str]] = None
     permission_mode: Optional[str] = None
     max_turns: Optional[int] = None
-    skills: Optional[list[str]] = None
+    skills: Optional[List[str]] = None
     mcp_servers: Optional[list] = None
     hooks: Optional[dict] = None
     memory: Optional[str] = None
@@ -153,7 +153,7 @@ class AgentResponse(AgentBase):
 class AgentListResponse(BaseModel):
     """子代理列表响应 Schema"""
     total: int
-    items: list[AgentResponse]
+    items: List[AgentResponse]
     builtin_count: int = Field(0, description="内置子代理数量")
     user_count: int = Field(0, description="用户级子代理数量")
     project_count: int = Field(0, description="项目级子代理数量")
@@ -172,7 +172,7 @@ class AgentSyncResponse(BaseModel):
     created: int = Field(0, description="新创建的数量")
     updated: int = Field(0, description="更新的数量")
     deleted: int = Field(0, description="删除的数量")
-    errors: list[str] = Field(default_factory=list, description="错误信息")
+    errors: List[str] = Field(default_factory=list, description="错误信息")
 
 
 class AgentGenerateRequest(BaseModel):
@@ -196,7 +196,7 @@ class AgentGenerateResponse(BaseModel):
     description: str
     system_prompt: str
     model: str
-    tools: list[str]
+    tools: List[str]
     suggested_filename: str
     preview_content: str = Field(..., description="完整的 Markdown 文件预览内容")
 

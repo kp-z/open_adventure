@@ -4,7 +4,7 @@ AgentTeam Schemas
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -19,8 +19,8 @@ class AgentTeamBase(BaseModel):
     """Base agent team schema"""
     name: str = Field(..., min_length=1, max_length=100)
     description: str = Field(..., min_length=1, max_length=500)
-    members: list[AgentTeamMember] = Field(default_factory=list)
-    tags: list[str] = Field(default_factory=list)
+    members: List[AgentTeamMember] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list)
     meta: Optional[dict] = Field(default=None)
 
 
@@ -33,8 +33,8 @@ class AgentTeamUpdate(BaseModel):
     """Schema for updating an agent team"""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, min_length=1, max_length=500)
-    members: Optional[list[AgentTeamMember]] = None
-    tags: Optional[list[str]] = None
+    members: Optional[List[AgentTeamMember]] = None
+    tags: Optional[List[str]] = None
     meta: Optional[dict] = None
 
 
@@ -50,4 +50,4 @@ class AgentTeamResponse(AgentTeamBase):
 class AgentTeamListResponse(BaseModel):
     """Schema for agent team list response"""
     total: int
-    items: list[AgentTeamResponse]
+    items: List[AgentTeamResponse]

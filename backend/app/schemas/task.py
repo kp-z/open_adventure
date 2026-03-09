@@ -4,7 +4,7 @@ Task Schemas
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.task import TaskStatus, ExecutionStatus
@@ -49,7 +49,7 @@ class TaskResponse(TaskBase):
 class TaskListResponse(BaseModel):
     """Schema for task list response"""
     total: int
-    items: list[TaskResponse]
+    items: List[TaskResponse]
 
 
 class NodeExecutionBase(BaseModel):
@@ -86,7 +86,7 @@ class ExecutionResponse(ExecutionBase):
     """Schema for execution response"""
     id: int
     task_id: int
-    node_executions: list[NodeExecutionResponse] = Field(default_factory=list)
+    node_executions: List[NodeExecutionResponse] = Field(default_factory=list)
     created_at: datetime
     finished_at: Optional[datetime] = None
 
@@ -96,4 +96,4 @@ class ExecutionResponse(ExecutionBase):
 class ExecutionListResponse(BaseModel):
     """Schema for execution list response"""
     total: int
-    items: list[ExecutionResponse]
+    items: List[ExecutionResponse]
