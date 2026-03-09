@@ -123,12 +123,15 @@ jobs:
 
               # 安装系统依赖
               apt-get update
-              apt-get install -y software-properties-common
+              apt-get install -y software-properties-common gpg-agent
 
               # 添加 deadsnakes PPA 以安装 Python 3.11
               add-apt-repository ppa:deadsnakes/ppa -y
               apt-get update
-              apt-get install -y python3.11 python3.11-venv python3.11-dev
+              apt-get install -y python3.11 python3.11-venv python3.11-distutils
+
+              # 安装 pip
+              curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11
 
               # 创建虚拟环境（使用 Python 3.11）
               cd /workspace/backend
