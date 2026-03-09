@@ -10,28 +10,33 @@
 
 ## 🔴 严重问题修复
 
-### Pydantic 模型类型注解兼容性问题
-- **问题描述**: v1.3.3 虽然添加了 `from __future__ import annotations`，但 Pydantic 模型在 Python 3.8 环境下仍然报错 `TypeError: Unable to evaluate type annotation 'list[str]'`
+### Pydantic 和 SQLAlchemy 模型类型注解兼容性问题
+- **问题描述**: v1.3.3 虽然添加了 `from __future__ import annotations`，但 Pydantic 和 SQLAlchemy 模型在 Python 3.8 环境下仍然报错
+  - Pydantic: `TypeError: Unable to evaluate type annotation 'list[str]'`
+  - SQLAlchemy: `MappedAnnotationError: Could not interpret annotation Mapped[list['WorkflowNode']]`
 - **根本原因**:
   - `from __future__ import annotations` 只能延迟类型注解的解析
-  - 但 Pydantic 需要在运行时真正解析类型注解来构建验证逻辑
-  - 在 Python 3.8 环境下，`list[str]` 语法根本不存在，Pydantic 的 `get_model_type_hints()` 会失败
-- **修复方案**: 将所有 Pydantic 模型中的新式类型注解改为旧式类型
+  - 但 Pydantic 和 SQLAlchemy 需要在运行时真正解析类型注解来构建验证逻辑和 ORM 映射
+  - 在 Python 3.8 环境下，`list[str]` 语法根本不存在，解析会失败
+- **修复方案**: 将所有 Pydantic 和 SQLAlchemy 模型中的新式类型注解改为旧式类型
   - `list[str]` → `typing.List[str]`
   - `dict[str, Any]` → `typing.Dict[str, Any]`
-  - `tuple[...]` → `typing.Tuple[...]`
-  - `set[...]` → `typing.Set[...]`
-- **影响范围**: 修复了 10 个 Pydantic 模型文件：
-  - `app/config/settings.py` (BaseSettings)
-  - `app/schemas/skill.py`
-  - `app/schemas/task.py`
-  - `app/schemas/project_path.py`
-  - `app/schemas/agent_team.py`
-  - `app/schemas/agent.py`
-  - `app/schemas/plugin.py`
-  - `app/schemas/process.py`
-  - `app/schemas/workflow.py`
-  - `app/api/routers/claude.py`
+  - `Mapped[list[...]]` → `Mapped[List[...]]`
+- **影响范围**: 修复了 12 个模型文件：
+  - **Pydantic 模型** (10 个):
+    - `app/config/settings.py` (BaseSettings)
+    - `app/schemas/skill.py`
+    - `app/schemas/task.py`
+    - `app/schemas/project_path.py`
+    - `app/schemas/agent_team.py`
+    - `app/schemas/agent.py`
+    - `app/schemas/plugin.py`
+    - `app/schemas/process.py`
+    - `app/schemas/workflow.py`
+    - `app/api/routers/claude.py`
+  - **SQLAlchemy 模型** (2 个):
+    - `app/models/workflow.py`
+    - `app/models/task.py`
 
 ---
 
@@ -47,30 +52,38 @@
 
 ### 为什么 v1.3.3 的修复不够？
 
-v1.3.3 添加了 `from __future__ import annotations`，这对普通函数和类是有效的，但对 Pydantic 模型不够：
+v1.3.3 添加了 `from __future__ import annotations`，这对普通函数和类是有效的，但对 Pydantic 和 SQLAlchemy 模型不够：
 
 ```python
-# ❌ v1.3.3 的方案 - 对 Pydantic 无效
+# ❌ v1.3.3 的方案 - 对 Pydantic 和 SQLAlchemy 无效
 from __future__ import annotations
 from pydantic import BaseModel
+from sqlalchemy.orm import Mapped
 
 class MyModel(BaseModel):
     items: list[str]  # Python 3.8 仍然会报错！
+
+class MyTable(Base):
+    items: Mapped[list["Item"]]  # Python 3.8 仍然会报错！
 
 # ✅ v1.3.4 的方案 - 正确
 from __future__ import annotations
 from typing import List
 from pydantic import BaseModel
+from sqlalchemy.orm import Mapped
 
 class MyModel(BaseModel):
     items: List[str]  # 兼容 Python 3.8+
+
+class MyTable(Base):
+    items: Mapped[List["Item"]]  # 兼容 Python 3.8+
 ```
 
 ### Python 版本兼容性
 - **支持版本**: Python 3.8+
 - **推荐版本**: Python 3.10+
 - **技术细节**:
-  - Pydantic 在运行时需要真正解析类型注解
+  - Pydantic 和 SQLAlchemy 在运行时需要真正解析类型注解
   - `from __future__ import annotations` 只是延迟解析，不能让 Python 3.8 理解 3.9+ 的语法
   - 必须使用 `typing` 模块的类型才能真正兼容
 
@@ -165,7 +178,7 @@ kill $(cat ~/.open_adventure/open_adventure.pid)
 
 ## 📊 版本统计
 
-- **修复文件数**: 10 个 Pydantic 模型
+- **修复文件数**: 12 个模型文件（10 个 Pydantic + 2 个 SQLAlchemy）
 - **新增脚本**: 1 个
 - **新增文档**: 2 个
 - **支持 Python 版本**: 3.8+
