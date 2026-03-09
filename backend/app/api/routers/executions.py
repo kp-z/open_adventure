@@ -1,7 +1,9 @@
 """
 执行相关 API 路由
 """
-from typing import List
+from __future__ import annotations
+
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -95,9 +97,9 @@ async def get_execution_nodes(
 async def list_executions(
     skip: int = 0,
     limit: int = 20,
-    task_id: int | None = None,
-    workflow_id: int | None = None,
-    execution_type: ExecutionType | None = None,
+    task_id: Optional[int] = None,
+    workflow_id: Optional[int] = None,
+    execution_type: Optional[ExecutionType] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """

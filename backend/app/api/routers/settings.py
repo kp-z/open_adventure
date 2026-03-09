@@ -2,9 +2,11 @@
 Settings API Router
 配置管理 API 端点
 """
+from __future__ import annotations
+
 import json
 from fastapi import APIRouter, HTTPException, status, Body
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, HttpUrl
 from app.services.settings_service import SettingsService, ConfigValidationError
 from app.services.marketplace_config_service import MarketplaceConfigService
@@ -27,7 +29,7 @@ class MarketplaceRepoResponse(BaseModel):
     git_repo_url: str
     branch: str
     auto_update: bool
-    last_sync_time: str | None = None
+    last_sync_time: Optional[str] = None
 
 
 @router.get("", response_model=Dict[str, Any])

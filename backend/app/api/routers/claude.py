@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,18 +24,18 @@ router = APIRouter(prefix="/claude", tags=["claude"])
 
 class ClaudeSettingsUpdate(BaseModel):
     """Claude settings.json 更新模型"""
-    env: Dict[str, str] | None = None
-    permissions: Dict[str, List[str]] | None = None
-    model: str | None = None
-    enabledPlugins: Dict[str, bool] | None = None
-    language: str | None = None
-    effortLevel: str | None = None
+    env: Optional[Dict[str, str]] = None
+    permissions: Optional[Dict[str, List[str]]] = None
+    model: Optional[str] = None
+    enabledPlugins: Optional[Dict[str, bool]] = None
+    language: Optional[str] = None
+    effortLevel: Optional[str] = None
 
 
 class PromptOptimizeRequest(BaseModel):
     """Prompt 优化请求模型"""
     prompt: str
-    context: str | None = None
+    context: Optional[str] = None
     mode: str = "rule"  # "ai" 或 "rule"，默认使用规则模式
 
 
@@ -46,7 +46,7 @@ class PromptOptimizeResponse(BaseModel):
     analysis: str
     mode: str  # 使用的模式：ai 或 rule
     success: bool
-    error: str | None = None
+    error: Optional[str] = None
 
 
 @router.post("/sync")

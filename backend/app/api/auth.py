@@ -1,8 +1,10 @@
 """
 Authentication API endpoints
 """
+from __future__ import annotations
+
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -31,21 +33,21 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
-    username: str | None = None
+    username: Optional[str] = None
 
 
 class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    full_name: str | None = None
+    full_name: Optional[str] = None
 
 
 class UserResponse(BaseModel):
     id: int
     username: str
     email: str
-    full_name: str | None
+    full_name: Optional[str]
     is_active: bool
     is_superuser: bool
 
@@ -54,9 +56,9 @@ class UserResponse(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    email: str | None = None
-    full_name: str | None = None
-    password: str | None = None
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = None
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
