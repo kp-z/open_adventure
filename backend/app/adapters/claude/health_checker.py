@@ -67,6 +67,7 @@ class ClaudeHealthChecker:
             # 映射模型别名到完整模型名
             model_map = {
                 "opus": "claude-opus-4-6",
+                "opus[1m]": "claude-opus-4-6",  # 使用相同的模型名进行检测
                 "sonnet": "claude-sonnet-4-6",
                 "haiku": "claude-haiku-4-6",
                 "haiku-3.5": "claude-3-5-haiku-20241022",
@@ -173,7 +174,7 @@ class ClaudeHealthChecker:
                 logger.error(f"Failed to read settings.json: {e}")
                 model_info["model_source"] = "default"
 
-        # 2. 定义所有模型
+        # 2. 定义所有模型（包括上下文变体）
         models = [
             {
                 "alias": "haiku",
@@ -189,6 +190,11 @@ class ClaudeHealthChecker:
                 "alias": "opus",
                 "full_name": "claude-opus-4-6",
                 "description": "Most capable model"
+            },
+            {
+                "alias": "opus[1m]",
+                "full_name": "claude-opus-4-6[1m]",
+                "description": "Opus with 1M context"
             },
             {
                 "alias": "haiku-3.5",

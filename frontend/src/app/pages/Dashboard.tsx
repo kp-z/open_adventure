@@ -194,6 +194,35 @@ const Dashboard = () => {
     }
   };
 
+  const handleModelSwitch = async (modelAlias: string, isAvailable: boolean, isCurrent: boolean) => {
+    // 如果是当前模型或不可用，不执行切换
+    if (isCurrent || !isAvailable) {
+      return;
+    }
+
+    try {
+      // 调用 API 更新配置
+      await claudeApi.updateSettings({ model: modelAlias });
+
+      // 显示成功通知
+      addNotification({
+        type: 'success',
+        title: '模型切换成功',
+        message: `已切换到 ${modelAlias}`,
+      });
+
+      // 刷新健康状态以获取新的当前模型
+      await fetchClaudeHealth();
+    } catch (error) {
+      // 显示错误通知
+      addNotification({
+        type: 'error',
+        title: '模型切换失败',
+        message: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
@@ -444,36 +473,58 @@ const Dashboard = () => {
                   // 构建气泡列表：优先显示当前模型，然后是可用模型，最后是不可用模型
                   const bubbleConfigs = [];
 
-                  // 1. 如果当前模型不在 available_models 中，添加它（蓝色）
+                  // 辅助函数：检查模型名称是否精确匹配
+                  const isExactMatch = (modelName: string, targetName: string) => {
+                    return modelName.toLowerCase() === targetName.toLowerCase();
+                  };
+
+                  // 辅助函数：检查模型名称是否是基础匹配（去掉后缀）
+                  const isBaseMatch = (modelName: string, targetName: string) => {
+                    const cleanModelName = modelName.toLowerCase().replace(/\[.*?\]/g, '').trim();
+                    const cleanTargetName = targetName.toLowerCase().replace(/\[.*?\]/g, '').trim();
+                    return cleanModelName === cleanTargetName;
+                  };
+
+                  // 1. 始终优先添加当前模型（使用原始名称显示）
                   if (currentModel) {
+                    // 检查当前模型是否在 available_models 中（精确匹配）
                     const currentModelInList = availableModels.find(m =>
-                      m.alias.toLowerCase() === currentModel.toLowerCase() ||
-                      m.full_name.toLowerCase() === currentModel.toLowerCase()
+                      isExactMatch(currentModel, m.alias) ||
+                      isExactMatch(currentModel, m.full_name)
                     );
 
-                    if (!currentModelInList) {
-                      bubbleConfigs.push({
-                        name: currentModel,
-                        alias: currentModel,
-                        available: true,
-                        isCurrent: true
-                      });
-                    }
+                    // 如果没有精确匹配，尝试基础匹配（用于获取 alias）
+                    const baseMatchModel = !currentModelInList ? availableModels.find(m =>
+                      isBaseMatch(currentModel, m.alias) ||
+                      isBaseMatch(currentModel, m.full_name)
+                    ) : null;
+
+                    // 始终添加当前模型，使用原始名称
+                    bubbleConfigs.push({
+                      name: currentModel,  // 使用原始名称（如 opus[1m]）
+                      alias: currentModelInList?.alias || baseMatchModel?.alias || currentModel,  // 用于切换的 alias
+                      available: currentModelInList?.available ?? true,  // 如果在列表中，使用列表的 available 状态
+                      isCurrent: true
+                    });
                   }
 
-                  // 2. 添加所有 available_models
+                  // 2. 添加所有非当前的 available_models
                   availableModels.forEach(model => {
+                    // 只进行精确匹配，不同后缀的模型视为不同模型
                     const isCurrent = currentModel && (
-                      model.alias.toLowerCase() === currentModel.toLowerCase() ||
-                      model.full_name.toLowerCase() === currentModel.toLowerCase()
+                      isExactMatch(currentModel, model.alias) ||
+                      isExactMatch(currentModel, model.full_name)
                     );
 
-                    bubbleConfigs.push({
-                      name: model.alias,
-                      alias: model.alias,
-                      available: model.available,
-                      isCurrent: isCurrent
-                    });
+                    // 跳过当前模型（已经在步骤1中添加）
+                    if (!isCurrent) {
+                      bubbleConfigs.push({
+                        name: model.alias,
+                        alias: model.alias,
+                        available: model.available,
+                        isCurrent: false
+                      });
+                    }
                   });
 
                   // 限制最多显示8个气泡
@@ -487,7 +538,7 @@ const Dashboard = () => {
                     return (
                       <div
                         key={bubble.name}
-                        className="absolute group cursor-pointer"
+                        className={`absolute group ${isAvailable && !isCurrentModel ? 'cursor-pointer' : 'cursor-default'}`}
                         style={{
                           top: position.top,
                           left: position.left,
@@ -497,7 +548,13 @@ const Dashboard = () => {
                           animationDelay: `${index * 0.3}s`
                         }}
                         title={bubble.name}
-                        onClick={() => setHoveredModel(hoveredModel === bubble.name ? null : bubble.name)}
+                        onClick={() => {
+                          if (isAvailable && !isCurrentModel) {
+                            handleModelSwitch(bubble.alias, isAvailable, isCurrentModel);
+                          } else {
+                            setHoveredModel(hoveredModel === bubble.name ? null : bubble.name);
+                          }
+                        }}
                       >
                         {/* 当前模型：蓝色高亮 */}
                         {isCurrentModel && tokenUsage ? (
@@ -584,7 +641,10 @@ const Dashboard = () => {
                             {hoveredModel === bubble.name && (
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                                 <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
-                                  <div className="font-bold mb-1">{bubble.name}</div>
+                                  <div className="font-bold mb-1 flex items-center gap-1">
+                                    {bubble.name}
+                                    <span className="text-green-400 text-[7px]">Click to switch</span>
+                                  </div>
                                   <div className="text-gray-300 mb-1.5 text-[7px]">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000</div>
                                   <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                     <div
@@ -602,23 +662,39 @@ const Dashboard = () => {
                           </>
                         ) : (
                           /* 不可用的模型：灰色 */
-                          <div
-                            className={`
-                              w-full h-full rounded-full relative
-                              transition-all duration-300
-                              backdrop-blur-[2px]
-                              border
-                              active:scale-110
-                              bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15
-                            `}
-                          >
-                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <span className="text-[7px] font-medium text-center leading-tight px-0.5 text-gray-400">
-                                {bubble.name}
-                              </span>
+                          <>
+                            <div
+                              className={`
+                                w-full h-full rounded-full relative
+                                transition-all duration-300
+                                backdrop-blur-[2px]
+                                border
+                                active:scale-110
+                                bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15
+                              `}
+                            >
+                              <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-[7px] font-medium text-center leading-tight px-0.5 text-gray-400">
+                                  {bubble.name}
+                                </span>
+                              </div>
                             </div>
-                          </div>
+
+                            {hoveredModel === bubble.name && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                                <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
+                                  <div className="font-bold mb-1 flex items-center gap-1">
+                                    {bubble.name}
+                                    <span className="text-gray-400 text-[7px]">Not available</span>
+                                  </div>
+                                </div>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                                  <div className="w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-black/90" />
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     );
@@ -653,36 +729,58 @@ const Dashboard = () => {
                 // 构建气泡列表：优先显示当前模型，然后是可用模型，最后是不可用模型
                 const bubbleConfigs = [];
 
-                // 1. 如果当前模型不在 available_models 中，添加它（蓝色）
+                // 辅助函数：检查模型名称是否精确匹配
+                const isExactMatch = (modelName: string, targetName: string) => {
+                  return modelName.toLowerCase() === targetName.toLowerCase();
+                };
+
+                // 辅助函数：检查模型名称是否是基础匹配（去掉后缀）
+                const isBaseMatch = (modelName: string, targetName: string) => {
+                  const cleanModelName = modelName.toLowerCase().replace(/\[.*?\]/g, '').trim();
+                  const cleanTargetName = targetName.toLowerCase().replace(/\[.*?\]/g, '').trim();
+                  return cleanModelName === cleanTargetName;
+                };
+
+                // 1. 始终优先添加当前模型（使用原始名称显示）
                 if (currentModel) {
+                  // 检查当前模型是否在 available_models 中（精确匹配）
                   const currentModelInList = availableModels.find(m =>
-                    m.alias.toLowerCase() === currentModel.toLowerCase() ||
-                    m.full_name.toLowerCase() === currentModel.toLowerCase()
+                    isExactMatch(currentModel, m.alias) ||
+                    isExactMatch(currentModel, m.full_name)
                   );
 
-                  if (!currentModelInList) {
-                    bubbleConfigs.push({
-                      name: currentModel,
-                      alias: currentModel,
-                      available: true,
-                      isCurrent: true
-                    });
-                  }
+                  // 如果没有精确匹配，尝试基础匹配（用于获取 alias）
+                  const baseMatchModel = !currentModelInList ? availableModels.find(m =>
+                    isBaseMatch(currentModel, m.alias) ||
+                    isBaseMatch(currentModel, m.full_name)
+                  ) : null;
+
+                  // 始终添加当前模型，使用原始名称
+                  bubbleConfigs.push({
+                    name: currentModel,  // 使用原始名称（如 opus[1m]）
+                    alias: currentModelInList?.alias || baseMatchModel?.alias || currentModel,  // 用于切换的 alias
+                    available: currentModelInList?.available ?? true,  // 如果在列表中，使用列表的 available 状态
+                    isCurrent: true
+                  });
                 }
 
-                // 2. 添加所有 available_models
+                // 2. 添加所有非当前的 available_models
                 availableModels.forEach(model => {
+                  // 只进行精确匹配，不同后缀的模型视为不同模型
                   const isCurrent = currentModel && (
-                    model.alias.toLowerCase() === currentModel.toLowerCase() ||
-                    model.full_name.toLowerCase() === currentModel.toLowerCase()
+                    isExactMatch(currentModel, model.alias) ||
+                    isExactMatch(currentModel, model.full_name)
                   );
 
-                  bubbleConfigs.push({
-                    name: model.alias,
-                    alias: model.alias,
-                    available: model.available,
-                    isCurrent: isCurrent
-                  });
+                  // 跳过当前模型（已经在步骤1中添加）
+                  if (!isCurrent) {
+                    bubbleConfigs.push({
+                      name: model.alias,
+                      alias: model.alias,
+                      available: model.available,
+                      isCurrent: false
+                    });
+                  }
                 });
 
                 // 限制最多显示8个气泡
@@ -696,7 +794,7 @@ const Dashboard = () => {
                   return (
                     <div
                       key={bubble.name}
-                      className="absolute group cursor-pointer"
+                      className={`absolute group ${isAvailable && !isCurrentModel ? 'cursor-pointer' : 'cursor-default'}`}
                       style={{
                         top: position.top,
                         left: position.left,
@@ -706,6 +804,7 @@ const Dashboard = () => {
                         animationDelay: `${index * 0.3}s`
                       }}
                       title={bubble.name}
+                      onClick={() => handleModelSwitch(bubble.alias, isAvailable, isCurrentModel)}
                       onMouseEnter={() => setHoveredModel(bubble.name)}
                       onMouseLeave={() => setHoveredModel(null)}
                     >
@@ -790,7 +889,10 @@ const Dashboard = () => {
                           {hoveredModel === bubble.name && (
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                               <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
-                                <div className="font-bold mb-1">{bubble.name}</div>
+                                <div className="font-bold mb-1 flex items-center gap-1.5">
+                                  {bubble.name}
+                                  <span className="text-green-400 text-[8px]">Click to switch</span>
+                                </div>
                                 <div className="text-gray-300 mb-2">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000 tokens</div>
                                 <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
                                   <div
@@ -808,24 +910,40 @@ const Dashboard = () => {
                         </>
                       ) : (
                         /* 不可用的模型：灰色 */
-                        <div
-                          className={`
-                            w-full h-full rounded-full relative
-                            transition-all duration-300
-                            backdrop-blur-[2px]
-                            border
-                            hover:scale-110
-                            bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]
-                          `}
-                        >
-                          <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
-                          <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-[8px] font-medium text-center leading-tight px-1 text-gray-400">
-                              {bubble.name}
-                            </span>
+                        <>
+                          <div
+                            className={`
+                              w-full h-full rounded-full relative
+                              transition-all duration-300
+                              backdrop-blur-[2px]
+                              border
+                              hover:scale-110
+                              bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]
+                            `}
+                          >
+                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
+                            <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <span className="text-[8px] font-medium text-center leading-tight px-1 text-gray-400">
+                                {bubble.name}
+                              </span>
+                            </div>
                           </div>
-                        </div>
+
+                          {hoveredModel === bubble.name && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                              <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
+                                <div className="font-bold mb-1 flex items-center gap-1.5">
+                                  {bubble.name}
+                                  <span className="text-gray-400 text-[8px]">Not available</span>
+                                </div>
+                              </div>
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/90" />
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   );

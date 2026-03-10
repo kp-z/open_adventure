@@ -1105,6 +1105,7 @@ async def get_claude_status(session_id: str):
             "session_exists": False,
             "process_alive": False,
             "claude_resume_session": None,
+            "initial_dir": None,
         })
 
     session = sessions[session_id]
@@ -1115,6 +1116,7 @@ async def get_claude_status(session_id: str):
         "session_exists": True,
         "process_alive": session.is_process_alive(),
         "claude_resume_session": session.claude_resume_session if hasattr(session, 'claude_resume_session') else None,
+        "initial_dir": session.initial_dir,
     })
 
 

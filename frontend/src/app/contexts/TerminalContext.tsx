@@ -97,6 +97,14 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const restoreActiveSetRef = useRef(false);
   const queueOverflowNotifyRef = useRef<Record<string, number>>({});
 
+  const getTerminalTitle = (projectPath?: string): string => {
+    if (projectPath) {
+      const pathParts = projectPath.split('/').filter((p) => p);
+      return pathParts[pathParts.length - 1] || `Terminal ${terminalCounterRef.current++}`;
+    }
+    return `Terminal ${terminalCounterRef.current++}`;
+  };
+
   const collectSavedSessions = () => {
     const savedSessions: Array<{ id: string; sessionId: string; title: string }> = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -123,11 +131,14 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
       const data = await response.json();
       const activeSessions = Array.isArray(data.active_sessions) ? data.active_sessions : [];
-      return activeSessions.map((session: any, index: number) => ({
-        id: `terminal-restored-${session.session_id}`,
-        sessionId: session.session_id,
-        title: `Terminal ${index + 1}`,
-      }));
+      return activeSessions.map((session: any) => {
+        const title = getTerminalTitle(session.initial_dir);
+        return {
+          id: `terminal-restored-${session.session_id}`,
+          sessionId: session.session_id,
+          title,
+        };
+      });
     } catch (error) {
       console.error('[TerminalContext] Failed to fetch active backend sessions:', error);
       return [] as Array<{ id: string; sessionId: string; title: string }>;
@@ -591,11 +602,15 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       return existing;
     }
 
+    // 获取 Claude 状态，包括 initial_dir
+    const claudeStatus = await checkClaudeStatus(sessionId);
+    const title = getTerminalTitle(claudeStatus.initial_dir || undefined);
+
     // 创建新终端，使用 claudeResumeSession 参数
     const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
     const terminal = initTerminal({
       id,
-      title: `Claude Resume ${sessionId.slice(0, 8)}`,
+      title,
       claudeResumeSession: sessionId,  // 传递 Claude 会话恢复参数
       mode: 'create',  // 使用 create 模式，因为这是创建新的 terminal session
     });
@@ -609,7 +624,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     setActiveTabId(id);
 
     return terminal;
-  }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification]);
+  }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification, checkClaudeStatus, getTerminalTitle]);
 
   const checkClaudeStatus = useCallback(async (sessionId: string) => {
     try {
@@ -625,6 +640,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         session_exists: false,
         process_alive: false,
         claude_resume_session: null,
+        initial_dir: null,
       };
     }
   }, []);
@@ -927,11 +943,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     }
 
     const id = `terminal-${Date.now()}`;
-    let title = `Terminal ${terminalCounterRef.current++}`;
-    if (projectPath) {
-      const pathParts = projectPath.split('/').filter((p) => p);
-      title = pathParts[pathParts.length - 1] || title;
-    }
+    const title = getTerminalTitle(projectPath);
 
     console.log('[TerminalContext] Creating terminal', { id, title, projectPath, autoStartClaude });
     const terminal = initTerminal({ id, title, projectPath, autoStartClaude, mode: 'create' });
