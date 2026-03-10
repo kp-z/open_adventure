@@ -1,0 +1,49 @@
+{
+  "models": [
+    {
+      "alias": "haiku",
+      "full_name": "claude-haiku-4-6",
+      "description": "Fast and efficient"
+    },
+    {
+      "alias": "sonnet",
+      "full_name": "claude-sonnet-4-6",
+      "description": "Balanced performance"
+    },
+    {
+      "alias": "opus",
+      "full_name": "claude-opus-4-6",
+      "description": "Most capable model"
+    },
+    {
+      "alias": "opus[1m]",
+      "full_name": "claude-opus-4-6[1m]",
+      "description": "Opus with 1M context"
+    },
+    {
+      "alias": "haiku-3.5",
+      "full_name": "claude-3-5-haiku-20241022",
+      "description": "Haiku 3.5"
+    },
+    {
+      "alias": "sonnet-3.5",
+      "full_name": "claude-3-5-sonnet-20241022",
+      "description": "Sonnet 3.5"
+    },
+    {
+      "alias": "sonnet-4",
+      "full_name": "claude-sonnet-4-20250514",
+      "description": "Sonnet 4"
+    },
+    {
+      "alias": "opus-4",
+      "full_name": "claude-opus-4-20250514",
+      "description": "Opus 4"
+    },
+    {
+      "alias": "opus-4.5",
+      "full_name": "claude-opus-4-5-20250514",
+      "description": "Opus 4.5"
+    }
+  ]
+}

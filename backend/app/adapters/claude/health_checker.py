@@ -24,7 +24,64 @@ class ClaudeHealthChecker:
         self.config_dir = settings.claude_config_dir
         self.skills_dir = settings.claude_skills_dir
 
-    async def check_model_availability(self, model_alias: str) -> bool:
+    def _load_default_models(self) -> List[Dict[str, str]]:
+        """
+        加载默认模型列表
+
+        Returns:
+            List[Dict]: 默认模型列表
+        """
+        try:
+            config_file = Path(__file__).parent.parent.parent / "config" / "default_models.json"
+            if config_file.exists():
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get("models", [])
+            else:
+                logger.warning(f"Default models config not found: {config_file}")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to load default models: {e}")
+            return []
+
+    def _load_custom_models(self) -> List[Dict[str, str]]:
+        """
+        加载用户自定义模型列表
+
+        Returns:
+            List[Dict]: 用户自定义模型列表
+        """
+        try:
+            custom_file = self.config_dir / "custom_models.json"
+            if custom_file.exists():
+                with open(custom_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get("models", [])
+            else:
+                logger.debug(f"No custom models config found: {custom_file}")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to load custom models: {e}")
+            return []
+
+    def _deduplicate_models(self, models: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        去重模型列表，保留最后出现的（用户自定义优先）
+
+        Args:
+            models: 模型列表
+
+        Returns:
+            List[Dict]: 去重后的模型列表
+        """
+        seen = {}
+        for model in models:
+            alias = model.get("alias")
+            if alias:
+                seen[alias] = model
+        return list(seen.values())
+
+    async def check_model_availability(self, model_alias: str, model_full_name: str) -> bool:
         """
         检查特定模型是否可用
 
@@ -32,6 +89,7 @@ class ClaudeHealthChecker:
 
         Args:
             model_alias: 模型别名（opus/sonnet/haiku）
+            model_full_name: 模型完整名称（claude-opus-4-6）
 
         Returns:
             bool: 模型是否可用
@@ -64,20 +122,12 @@ class ClaudeHealthChecker:
                 logger.warning(f"No API key found, cannot check model {model_alias} availability")
                 return False
 
-            # 映射模型别名到完整模型名
-            model_map = {
-                "opus": "claude-opus-4-6",
-                "opus[1m]": "claude-opus-4-6",  # 使用相同的模型名进行检测
-                "sonnet": "claude-sonnet-4-6",
-                "haiku": "claude-haiku-4-6",
-                "haiku-3.5": "claude-3-5-haiku-20241022",
-                "sonnet-3.5": "claude-3-5-sonnet-20241022",
-                "sonnet-4": "claude-sonnet-4-20250514",
-                "opus-4": "claude-opus-4-20250514",
-                "opus-4.5": "claude-opus-4-5-20250514"
-            }
+            # 使用传入的完整模型名
+            model_name = model_full_name
 
-            model_name = model_map.get(model_alias, model_alias)
+            # 特殊处理：opus[1m] 使用 opus 的模型名进行检测
+            if "[1m]" in model_name:
+                model_name = model_name.replace("[1m]", "")
 
             # 使用 aiohttp 测试 API
             import aiohttp
@@ -174,58 +224,20 @@ class ClaudeHealthChecker:
                 logger.error(f"Failed to read settings.json: {e}")
                 model_info["model_source"] = "default"
 
-        # 2. 定义所有模型（包括上下文变体）
-        models = [
-            {
-                "alias": "haiku",
-                "full_name": "claude-haiku-4-6",
-                "description": "Fast and efficient"
-            },
-            {
-                "alias": "sonnet",
-                "full_name": "claude-sonnet-4-6",
-                "description": "Balanced performance"
-            },
-            {
-                "alias": "opus",
-                "full_name": "claude-opus-4-6",
-                "description": "Most capable model"
-            },
-            {
-                "alias": "opus[1m]",
-                "full_name": "claude-opus-4-6[1m]",
-                "description": "Opus with 1M context"
-            },
-            {
-                "alias": "haiku-3.5",
-                "full_name": "claude-3-5-haiku-20241022",
-                "description": "Haiku 3.5"
-            },
-            {
-                "alias": "sonnet-3.5",
-                "full_name": "claude-3-5-sonnet-20241022",
-                "description": "Sonnet 3.5"
-            },
-            {
-                "alias": "sonnet-4",
-                "full_name": "claude-sonnet-4-20250514",
-                "description": "Sonnet 4"
-            },
-            {
-                "alias": "opus-4",
-                "full_name": "claude-opus-4-20250514",
-                "description": "Opus 4"
-            },
-            {
-                "alias": "opus-4.5",
-                "full_name": "claude-opus-4-5-20250514",
-                "description": "Opus 4.5"
-            }
-        ]
+        # 2. 加载模型列表（默认 + 自定义）
+        models = self._load_default_models()
+        custom_models = self._load_custom_models()
+        if custom_models:
+            logger.info(f"Loaded {len(custom_models)} custom models")
+            models.extend(custom_models)
+
+        # 去重（用户自定义优先）
+        models = self._deduplicate_models(models)
+        logger.info(f"Total models to check: {len(models)}")
 
         # 3. 并发检测所有模型的可用性
         availability_tasks = [
-            self.check_model_availability(model["alias"])
+            self.check_model_availability(model["alias"], model["full_name"])
             for model in models
         ]
 

@@ -1,0 +1,9 @@
+{
+  "models": [
+    {
+      "alias": "my-custom-model",
+      "full_name": "claude-custom-20260101",
+      "description": "My custom model"
+    }
+  ]
+}
