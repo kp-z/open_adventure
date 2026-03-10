@@ -8,6 +8,7 @@ pydantic-settings>=2.6.0
 python-dotenv>=1.0.1
 python-multipart>=0.0.12
 aiohttp>=3.9.0
+typing-extensions>=4.5.0  # For Python 3.8 compatibility (Annotated)
 
 # Database
 aiosqlite>=0.20.0

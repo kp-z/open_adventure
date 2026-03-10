@@ -4,7 +4,12 @@ Authentication API endpoints
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Annotated, Optional
+from typing import Optional
+
+try:
+    from typing import Annotated
+except ImportError:
+    from typing_extensions import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
