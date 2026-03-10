@@ -121,14 +121,29 @@ jobs:
               set -e
               export DEBIAN_FRONTEND=noninteractive
 
-              # 安装系统依赖
+              # 安装基础依赖
               apt-get update
-              apt-get install -y python3 python3-venv python3-pip
+              apt-get install -y software-properties-common curl ca-certificates gnupg
+
+              # 添加 deadsnakes PPA
+              add-apt-repository ppa:deadsnakes/ppa -y
+              apt-get update
+
+              # 安装 Python 3.11 和必要的包
+              apt-get install -y python3.11 python3.11-venv python3.11-distutils
+
+              # 下载并安装 pip for Python 3.11
+              curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+              python3.11 get-pip.py
+              rm get-pip.py
 
               # 创建虚拟环境
               cd /workspace/backend
-              python3 -m venv venv
+              python3.11 -m venv venv
               . venv/bin/activate
+
+              # 验证 Python 版本
+              python --version
 
               # 安装 Python 依赖
               pip install --upgrade pip
