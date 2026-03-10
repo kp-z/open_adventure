@@ -422,47 +422,140 @@ const Dashboard = () => {
             <div className="block md:hidden">
               <div className="relative h-32 flex items-center justify-center">
                 {(() => {
-                  // 移动端气泡配置 - 使用桌面端相同尺寸
-                  const mobileBubbleConfigs = [
-                    { name: 'Haiku', size: 28, top: '15%', left: '8%' },
-                    { name: 'Sonnet', size: 48, top: '50%', left: '12%' },
-                    { name: 'Opus', size: 52, top: '10%', left: '28%' },
-                    { name: 'Haiku 3.5', size: 32, top: '65%', left: '35%' },
-                    { name: 'Sonnet 3.5', size: 45, top: '18%', left: '50%' },
-                    { name: 'Sonnet 4', size: 38, top: '58%', left: '60%' },
-                    { name: 'Opus 4', size: 55, top: '8%', left: '75%' },
-                    { name: 'Opus 4.5', size: 35, top: '55%', left: '85%' }
+                  // 预定义的气泡位置配置（最多8个位置）- 按大小降序排列
+                  const bubblePositions = [
+                    { size: 55, top: '8%', left: '75%' },      // 最大
+                    { size: 52, top: '10%', left: '28%' },     // 第二大
+                    { size: 48, top: '50%', left: '12%' },     // 第三大
+                    { size: 45, top: '18%', left: '50%' },     // 第四大
+                    { size: 38, top: '58%', left: '60%' },     // 中等
+                    { size: 35, top: '55%', left: '85%' },     // 较小
+                    { size: 32, top: '65%', left: '35%' },     // 更小
+                    { size: 28, top: '15%', left: '8%' }       // 最小
                   ];
 
-                  return mobileBubbleConfigs.map((config, index) => {
-                    const matchedModel = claudeHealth?.model_info?.available_models.find(m => {
-                      const modelAlias = m.alias.toLowerCase();
-                      const configName = config.name.toLowerCase();
-                      const normalizedConfigName = configName.replace(/\s+/g, '-');
-                      return modelAlias === configName ||
-                             modelAlias === normalizedConfigName ||
-                             modelAlias.includes(normalizedConfigName) ||
-                             normalizedConfigName.includes(modelAlias);
+                  if (!claudeHealth?.model_info?.available_models) {
+                    return null;
+                  }
+
+                  const currentModel = claudeHealth.model_info.current_model;
+                  const availableModels = claudeHealth.model_info.available_models;
+
+                  // 构建气泡列表：优先显示当前模型，然后是可用模型，最后是不可用模型
+                  const bubbleConfigs = [];
+
+                  // 1. 如果当前模型不在 available_models 中，添加它（蓝色）
+                  if (currentModel) {
+                    const currentModelInList = availableModels.find(m =>
+                      m.alias.toLowerCase() === currentModel.toLowerCase() ||
+                      m.full_name.toLowerCase() === currentModel.toLowerCase()
+                    );
+
+                    if (!currentModelInList) {
+                      bubbleConfigs.push({
+                        name: currentModel,
+                        alias: currentModel,
+                        available: true,
+                        isCurrent: true
+                      });
+                    }
+                  }
+
+                  // 2. 添加所有 available_models
+                  availableModels.forEach(model => {
+                    const isCurrent = currentModel && (
+                      model.alias.toLowerCase() === currentModel.toLowerCase() ||
+                      model.full_name.toLowerCase() === currentModel.toLowerCase()
+                    );
+
+                    bubbleConfigs.push({
+                      name: model.alias,
+                      alias: model.alias,
+                      available: model.available,
+                      isCurrent: isCurrent
                     });
-                    const isAvailable = matchedModel?.available ?? false;
+                  });
+
+                  // 限制最多显示8个气泡
+                  const displayBubbles = bubbleConfigs.slice(0, 8);
+
+                  return displayBubbles.map((bubble, index) => {
+                    const position = bubblePositions[index];
+                    const isCurrentModel = bubble.isCurrent;
+                    const isAvailable = bubble.available;
 
                     return (
                       <div
-                        key={config.name}
+                        key={bubble.name}
                         className="absolute group cursor-pointer"
                         style={{
-                          top: config.top,
-                          left: config.left,
-                          width: `${config.size}px`,
-                          height: `${config.size}px`,
+                          top: position.top,
+                          left: position.left,
+                          width: `${position.size}px`,
+                          height: `${position.size}px`,
                           animation: `float ${3 + index * 0.5}s ease-in-out infinite`,
                           animationDelay: `${index * 0.3}s`
                         }}
-                        title={config.name}
-                        onClick={() => setHoveredModel(hoveredModel === config.name ? null : config.name)}
+                        title={bubble.name}
+                        onClick={() => setHoveredModel(hoveredModel === bubble.name ? null : bubble.name)}
                       >
-                        {/* 可用模型：显示绿色高亮边框和水位线 */}
-                        {isAvailable && tokenUsage ? (
+                        {/* 当前模型：蓝色高亮 */}
+                        {isCurrentModel && tokenUsage ? (
+                          <>
+                            <div
+                              className={`
+                                w-full h-full rounded-full relative overflow-hidden
+                                transition-all duration-300
+                                backdrop-blur-[2px]
+                                border-2
+                                active:scale-110
+                                bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                                group
+                              `}
+                              style={{
+                                borderColor: 'rgba(59, 130, 246, 0.6)',
+                                boxShadow: '0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.3), inset 0 0 25px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255,255,255,0.4)'
+                              }}
+                            >
+                              {/* 顶部高光 */}
+                              <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
+
+                              {/* 水位线 */}
+                              <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={position.size} />
+
+                              {/* 模型名称 - 在水位线后面 */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                                <span className="text-[7px] font-bold text-white drop-shadow-lg text-center leading-tight px-0.5">
+                                  {bubble.name}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Active 显示 token 信息 */}
+                            {hoveredModel === bubble.name && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                                <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
+                                  <div className="font-bold mb-1 flex items-center gap-1">
+                                    {bubble.name}
+                                    <span className="text-blue-400 text-[7px]">(Current)</span>
+                                  </div>
+                                  <div className="text-gray-300 mb-1.5 text-[7px]">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000</div>
+                                  <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
+                                      style={{ width: `${tokenUsage?.percentage ?? 0}%` }}
+                                    />
+                                  </div>
+                                  <div className="text-[6px] text-gray-400 mt-1">{tokenUsage.percentage.toFixed(1)}% Used</div>
+                                </div>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                                  <div className="w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-black/90" />
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : isAvailable && tokenUsage ? (
+                          /* 可用但非当前模型：绿色高亮 */
                           <>
                             <div
                               className={`
@@ -479,27 +572,20 @@ const Dashboard = () => {
                                 boxShadow: '0 0 15px rgba(34, 197, 94, 0.4), 0 0 30px rgba(34, 197, 94, 0.2), inset 0 0 20px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
                               }}
                             >
-                              {/* 顶部高光 */}
                               <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
-
-                              {/* 水位线 */}
-                              <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={config.size} />
-
-                              {/* 模型名称 - 在水位线后面 */}
+                              <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={position.size} />
                               <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
                                 <span className="text-[7px] font-bold text-white drop-shadow-lg text-center leading-tight px-0.5">
-                                  {config.name}
+                                  {bubble.name}
                                 </span>
                               </div>
                             </div>
 
-                            {/* Active 显示 token 信息 - 移到气泡容器外部 */}
-                            {hoveredModel === config.name && (
+                            {hoveredModel === bubble.name && (
                               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                                 <div className="bg-black/90 backdrop-blur-sm rounded-lg px-2 py-1.5 text-[8px] text-white whitespace-nowrap shadow-lg border border-white/10">
-                                  <div className="font-bold mb-1">{config.name}</div>
+                                  <div className="font-bold mb-1">{bubble.name}</div>
                                   <div className="text-gray-300 mb-1.5 text-[7px]">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000</div>
-                                  {/* 横向柱状图 */}
                                   <div className="w-24 h-1.5 bg-white/10 rounded-full overflow-hidden">
                                     <div
                                       className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300"
@@ -508,7 +594,6 @@ const Dashboard = () => {
                                   </div>
                                   <div className="text-[6px] text-gray-400 mt-1">{tokenUsage.percentage.toFixed(1)}% Used</div>
                                 </div>
-                                {/* 小三角箭头 */}
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
                                   <div className="w-0 h-0 border-l-3 border-r-3 border-t-3 border-transparent border-t-black/90" />
                                 </div>
@@ -516,7 +601,7 @@ const Dashboard = () => {
                             )}
                           </>
                         ) : (
-                          /* 不可用的模型显示原来的样式 */
+                          /* 不可用的模型：灰色 */
                           <div
                             className={`
                               w-full h-full rounded-full relative
@@ -527,13 +612,10 @@ const Dashboard = () => {
                               bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15
                             `}
                           >
-                            {/* 顶部高光 */}
                             <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[2px]" />
-
-                            {/* 模型名称 */}
                             <div className="absolute inset-0 flex items-center justify-center">
                               <span className="text-[7px] font-medium text-center leading-tight px-0.5 text-gray-400">
-                                {config.name}
+                                {bubble.name}
                               </span>
                             </div>
                           </div>
@@ -545,68 +627,140 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* 桌面端气泡展示 - 仅在 ≥md 显示，保持原样 */}
+            {/* 桌面端气泡展示 - 仅在 ≥md 显示 */}
             <div className="hidden md:block">
               <div className="relative h-24 flex items-center justify-center">
               {(() => {
-                // 8个常用模型及其气泡配置 - 大小差异更大
-                const bubbleConfigs = [
-                  { name: 'Haiku', size: 28, top: '15%', left: '8%' },
-                  { name: 'Sonnet', size: 48, top: '50%', left: '12%' },
-                  { name: 'Opus', size: 52, top: '10%', left: '28%' },
-                  { name: 'Haiku 3.5', size: 32, top: '65%', left: '35%' },
-                  { name: 'Sonnet 3.5', size: 45, top: '18%', left: '50%' },
-                  { name: 'Sonnet 4', size: 38, top: '58%', left: '60%' },
-                  { name: 'Opus 4', size: 55, top: '8%', left: '75%' },
-                  { name: 'Opus 4.5', size: 35, top: '55%', left: '85%' }
+                // 预定义的气泡位置配置（最多8个位置）- 按大小降序排列
+                const bubblePositions = [
+                  { size: 55, top: '8%', left: '75%' },      // 最大
+                  { size: 52, top: '10%', left: '28%' },     // 第二大
+                  { size: 48, top: '50%', left: '12%' },     // 第三大
+                  { size: 45, top: '18%', left: '50%' },     // 第四大
+                  { size: 38, top: '58%', left: '60%' },     // 中等
+                  { size: 35, top: '55%', left: '85%' },     // 较小
+                  { size: 32, top: '65%', left: '35%' },     // 更小
+                  { size: 28, top: '15%', left: '8%' }       // 最小
                 ];
 
-                return bubbleConfigs.map((config, index) => {
-                  // 检查模型是否可用 - 改进匹配逻辑
-                  const matchedModel = claudeHealth?.model_info?.available_models.find(m => {
-                    const modelAlias = m.alias.toLowerCase();
-                    const configName = config.name.toLowerCase();
+                if (!claudeHealth?.model_info?.available_models) {
+                  return null;
+                }
 
-                    // 将空格替换为连字符进行匹配
-                    const normalizedConfigName = configName.replace(/\s+/g, '-');
+                const currentModel = claudeHealth.model_info.current_model;
+                const availableModels = claudeHealth.model_info.available_models;
 
-                    // 精确匹配或包含匹配
-                    return modelAlias === configName ||
-                           modelAlias === normalizedConfigName ||
-                           modelAlias.includes(normalizedConfigName) ||
-                           normalizedConfigName.includes(modelAlias);
+                // 构建气泡列表：优先显示当前模型，然后是可用模型，最后是不可用模型
+                const bubbleConfigs = [];
+
+                // 1. 如果当前模型不在 available_models 中，添加它（蓝色）
+                if (currentModel) {
+                  const currentModelInList = availableModels.find(m =>
+                    m.alias.toLowerCase() === currentModel.toLowerCase() ||
+                    m.full_name.toLowerCase() === currentModel.toLowerCase()
+                  );
+
+                  if (!currentModelInList) {
+                    bubbleConfigs.push({
+                      name: currentModel,
+                      alias: currentModel,
+                      available: true,
+                      isCurrent: true
+                    });
+                  }
+                }
+
+                // 2. 添加所有 available_models
+                availableModels.forEach(model => {
+                  const isCurrent = currentModel && (
+                    model.alias.toLowerCase() === currentModel.toLowerCase() ||
+                    model.full_name.toLowerCase() === currentModel.toLowerCase()
+                  );
+
+                  bubbleConfigs.push({
+                    name: model.alias,
+                    alias: model.alias,
+                    available: model.available,
+                    isCurrent: isCurrent
                   });
+                });
 
-                  const isAvailable = matchedModel?.available ?? false;
+                // 限制最多显示8个气泡
+                const displayBubbles = bubbleConfigs.slice(0, 8);
 
-                  // 调试信息 - 打印所有气泡的匹配情况
-                  console.log(`Bubble ${config.name}:`, {
-                    configName: config.name,
-                    matchedModel,
-                    isAvailable,
-                    tokenUsage,
-                    hasTokenUsage: !!tokenUsage,
-                    willShowWaterLevel: isAvailable && !!tokenUsage
-                  });
+                return displayBubbles.map((bubble, index) => {
+                  const position = bubblePositions[index];
+                  const isCurrentModel = bubble.isCurrent;
+                  const isAvailable = bubble.available;
 
                   return (
                     <div
-                      key={config.name}
+                      key={bubble.name}
                       className="absolute group cursor-pointer"
                       style={{
-                        top: config.top,
-                        left: config.left,
-                        width: `${config.size}px`,
-                        height: `${config.size}px`,
+                        top: position.top,
+                        left: position.left,
+                        width: `${position.size}px`,
+                        height: `${position.size}px`,
                         animation: `float ${3 + index * 0.5}s ease-in-out infinite`,
                         animationDelay: `${index * 0.3}s`
                       }}
-                      title={config.name}
-                      onMouseEnter={() => setHoveredModel(config.name)}
+                      title={bubble.name}
+                      onMouseEnter={() => setHoveredModel(bubble.name)}
                       onMouseLeave={() => setHoveredModel(null)}
                     >
-                      {/* 可用模型：显示绿色高亮边框和水位线 */}
-                      {isAvailable && tokenUsage ? (
+                      {/* 当前模型：蓝色高亮 */}
+                      {isCurrentModel && tokenUsage ? (
+                        <>
+                          <div
+                            className={`
+                              w-full h-full rounded-full relative overflow-hidden
+                              transition-all duration-300
+                              backdrop-blur-[2px]
+                              border-2
+                              hover:scale-110
+                              bg-gradient-to-br from-white/8 via-white/4 to-transparent
+                              group
+                            `}
+                            style={{
+                              borderColor: 'rgba(59, 130, 246, 0.6)',
+                              boxShadow: '0 0 25px rgba(59, 130, 246, 0.6), 0 0 50px rgba(59, 130, 246, 0.3), inset 0 0 35px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(255,255,255,0.4)'
+                            }}
+                          >
+                            <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
+                            <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
+                            <WaterLevel percentage={tokenUsage.percentage} size={position.size} />
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                              <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
+                                {bubble.name}
+                              </span>
+                            </div>
+                          </div>
+
+                          {hoveredModel === bubble.name && (
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
+                              <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
+                                <div className="font-bold mb-1 flex items-center gap-1.5">
+                                  {bubble.name}
+                                  <span className="text-blue-400 text-[9px]">(Current)</span>
+                                </div>
+                                <div className="text-gray-300 mb-2">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000 tokens</div>
+                                <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
+                                    style={{ width: `${tokenUsage.percentage}%` }}
+                                  />
+                                </div>
+                                <div className="text-[8px] text-gray-400 mt-1">{(tokenUsage?.percentage ?? 0).toFixed(1)}% Used</div>
+                              </div>
+                              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                                <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/90" />
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : isAvailable && tokenUsage ? (
+                        /* 可用但非当前模型：绿色高亮 */
                         <>
                           <div
                             className={`
@@ -623,30 +777,21 @@ const Dashboard = () => {
                               boxShadow: '0 0 20px rgba(34, 197, 94, 0.4), 0 0 40px rgba(34, 197, 94, 0.2), inset 0 0 30px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(255,255,255,0.4)'
                             }}
                           >
-                            {/* 顶部高光 */}
                             <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
-
-                            {/* 次级高光 */}
                             <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
-
-                            {/* 水位线 */}
-                            <WaterLevel percentage={tokenUsage.percentage} size={config.size} />
-
-                            {/* 模型名称 - 在水位线后面 */}
+                            <WaterLevel percentage={tokenUsage.percentage} size={position.size} />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
                               <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
-                                {config.name}
+                                {bubble.name}
                               </span>
                             </div>
                           </div>
 
-                          {/* Hover 显示 token 信息 - 移到气泡容器外部 */}
-                          {hoveredModel === config.name && (
+                          {hoveredModel === bubble.name && (
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-100 transition-opacity duration-300 pointer-events-none" style={{ zIndex: 30 }}>
                               <div className="bg-black/90 backdrop-blur-sm rounded-lg px-3 py-2 text-[10px] text-white whitespace-nowrap shadow-lg border border-white/10">
-                                <div className="font-bold mb-1">{config.name}</div>
+                                <div className="font-bold mb-1">{bubble.name}</div>
                                 <div className="text-gray-300 mb-2">{(200000 - 200000 * (tokenUsage?.percentage ?? 0) / 100).toFixed(0)} / 200,000 tokens</div>
-                                {/* 横向柱状图 */}
                                 <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-300"
@@ -655,7 +800,6 @@ const Dashboard = () => {
                                 </div>
                                 <div className="text-[8px] text-gray-400 mt-1">{(tokenUsage?.percentage ?? 0).toFixed(1)}% Used</div>
                               </div>
-                              {/* 小三角箭头 */}
                               <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
                                 <div className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-black/90" />
                               </div>
@@ -663,7 +807,7 @@ const Dashboard = () => {
                           )}
                         </>
                       ) : (
-                        /* 不可用的模型显示原来的样式 */
+                        /* 不可用的模型：灰色 */
                         <div
                           className={`
                             w-full h-full rounded-full relative
@@ -674,16 +818,11 @@ const Dashboard = () => {
                             bg-gradient-to-br from-white/8 via-white/4 to-transparent border-white/15 shadow-[0_4px_16px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.4)]
                           `}
                         >
-                          {/* 顶部高光 */}
                           <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
-
-                          {/* 次级高光 */}
                           <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
-
-                          {/* 模型名称 */}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-[8px] font-medium text-center leading-tight px-1 text-gray-400">
-                              {config.name}
+                              {bubble.name}
                             </span>
                           </div>
                         </div>

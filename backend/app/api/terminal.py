@@ -1096,6 +1096,28 @@ async def terminal_status():
     })
 
 
+@router.get("/session/{session_id}/claude-status")
+async def get_claude_status(session_id: str):
+    """检查指定 session 中的 Claude 进程是否还在运行"""
+    if session_id not in sessions:
+        return JSONResponse({
+            "running": False,
+            "session_exists": False,
+            "process_alive": False,
+            "claude_resume_session": None,
+        })
+
+    session = sessions[session_id]
+    claude_running = session.check_claude_running()
+
+    return JSONResponse({
+        "running": claude_running,
+        "session_exists": True,
+        "process_alive": session.is_process_alive(),
+        "claude_resume_session": session.claude_resume_session if hasattr(session, 'claude_resume_session') else None,
+    })
+
+
 @router.post("/sessions/{session_id}/close")
 async def close_session(
     session_id: str,

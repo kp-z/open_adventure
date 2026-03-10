@@ -848,8 +848,9 @@ export const Layout = () => {
 
       {/* 移动端底部导航栏 - iOS 液态玻璃风格浮动导航栏 */}
       <nav
-        className="md:hidden fixed left-4 right-4 z-50 safe-area-left safe-area-right"
+        className="md:hidden fixed left-4 right-4 z-50 safe-area-left safe-area-right transition-all duration-200 ease-out"
         style={{ bottom: 'calc(var(--safe-bottom) + 1rem)' }}
+        id="mobile-dock"
       >
         {/* 二级菜单和通知弹出层 */}
         <AnimatePresence>

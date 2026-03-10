@@ -33,6 +33,9 @@ export interface TerminalInstance {
   backendOutputFrames: number;
   backendProcessAlive: boolean;
   backendPid: number;
+  reconnecting: boolean;
+  reconnectAttempts: number;
+  maxReconnectAttempts: number;
 }
 
 interface ClaudeConversation {
@@ -57,6 +60,8 @@ interface TerminalContextType {
   markTerminalOpened: (terminalId: string) => void;
   syncClaudeConversations: () => Promise<ClaudeConversation[]>;
   restoreClaudeConversation: (sessionId: string) => Promise<TerminalInstance | null>;
+  reconnectTerminal: (terminalId: string) => Promise<boolean>;
+  checkClaudeStatus: (sessionId: string) => Promise<{ running: boolean; session_exists: boolean; process_alive: boolean; claude_resume_session: string | null }>;
   isRestoring: boolean;
   restoreSettled: boolean;
 }
@@ -387,6 +392,9 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       backendOutputFrames: 0,
       backendProcessAlive: true,
       backendPid: 0,
+      reconnecting: false,
+      reconnectAttempts: 0,
+      maxReconnectAttempts: 3,
     };
 
     logLifecycle(terminal, 'ws_connecting', `${mode}:ws create`);
@@ -603,6 +611,228 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     return terminal;
   }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification]);
 
+  const checkClaudeStatus = useCallback(async (sessionId: string) => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/session/${sessionId}/claude-status`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[TerminalContext] Failed to check Claude status:', error);
+      return {
+        running: false,
+        session_exists: false,
+        process_alive: false,
+        claude_resume_session: null,
+      };
+    }
+  }, []);
+
+  const reconnectTerminal = useCallback(async (terminalId: string): Promise<boolean> => {
+    const terminal = terminals.find((t) => t.id === terminalId);
+    if (!terminal) {
+      console.error('[TerminalContext] Terminal not found:', terminalId);
+      return false;
+    }
+
+    if (!terminal.sessionId) {
+      console.error('[TerminalContext] Terminal has no session ID:', terminalId);
+      addNotification({
+        type: 'error',
+        title: '重连失败',
+        message: '终端没有会话 ID，无法重连。',
+      });
+      return false;
+    }
+
+    if (terminal.reconnecting) {
+      console.log('[TerminalContext] Terminal is already reconnecting:', terminalId);
+      return false;
+    }
+
+    if (terminal.ws.readyState === WebSocket.OPEN) {
+      console.log('[TerminalContext] Terminal is already connected:', terminalId);
+      return true;
+    }
+
+    // 标记为重连中
+    terminal.reconnecting = true;
+    terminal.reconnectAttempts += 1;
+    setTerminals((prev) => [...prev]);
+
+    console.log(`[TerminalContext] Reconnecting terminal ${terminalId}, attempt ${terminal.reconnectAttempts}/${terminal.maxReconnectAttempts}`);
+
+    try {
+      // 关闭旧的 WebSocket
+      if (terminal.ws.readyState !== WebSocket.CLOSED) {
+        terminal.ws.close();
+      }
+
+      // 创建新的 WebSocket 连接
+      const wsUrl = `${API_CONFIG.WS_BASE_URL}/terminal/ws?session_id=${terminal.sessionId}`;
+      const newWs = new WebSocket(wsUrl);
+
+      // 等待连接建立或失败
+      const connected = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => {
+          console.error('[TerminalContext] Reconnect timeout');
+          resolve(false);
+        }, 5000);
+
+        newWs.onopen = () => {
+          clearTimeout(timeout);
+          console.log('[TerminalContext] Reconnect successful:', terminalId);
+          resolve(true);
+        };
+
+        newWs.onerror = () => {
+          clearTimeout(timeout);
+          console.error('[TerminalContext] Reconnect error:', terminalId);
+          resolve(false);
+        };
+      });
+
+      if (!connected) {
+        throw new Error('WebSocket connection failed');
+      }
+
+      // 更新 terminal 的 WebSocket
+      terminal.ws = newWs;
+      terminal.reconnecting = false;
+      terminal.reconnectAttempts = 0;
+
+      // 重新设置 WebSocket 事件处理
+      newWs.onmessage = (event) => {
+        const raw = event.data;
+
+        if (typeof raw === 'string') {
+          let parsed: any = null;
+          if (raw.startsWith('{')) {
+            try {
+              parsed = JSON.parse(raw);
+            } catch {
+              parsed = null;
+            }
+          }
+
+          if (parsed?.type === 'ack') {
+            const ackSeq = Number(parsed.seq || 0);
+            if (Number.isFinite(ackSeq) && ackSeq > 0) {
+              terminal.lastAckSeq = ackSeq;
+              console.log(`[TerminalContext] ack(seq): terminal=${terminal.id}, seq=${ackSeq}`);
+            }
+            return;
+          }
+
+          if (parsed?.type === 'debug_input_accepted') {
+            const inputSeq = Number(parsed.seq || 0);
+            if (Number.isFinite(inputSeq) && inputSeq > 0) {
+              terminal.lastBackendInputSeq = inputSeq;
+              terminal.backendProcessAlive = Boolean(parsed.process_alive);
+              terminal.backendPid = Number(parsed.pid || 0);
+              console.log(`[TerminalContext] backend_input_accepted(seq): terminal=${terminal.id}, seq=${inputSeq}`);
+            }
+            return;
+          }
+
+          if (parsed?.type === 'debug_output_forwarded') {
+            terminal.backendOutputFrames = Number(parsed.frame || terminal.backendOutputFrames + 1);
+            return;
+          }
+
+          if (raw.includes('SESSION_ID:')) {
+            const extracted = extractSessionId(raw);
+            if (extracted) {
+              terminal.sessionId = extracted;
+              localStorage.setItem(`terminal_session_${terminal.id}`, extracted);
+              localStorage.setItem(`terminal_title_${terminal.id}`, terminal.title);
+            }
+            return;
+          }
+
+          if (raw.includes('Reconnected to existing session')) {
+            return;
+          }
+        }
+
+        // 写入终端输出
+        console.log(`[TerminalContext] 📤 Writing to terminal: ${terminal.id}, length=${raw.length}, preview=${raw.substring(0, 50)}`);
+        terminal.term.write(raw);
+        terminal.lastOutputAt = Date.now();
+        terminal.backendOutputFrames += 1;
+      };
+
+      newWs.onerror = () => {
+        logLifecycle(terminal, 'disposed', 'ws error');
+        terminal.term.writeln('\x1b[31m✗ Connection error\x1b[0m');
+        notifyTerminalConnectionIssue('终端连接失败', 'Terminal WebSocket 连接失败，正在尝试重连...');
+      };
+
+      newWs.onclose = (event) => {
+        logLifecycle(terminal, 'disposed', `ws close:${event.code}`);
+        if (event.code !== 1000) {
+          terminal.term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
+          // 自动重连
+          if (!terminal.reconnecting && terminal.reconnectAttempts < terminal.maxReconnectAttempts) {
+            console.log('[TerminalContext] WebSocket closed, attempting reconnect...');
+            setTimeout(() => {
+              reconnectTerminal(terminal.id);
+            }, 1000);
+          }
+        }
+      };
+
+      // 发送 restore_ready 消息
+      setTimeout(() => {
+        sendRestoreReady(terminalId, terminal.term.rows, terminal.term.cols);
+      }, 100);
+
+      // 检查 Claude 状态
+      const claudeStatus = await checkClaudeStatus(terminal.sessionId!);
+      if (!claudeStatus.running && claudeStatus.claude_resume_session) {
+        // Claude 进程已退出，但有会话可以恢复
+        addNotification({
+          type: 'info',
+          title: 'Claude 会话已断开',
+          message: '检测到 Claude 会话已断开，是否恢复？',
+        });
+      }
+
+      addNotification({
+        type: 'success',
+        title: '重连成功',
+        message: '终端已重新连接。',
+      });
+
+      setTerminals((prev) => [...prev]);
+      return true;
+    } catch (error) {
+      console.error('[TerminalContext] Reconnect failed:', error);
+      terminal.reconnecting = false;
+
+      // 如果未超过最大重连次数，延迟后重试
+      if (terminal.reconnectAttempts < terminal.maxReconnectAttempts) {
+        const delay = Math.pow(2, terminal.reconnectAttempts - 1) * 1000; // 指数退避：1s, 2s, 4s
+        console.log(`[TerminalContext] Retrying reconnect in ${delay}ms...`);
+        setTimeout(() => {
+          reconnectTerminal(terminalId);
+        }, delay);
+      } else {
+        // 超过最大重连次数
+        addNotification({
+          type: 'error',
+          title: '重连失败',
+          message: '终端重连失败，已达到最大重试次数。请尝试重新创建终端。',
+        });
+        terminal.reconnectAttempts = 0;
+      }
+
+      setTerminals((prev) => [...prev]);
+      return false;
+    }
+  }, [terminals, addNotification, sendRestoreReady, checkClaudeStatus, logLifecycle, notifyTerminalConnectionIssue, extractSessionId]);
+
   useEffect(() => {
     if (hasRestoredRef.current) {
       return;
@@ -809,6 +1039,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         markTerminalOpened,
         syncClaudeConversations,
         restoreClaudeConversation,
+        reconnectTerminal,
+        checkClaudeStatus,
         isRestoring,
         restoreSettled,
       }}

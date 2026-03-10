@@ -237,6 +237,8 @@ const Terminal = () => {
     restoreSettled,
     syncClaudeConversations,
     restoreClaudeConversation,
+    reconnectTerminal,
+    checkClaudeStatus,
   } = useTerminalContext();
   const { addNotification } = useNotifications();
   const isMobile = useIsMobile();
@@ -250,6 +252,7 @@ const Terminal = () => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [isMobileInputFocused, setIsMobileInputFocused] = useState(false);
+  const [lockedKeyboardHeight, setLockedKeyboardHeight] = useState<number | null>(null); // 锁定的键盘高度
   const [inputValue, setInputValue] = useState('');
   const [showShortcuts, setShowShortcuts] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -257,6 +260,7 @@ const Terminal = () => {
   const [debugExpanded, setDebugExpanded] = useState(false);
   const viewportRafRef = useRef<number | null>(null);
   const viewportBaselineRef = useRef<number>(0);
+  const keyboardLockTimerRef = useRef<NodeJS.Timeout | null>(null);
   const showDebugInfo = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('terminal_debug') === '1';
   const preserveInputFocusOnPress = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
@@ -517,7 +521,7 @@ const Terminal = () => {
 
     const KEYBOARD_SHOW_THRESHOLD = 60;
     const KEYBOARD_HIDE_THRESHOLD = 40;
-    const HEIGHT_JITTER_THRESHOLD = 4;
+    const HEIGHT_JITTER_THRESHOLD = 8; // 增加抖动阈值，减少频繁更新
 
     const applyViewportState = () => {
       if (!window.visualViewport) return;
@@ -534,9 +538,16 @@ const Terminal = () => {
       const baseline = viewportBaselineRef.current;
       const nextKeyboardHeight = Math.max(0, baseline - currentHeight);
 
-      setKeyboardHeight((prev) =>
-        Math.abs(prev - nextKeyboardHeight) > HEIGHT_JITTER_THRESHOLD ? nextKeyboardHeight : prev,
-      );
+      // 使用更大的阈值来减少抖动，并且在键盘显示时锁定高度
+      setKeyboardHeight((prev) => {
+        // 如果键盘已经显示，只在高度变化超过阈值时才更新
+        if (prev > KEYBOARD_SHOW_THRESHOLD && nextKeyboardHeight > KEYBOARD_SHOW_THRESHOLD) {
+          // 键盘显示状态，使用更大的阈值
+          return Math.abs(prev - nextKeyboardHeight) > HEIGHT_JITTER_THRESHOLD * 2 ? nextKeyboardHeight : prev;
+        }
+        // 键盘显示/隐藏切换时，使用正常阈值
+        return Math.abs(prev - nextKeyboardHeight) > HEIGHT_JITTER_THRESHOLD ? nextKeyboardHeight : prev;
+      });
 
       setIsKeyboardVisible((prev) => {
         if (isZooming) {
@@ -603,6 +614,63 @@ const Terminal = () => {
       setShowShortcuts(false);
     }
   }, [isKeyboardVisible, isMobileInputFocused]);
+
+  // 在移动端输入框获得焦点时隐藏底部 dock
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const dock = document.getElementById('mobile-dock');
+    if (!dock) return;
+
+    if (isMobileInputFocused || isKeyboardVisible) {
+      dock.style.transform = 'translateY(100%)';
+      dock.style.opacity = '0';
+      dock.style.pointerEvents = 'none';
+    } else {
+      dock.style.transform = 'translateY(0)';
+      dock.style.opacity = '1';
+      dock.style.pointerEvents = 'auto';
+    }
+  }, [isMobile, isMobileInputFocused, isKeyboardVisible]);
+
+  // 锁定键盘高度：当输入框获得焦点且键盘显示后，锁定键盘高度
+  useEffect(() => {
+    if (!isMobile) return;
+
+    // 当输入框获得焦点且键盘显示时，锁定键盘高度
+    if (isMobileInputFocused && isKeyboardVisible && keyboardHeight > 60) {
+      // 清除之前的定时器
+      if (keyboardLockTimerRef.current) {
+        clearTimeout(keyboardLockTimerRef.current);
+      }
+
+      // 延迟 300ms 后锁定高度，确保键盘完全弹出
+      keyboardLockTimerRef.current = setTimeout(() => {
+        setLockedKeyboardHeight(keyboardHeight);
+        if (showDebugInfo) {
+          console.log('[Terminal] Locked keyboard height:', keyboardHeight);
+        }
+      }, 300);
+    }
+
+    // 当输入框失去焦点或键盘隐藏时，解锁键盘高度
+    if (!isMobileInputFocused || !isKeyboardVisible) {
+      if (keyboardLockTimerRef.current) {
+        clearTimeout(keyboardLockTimerRef.current);
+        keyboardLockTimerRef.current = null;
+      }
+      setLockedKeyboardHeight(null);
+      if (showDebugInfo && lockedKeyboardHeight !== null) {
+        console.log('[Terminal] Unlocked keyboard height');
+      }
+    }
+
+    return () => {
+      if (keyboardLockTimerRef.current) {
+        clearTimeout(keyboardLockTimerRef.current);
+      }
+    };
+  }, [isMobile, isMobileInputFocused, isKeyboardVisible, keyboardHeight, showDebugInfo, lockedKeyboardHeight]);
 
   // 获取当前活跃的终端
   const activeTerminal = terminals.find(t => t.id === activeTabId);
@@ -844,6 +912,27 @@ const Terminal = () => {
       }
     };
   }, []);
+
+  // 页面可见性检测 - 自动重连
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // 页面变为可见，检查所有终端连接
+        console.log('[Terminal] Page became visible, checking terminal connections...');
+        terminals.forEach((terminal) => {
+          if (terminal.ws.readyState !== WebSocket.OPEN && !terminal.reconnecting) {
+            console.log(`[Terminal] Terminal ${terminal.id} is disconnected, attempting reconnect...`);
+            reconnectTerminal(terminal.id);
+          }
+        });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [terminals, isMobile, reconnectTerminal]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 px-4 pt-4 md:gap-6 md:px-8 md:pt-6">
@@ -1152,11 +1241,17 @@ const Terminal = () => {
       {/* 移动端输入工具栏 */}
       {isMobile && (
         <div
-          className={`fixed left-0 right-0 z-50 transition-[transform,opacity,bottom] duration-200 ease-out ${
-            isMobileInputMode ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0 pointer-events-none'
+          className={`fixed left-0 right-0 z-50 transition-opacity duration-200 ease-out ${
+            isMobileInputMode ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
           style={{
-            bottom: `${keyboardHeight}px`,
+            // 使用锁定的键盘高度，如果没有锁定则使用实时高度
+            bottom: `${lockedKeyboardHeight !== null ? lockedKeyboardHeight : keyboardHeight}px`,
+            transform: isMobileInputMode ? 'translateY(0)' : 'translateY(8px)',
+            // 只在没有锁定时才过渡 bottom 属性
+            transition: lockedKeyboardHeight !== null
+              ? 'opacity 0.2s ease-out, transform 0.2s ease-out'
+              : 'bottom 0.2s ease-out, opacity 0.2s ease-out, transform 0.2s ease-out',
           }}
         >
           <div className="px-4 pb-3">
