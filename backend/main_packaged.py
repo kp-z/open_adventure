@@ -71,6 +71,17 @@ def init_database():
         print(f"✓ 已加载配置: {user_env}")
 
 
+def check_port_available(port: int) -> bool:
+    """检查端口是否可用"""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('0.0.0.0', port))
+            return True
+    except OSError:
+        return False
+
+
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="Open Adventure - AI Configuration Management System")
@@ -79,6 +90,20 @@ def parse_args():
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
     parser.add_argument("-d", "--daemon", action="store_true", help="后台运行模式")
     return parser.parse_args()
+
+
+def get_local_ip():
+    """获取本机局域网 IP 地址"""
+    import socket
+    try:
+        # 创建一个 UDP 连接来获取本机 IP（不会真正发送数据）
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
 
 
 def open_browser(port: int, delay: float = 1.5):
@@ -154,14 +179,32 @@ if __name__ == "__main__":
         print(f"⏳ 等待服务启动...")
         time.sleep(3)
 
+        # 获取局域网 IP
+        local_ip = get_local_ip()
+
         # 验证服务是否启动成功
         try:
             import urllib.request
             urllib.request.urlopen(f"http://localhost:{port}/api/system/health", timeout=5)
             print(f"✅ 服务已启动 (PID: {process.pid})")
-            print(f"🌐 访问地址: http://localhost:{port}/")
-            print(f"\n停止服务: kill {process.pid}")
-            print(f"查看日志: tail -f {log_file}")
+            print(f"\n============================================")
+            print(f"✅ Open Adventure is running in background!")
+            print(f"============================================")
+            print(f"\n🌐 本地访问:")
+            print(f"   Frontend: http://localhost:{port}/")
+            print(f"   Backend API: http://localhost:{port}/api")
+            print(f"   API Docs: http://localhost:{port}/docs")
+            if local_ip:
+                print(f"\n🌍 局域网访问:")
+                print(f"   Frontend: http://{local_ip}:{port}/")
+                print(f"   Backend API: http://{local_ip}:{port}/api")
+            print(f"\n📋 进程信息:")
+            print(f"   PID: {process.pid}")
+            print(f"\n📝 日志文件:")
+            print(f"   {log_file}")
+            print(f"\n🛑 停止服务: kill {process.pid}")
+            print(f"📊 查看日志: tail -f {log_file}")
+            print(f"============================================")
         except Exception as e:
             print(f"⚠️  服务可能未正常启动，请查看日志: {log_file}")
             print(f"错误: {e}")
@@ -175,12 +218,34 @@ if __name__ == "__main__":
     port = args.port or int(os.environ.get("PORT", 8000))
     host = args.host
 
+    # 检查端口是否可用
+    if not check_port_available(port):
+        print(f"⚠️  端口 {port} 已被占用", flush=True)
+        print(f"请使用 --port 参数指定其他端口，例如: ./open-adventure --port 8001", flush=True)
+        sys.exit(1)
+
+    # 获取局域网 IP
+    local_ip = get_local_ip()
+
     # 启动 FastAPI 服务器
     print(f"\n🚀 启动服务器...", flush=True)
     print(f"📂 前端资源: {FRONTEND_DIR}", flush=True)
     print(f"💾 数据库: {os.environ['DATABASE_URL']}", flush=True)
-    print(f"\n🌐 访问地址: http://localhost:{port}/", flush=True)
-    print("按 Ctrl+C 停止服务\n", flush=True)
+    print(f"\n============================================", flush=True)
+    print(f"✅ Open Adventure is running!", flush=True)
+    print(f"============================================", flush=True)
+    print(f"\n🌐 本地访问:", flush=True)
+    print(f"   Frontend: http://localhost:{port}/", flush=True)
+    print(f"   Backend API: http://localhost:{port}/api", flush=True)
+    print(f"   API Docs: http://localhost:{port}/docs", flush=True)
+
+    if local_ip:
+        print(f"\n🌍 局域网访问:", flush=True)
+        print(f"   Frontend: http://{local_ip}:{port}/", flush=True)
+        print(f"   Backend API: http://{local_ip}:{port}/api", flush=True)
+
+    print(f"\n按 Ctrl+C 停止服务", flush=True)
+    print(f"============================================\n", flush=True)
 
     # 自动打开浏览器（除非指定 --no-browser）
     if not args.no_browser:
