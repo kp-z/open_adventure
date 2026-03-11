@@ -21,6 +21,8 @@ export interface TerminalInstance {
   serializeAddon: SerializeAddon;
   title: string;
   sessionId?: string;
+  claudeCodeId?: string;  // Claude Code 的 session ID
+  projectName?: string;    // 项目名称
   lifecycle: TerminalLifecycle;
   isOpened: boolean;
   inputQueue: TerminalInputPacket[];
@@ -97,12 +99,24 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const restoreActiveSetRef = useRef(false);
   const queueOverflowNotifyRef = useRef<Record<string, number>>({});
 
-  const getTerminalTitle = (projectPath?: string): string => {
+  const getTerminalTitle = (projectPath?: string, claudeCodeId?: string): string => {
+    let projectName = '';
     if (projectPath) {
       const pathParts = projectPath.split('/').filter((p) => p);
-      return pathParts[pathParts.length - 1] || `Terminal ${terminalCounterRef.current++}`;
+      projectName = pathParts[pathParts.length - 1] || '';
     }
-    return `Terminal ${terminalCounterRef.current++}`;
+
+    if (!projectName) {
+      projectName = `Terminal ${terminalCounterRef.current++}`;
+    }
+
+    // 如果有 Claude Code ID，使用 "project_name(claude_code_id)" 格式
+    if (claudeCodeId) {
+      const shortId = claudeCodeId.slice(0, 8);
+      return `${projectName}(${shortId})`;
+    }
+
+    return projectName;
   };
 
   const collectSavedSessions = () => {
@@ -126,22 +140,23 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/status`);
       if (!response.ok) {
-        return [] as Array<{ id: string; sessionId: string; title: string }>;
+        return [] as Array<{ id: string; sessionId: string; title: string; claudeCodeId?: string }>;
       }
 
       const data = await response.json();
       const activeSessions = Array.isArray(data.active_sessions) ? data.active_sessions : [];
       return activeSessions.map((session: any) => {
-        const title = getTerminalTitle(session.initial_dir);
+        const title = getTerminalTitle(session.initial_dir, session.claude_code_id);
         return {
           id: `terminal-restored-${session.session_id}`,
           sessionId: session.session_id,
+          claudeCodeId: session.claude_code_id,
           title,
         };
       });
     } catch (error) {
       console.error('[TerminalContext] Failed to fetch active backend sessions:', error);
-      return [] as Array<{ id: string; sessionId: string; title: string }>;
+      return [] as Array<{ id: string; sessionId: string; title: string; claudeCodeId?: string }>;
     }
   };
 
@@ -391,6 +406,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       serializeAddon,
       title,
       sessionId: restoreSessionId,
+      claudeCodeId: claudeResumeSession,  // 保存 Claude Code 的 session ID
+      projectName: projectPath ? projectPath.split('/').filter(p => p).pop() : undefined,  // 提取项目名称
       lifecycle: 'init',
       isOpened: false,
       inputQueue: [],
@@ -576,6 +593,25 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     }
   }, [addNotification]);
 
+  const checkClaudeStatus = useCallback(async (sessionId: string) => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/session/${sessionId}/claude-status`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[TerminalContext] Failed to check Claude status:', error);
+      return {
+        running: false,
+        session_exists: false,
+        process_alive: false,
+        claude_resume_session: null,
+        initial_dir: null,
+      };
+    }
+  }, []);
+
   const restoreClaudeConversation = useCallback(async (sessionId: string): Promise<TerminalInstance | null> => {
     if (!sessionId) {
       return null;
@@ -604,7 +640,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     // 获取 Claude 状态，包括 initial_dir
     const claudeStatus = await checkClaudeStatus(sessionId);
-    const title = getTerminalTitle(claudeStatus.initial_dir || undefined);
+    const title = getTerminalTitle(claudeStatus.initial_dir || undefined, sessionId);
 
     // 创建新终端，使用 claudeResumeSession 参数
     const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
@@ -625,25 +661,6 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     return terminal;
   }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification, checkClaudeStatus, getTerminalTitle]);
-
-  const checkClaudeStatus = useCallback(async (sessionId: string) => {
-    try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/session/${sessionId}/claude-status`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('[TerminalContext] Failed to check Claude status:', error);
-      return {
-        running: false,
-        session_exists: false,
-        process_alive: false,
-        claude_resume_session: null,
-        initial_dir: null,
-      };
-    }
-  }, []);
 
   const reconnectTerminal = useCallback(async (terminalId: string): Promise<boolean> => {
     const terminal = terminals.find((t) => t.id === terminalId);
@@ -869,6 +886,60 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       console.log(`[TerminalContext] Restore process settled (${reason})`);
     };
 
+    const autoRestoreClaudeSessions = async (backendSessions: Array<{ id: string; sessionId: string; title: string }>) => {
+      console.log('[TerminalContext] Auto-restore Claude sessions started');
+
+      // 等待一小段时间，确保 WebSocket 连接已经稳定
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      let restoredCount = 0;
+
+      for (const { sessionId } of backendSessions) {
+        try {
+          console.log(`[TerminalContext] Checking Claude status for session: ${sessionId}`);
+          const claudeStatus = await checkClaudeStatus(sessionId);
+
+          console.log(`[TerminalContext] Claude status for ${sessionId}:`, claudeStatus);
+
+          // 如果检测到 Claude 进程在运行，且有 claude_resume_session
+          if (claudeStatus.running && claudeStatus.claude_resume_session) {
+            console.log(`[TerminalContext] Found running Claude session: ${claudeStatus.claude_resume_session}`);
+
+            // 使用 setTerminals 的回调形式获取最新的 terminals 状态
+            setTerminals((currentTerminals) => {
+              const terminal = currentTerminals.find(t => t.sessionId === sessionId);
+              if (terminal && terminal.ws && terminal.ws.readyState === WebSocket.OPEN) {
+                // 发送 claude --resume 命令
+                const resumeCommand = `claude --resume ${claudeStatus.claude_resume_session}\n`;
+                console.log(`[TerminalContext] Sending auto-resume command: ${resumeCommand.trim()}`);
+
+                terminal.ws.send(JSON.stringify({
+                  type: 'input',
+                  data: resumeCommand,
+                }));
+
+                restoredCount++;
+
+                // 显示通知
+                addNotification({
+                  type: 'success',
+                  title: 'Claude 会话自动恢复',
+                  message: `已自动恢复会话 ${claudeStatus.claude_resume_session.slice(0, 8)}`,
+                });
+              } else {
+                console.warn(`[TerminalContext] Terminal not found or WebSocket not ready for session: ${sessionId}`);
+              }
+              return currentTerminals;
+            });
+          }
+        } catch (error) {
+          console.error(`[TerminalContext] Failed to auto-restore Claude session for ${sessionId}:`, error);
+        }
+      }
+
+      console.log(`[TerminalContext] Auto-restore Claude sessions completed. Restored: ${restoredCount}/${backendSessions.length}`);
+    };
+
     const restoreSessions = async () => {
       setIsRestoring(true);
       setRestoreSettled(false);
@@ -903,6 +974,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         console.log(`[TerminalContext] Restore connection settled: session=${sessionId}, state=${state}, pending=${pendingConnections}`);
         if (pendingConnections === 0) {
           settleRestore('all-connections-settled');
+          // 所有连接恢复完成后，自动检测并恢复 Claude 会话
+          autoRestoreClaudeSessions(backendSessions);
         }
       };
 

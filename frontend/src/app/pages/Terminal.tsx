@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { Terminal as TerminalIcon, X, Plus, RefreshCw, FolderOpen, Send, ChevronRight, ChevronLeft, ChevronDown } from 'lucide-react';
+import { Terminal as TerminalIcon, X, Plus, RefreshCw, FolderOpen, Send, ChevronRight, ChevronLeft, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 import { ActionButton } from '../components/ui-shared';
 import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -255,7 +255,8 @@ const Terminal = () => {
   const [lockedKeyboardHeight, setLockedKeyboardHeight] = useState<number | null>(null); // 锁定的键盘高度
   const [inputValue, setInputValue] = useState('');
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [isFullscreenInput, setIsFullscreenInput] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const viewportRafRef = useRef<number | null>(null);
@@ -1123,32 +1124,48 @@ const Terminal = () => {
               : 'flex flex-col gap-2 p-3 bg-black/20 border-l border-white/5 overflow-y-auto w-48 shrink-0 order-last'
             }
           `}>
-            {terminals.map(terminal => (
-              <button
-                type="button"
-                key={terminal.id}
-                onClick={() => handleActivateTerminal(terminal.id)}
-                className={`
-                  flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-mono transition-colors
-                  ${isMobile ? 'whitespace-nowrap' : ''}
-                  ${activeTabId === terminal.id
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                  }
-                `}
-              >
-                <span className="truncate text-xs sm:text-sm">{terminal.title}</span>
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTerminal(terminal.id);
-                  }}
-                  className="hover:text-red-400 transition-colors shrink-0 cursor-pointer"
+            {terminals.map(terminal => {
+              // 构建 tooltip 内容
+              const tooltipLines = [];
+              if (terminal.projectName) {
+                tooltipLines.push(`项目: ${terminal.projectName}`);
+              }
+              if (terminal.claudeCodeId) {
+                tooltipLines.push(`Claude Code ID: ${terminal.claudeCodeId}`);
+              }
+              if (terminal.sessionId) {
+                tooltipLines.push(`Session ID: ${terminal.sessionId}`);
+              }
+              const tooltipText = tooltipLines.length > 0 ? tooltipLines.join('\n') : terminal.title;
+
+              return (
+                <button
+                  type="button"
+                  key={terminal.id}
+                  onClick={() => handleActivateTerminal(terminal.id)}
+                  title={tooltipText}
+                  className={`
+                    flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-mono transition-colors
+                    ${isMobile ? 'whitespace-nowrap' : ''}
+                    ${activeTabId === terminal.id
+                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                    }
+                  `}
                 >
-                  <X size={14} />
-                </span>
-              </button>
-            ))}
+                  <span className="truncate text-xs sm:text-sm">{terminal.title}</span>
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTerminal(terminal.id);
+                    }}
+                    className="hover:text-red-400 transition-colors shrink-0 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -1356,30 +1373,120 @@ const Terminal = () => {
                 </button>
 
                 <div className="relative flex-1 min-w-0">
-                  <input
+                  <textarea
                     ref={inputRef}
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleInputKeyDown}
                     onFocus={() => setIsMobileInputFocused(true)}
                     onBlur={() => setIsMobileInputFocused(false)}
-                    className="w-full pl-3 pr-12 py-2.5 bg-white/8 border border-white/16 rounded-xl text-white placeholder-gray-400 transition-colors focus:outline-none focus:border-blue-400/70 focus:bg-white/10"
+                    rows={1}
+                    className="w-full pl-3 pr-24 py-2.5 bg-white/8 border border-white/16 rounded-xl text-white placeholder-gray-400 transition-colors focus:outline-none focus:border-blue-400/70 focus:bg-white/10 resize-none overflow-hidden"
                     placeholder="输入 prompt..."
-                  />
-                  <button
-                    type="button"
-                    onPointerDown={(event) => {
-                      preserveInputFocusOnPress(event);
-                      handleSendInput();
+                    style={{
+                      minHeight: '44px',
+                      maxHeight: '120px',
                     }}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 bg-blue-500 hover:bg-blue-600 shadow-[0_6px_18px_rgba(59,130,246,0.35)] disabled:bg-white/12 disabled:text-gray-500 disabled:shadow-none"
-                    disabled={!inputValue.trim()}
-                    aria-label="发送输入"
-                  >
-                    <Send size={18} className="text-white" />
-                  </button>
+                    onInput={(e) => {
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = 'auto';
+                      target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                    }}
+                  />
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onPointerDown={(event) => {
+                        preserveInputFocusOnPress(event);
+                        setIsFullscreenInput(true);
+                      }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 bg-white/8 hover:bg-white/12 border border-white/16"
+                      aria-label="放大输入框"
+                    >
+                      <Maximize2 size={16} className="text-white" />
+                    </button>
+                    <button
+                      type="button"
+                      onPointerDown={(event) => {
+                        preserveInputFocusOnPress(event);
+                        handleSendInput();
+                      }}
+                      className="w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200 bg-blue-500 hover:bg-blue-600 shadow-[0_6px_18px_rgba(59,130,246,0.35)] disabled:bg-white/12 disabled:text-gray-500 disabled:shadow-none"
+                      disabled={!inputValue.trim()}
+                      aria-label="发送输入"
+                    >
+                      <Send size={18} className="text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 全屏输入框模态框 */}
+      {isFullscreenInput && isMobile && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-end"
+          onClick={() => setIsFullscreenInput(false)}
+          style={{
+            paddingBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 'env(safe-area-inset-bottom)',
+          }}
+        >
+          {/* 漂浮卡片 */}
+          <div
+            className="w-full bg-slate-900/95 backdrop-blur-xl border-t border-white/10 rounded-t-3xl shadow-2xl flex flex-col"
+            style={{
+              maxHeight: keyboardHeight > 0 ? `calc(100vh - ${keyboardHeight}px - 60px)` : 'calc(100vh - 120px)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 顶部工具栏 */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
+              <h3 className="text-white font-medium">输入 Prompt</h3>
+              <button
+                type="button"
+                onClick={() => setIsFullscreenInput(false)}
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-white/8 hover:bg-white/12 transition-colors"
+                aria-label="关闭"
+              >
+                <Minimize2 size={20} className="text-white" />
+              </button>
+            </div>
+
+            {/* 可滚动的输入区域 */}
+            <div className="flex-1 overflow-y-auto p-4 min-h-0">
+              <textarea
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleSendInput();
+                    setIsFullscreenInput(false);
+                  }
+                }}
+                className="w-full h-full min-h-[200px] p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 resize-none focus:outline-none focus:border-blue-400/70 focus:bg-white/8"
+                placeholder="输入 prompt...&#10;&#10;提示：按 Cmd/Ctrl + Enter 发送"
+                autoFocus
+              />
+            </div>
+
+            {/* 底部操作栏 */}
+            <div className="px-4 py-3 border-t border-white/10 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  handleSendInput();
+                  setIsFullscreenInput(false);
+                }}
+                className="px-6 py-2.5 rounded-full flex items-center gap-2 transition-all duration-200 bg-blue-500 hover:bg-blue-600 shadow-[0_6px_18px_rgba(59,130,246,0.35)] disabled:bg-white/12 disabled:text-gray-500 disabled:shadow-none"
+                disabled={!inputValue.trim()}
+              >
+                <Send size={18} className="text-white" />
+                <span className="text-white font-medium">发送</span>
+              </button>
             </div>
           </div>
         </div>

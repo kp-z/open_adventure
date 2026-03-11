@@ -111,6 +111,52 @@ class TerminalSession:
             print(f"[Terminal] Error checking claude process: {e}")
             return False
 
+    def get_claude_session_id(self) -> Optional[str]:
+        """获取当前运行的 Claude 会话 ID"""
+        if not self.pid:
+            return None
+        try:
+            import subprocess
+            # 查找 shell 进程的所有子进程
+            result = subprocess.run(
+                ['pgrep', '-P', str(self.pid)],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode == 0:
+                child_pids = result.stdout.strip().split('\n')
+
+                # 检查每个子进程的命令行参数
+                for child_pid in child_pids:
+                    if child_pid:
+                        try:
+                            # 获取完整的命令行参数
+                            cmd_result = subprocess.run(
+                                ['ps', '-p', child_pid, '-o', 'args='],
+                                capture_output=True,
+                                text=True
+                            )
+                            cmd_line = cmd_result.stdout.strip()
+                            print(f"[Terminal] PID {child_pid} full command: {cmd_line}")
+
+                            # 检查是否是 claude --resume 命令
+                            if 'claude' in cmd_line.lower() and '--resume' in cmd_line:
+                                # 提取 session ID
+                                parts = cmd_line.split()
+                                for i, part in enumerate(parts):
+                                    if part == '--resume' and i + 1 < len(parts):
+                                        session_id = parts[i + 1]
+                                        print(f"[Terminal] Found Claude session ID: {session_id}")
+                                        return session_id
+                        except Exception as e:
+                            print(f"[Terminal] Error checking PID {child_pid}: {e}")
+
+            return None
+        except Exception as e:
+            print(f"[Terminal] Error in get_claude_session_id: {e}")
+            return None
+
     def start(self):
         """Start a new PTY session"""
         print(f"[Terminal] Starting new PTY session...")
@@ -1084,6 +1130,7 @@ async def terminal_status():
             "running": session.running,
             "process_alive": session.is_process_alive(),
             "initial_dir": session.initial_dir,
+            "claude_code_id": session.claude_resume_session,  # Claude Code 的 session ID
             "created_at": session.created_at.isoformat(),
             "last_activity": session.last_activity.isoformat(),
         })
@@ -1111,11 +1158,19 @@ async def get_claude_status(session_id: str):
     session = sessions[session_id]
     claude_running = session.check_claude_running()
 
+    # 尝试获取当前运行的 Claude 会话 ID
+    detected_session_id = None
+    if claude_running:
+        detected_session_id = session.get_claude_session_id()
+
+    # 优先使用检测到的会话 ID，如果没有则使用创建时传入的
+    claude_session_id = detected_session_id or (session.claude_resume_session if hasattr(session, 'claude_resume_session') else None)
+
     return JSONResponse({
         "running": claude_running,
         "session_exists": True,
         "process_alive": session.is_process_alive(),
-        "claude_resume_session": session.claude_resume_session if hasattr(session, 'claude_resume_session') else None,
+        "claude_resume_session": claude_session_id,
         "initial_dir": session.initial_dir,
     })
 
