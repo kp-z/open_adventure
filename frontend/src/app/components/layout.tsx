@@ -474,8 +474,19 @@ export const Layout = () => {
     <div
       className={`app-shell min-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} bg-[#0f111a]`}
     >
-      {/* 桌面端侧边栏 - Microverse 模式下完全隐藏 */}
-      {!isMicroverse && (
+      {/* 桌面端侧边栏 - Microverse 模式下变成浮动按钮 */}
+      {isMicroverse ? (
+        /* Microverse 模式：浮动返回按钮 */
+        <div className="hidden md:block fixed top-4 left-4 z-50">
+          <button
+            onClick={() => navigate('/')}
+            className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 hover:scale-110 shadow-lg bg-purple-500/10 backdrop-blur-xl border border-purple-400/30 shadow-purple-500/20 hover:bg-purple-500/20"
+          >
+            <Gamepad2 size={24} className="text-purple-400" />
+          </button>
+        </div>
+      ) : (
+        /* 正常模式：完整侧边栏 */
         <aside
           className={`
           ${isSidebarOpen ? "w-72" : "w-20"}
@@ -485,28 +496,38 @@ export const Layout = () => {
         >
         {/* Logo - 点击切换到 Microverse */}
         <button
-          onClick={() => navigate('/microverse')}
+          onClick={() => navigate(isMicroverse ? '/' : '/microverse')}
           className={`
             h-20 flex items-center ${isSidebarOpen ? 'px-6' : 'px-4 justify-center'} gap-4 transition-all duration-500 hover:bg-white/5 group
-            border-b border-blue-500/20
+            ${isMicroverse ? 'border-b border-purple-500/20' : 'border-b border-blue-500/20'}
           `}
         >
           <div
             className={`
               w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
-              bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10
+              ${isMicroverse
+                ? 'bg-purple-500/10 backdrop-blur-xl border border-purple-400/30 shadow-purple-500/10'
+                : 'bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10'
+              }
             `}
           >
-            <Zap
-              size={24}
-              className="text-blue-400"
-            />
+            {isMicroverse ? (
+              <Gamepad2
+                size={24}
+                className="text-purple-400"
+              />
+            ) : (
+              <Zap
+                size={24}
+                className="text-blue-400"
+              />
+            )}
           </div>
 
           {isSidebarOpen && (
             <div className="flex flex-col items-start overflow-hidden">
               <motion.div
-                key={lang}
+                key={`${lang}-${isMicroverse}`}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="flex flex-col"
@@ -514,19 +535,19 @@ export const Layout = () => {
                 <span
                   className="text-lg font-black tracking-tighter uppercase italic leading-[0.85] text-white"
                 >
-                  Open
+                  {isMicroverse ? 'Game' : 'Open'}
                 </span>
                 <span
-                  className="text-sm font-black tracking-[0.2em] uppercase leading-tight text-blue-400/80"
+                  className={`text-sm font-black tracking-[0.2em] uppercase leading-tight ${isMicroverse ? 'text-purple-400/80' : 'text-blue-400/80'}`}
                 >
-                  Adventure
+                  {isMicroverse ? 'Mode' : 'Adventure'}
                 </span>
               </motion.div>
             </div>
           )}
         </button>
 
-        <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />
+        {!isMicroverse && <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />}
         </aside>
       )}
 
@@ -627,46 +648,24 @@ export const Layout = () => {
         `}
         >
           <div className="flex items-center gap-4 flex-1">
-            {/* Microverse 模式：显示 Logo */}
-            {isMicroverse ? (
-              <button
-                onClick={() => navigate('/')}
-                className="flex items-center gap-4 transition-all duration-500 hover:bg-white/5 px-4 py-2 rounded-xl group"
-              >
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10">
-                  <Zap size={24} className="text-blue-400" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <span className="text-lg font-black tracking-tighter uppercase italic leading-[0.85] text-white">
-                    Open
-                  </span>
-                  <span className="text-sm font-black tracking-[0.2em] uppercase leading-tight text-blue-400/80">
-                    Adventure
-                  </span>
-                </div>
-              </button>
-            ) : (
-              <>
-                {/* 侧边栏收起/展开按钮 - 仅桌面端显示 */}
-                <button
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className={`
-                    hidden md:flex p-2.5 rounded-xl transition-all duration-200
-                    ${isSidebarOpen
-                      ? 'hover:bg-white/5 text-gray-400 hover:text-white'
-                      : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
-                    }
-                  `}
-                  title={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
-                >
-                  {isSidebarOpen ? (
-                    <PanelLeftClose size={20} />
-                  ) : (
-                    <PanelLeftOpen size={20} />
-                  )}
-                </button>
-              </>
-            )}
+            {/* 侧边栏收起/展开按钮 - 仅桌面端显示 */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className={`
+                hidden md:flex p-2.5 rounded-xl transition-all duration-200
+                ${isSidebarOpen
+                  ? 'hover:bg-white/5 text-gray-400 hover:text-white'
+                  : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                }
+              `}
+              title={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
+            >
+              {isSidebarOpen ? (
+                <PanelLeftClose size={20} />
+              ) : (
+                <PanelLeftOpen size={20} />
+              )}
+            </button>
 
             {/* 前进/后退按钮 */}
             <div className="hidden sm:flex items-center gap-1">
