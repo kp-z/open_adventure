@@ -329,7 +329,7 @@ async def get_claude_settings():
 @router.put("/settings")
 async def update_claude_settings(update: ClaudeSettingsUpdate):
     """
-    更新 Claude settings.json 配置
+    更新 Claude 配置（自动检测并更新 cc-switch 或 settings.json）
 
     Args:
         update: 要更新的配置项（只更新提供的字段）
@@ -337,10 +337,73 @@ async def update_claude_settings(update: ClaudeSettingsUpdate):
     Returns:
         Dict: 更新后的完整配置
     """
+    import sqlite3
+    from app.core.logging import get_logger
+
+    logger = get_logger(__name__)
+
+    # 1. 检查是否使用 cc-switch
+    cc_switch_db = Path.home() / ".cc-switch" / "cc-switch.db"
+    if cc_switch_db.exists():
+        try:
+            # 更新 cc-switch 数据库
+            conn = sqlite3.connect(str(cc_switch_db))
+            cursor = conn.cursor()
+
+            # 查询当前激活的 provider
+            cursor.execute("""
+                SELECT id, settings_config
+                FROM providers
+                WHERE app_type = 'claude' AND is_current = 1
+                LIMIT 1
+            """)
+
+            row = cursor.fetchone()
+            if row:
+                provider_id, settings_config_str = row
+                settings_config = json.loads(settings_config_str)
+
+                # 更新提供的字段
+                update_dict = update.model_dump(exclude_none=True)
+                for key, value in update_dict.items():
+                    if key == 'permissions' and value is not None:
+                        if 'permissions' not in settings_config:
+                            settings_config['permissions'] = {}
+                        settings_config['permissions'].update(value)
+                    elif key == 'env' and value is not None:
+                        if 'env' not in settings_config:
+                            settings_config['env'] = {}
+                        settings_config['env'].update(value)
+                    elif key == 'enabledPlugins' and value is not None:
+                        if 'enabledPlugins' not in settings_config:
+                            settings_config['enabledPlugins'] = {}
+                        settings_config['enabledPlugins'].update(value)
+                    else:
+                        settings_config[key] = value
+
+                # 更新数据库
+                cursor.execute("""
+                    UPDATE providers
+                    SET settings_config = ?
+                    WHERE id = ?
+                """, (json.dumps(settings_config), provider_id))
+
+                conn.commit()
+                conn.close()
+
+                logger.info(f"Updated cc-switch config for provider {provider_id}")
+                return settings_config
+
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to update cc-switch: {e}")
+            # 如果 cc-switch 更新失败，继续尝试更新 settings.json
+
+    # 2. 更新 settings.json（作为 fallback 或主要配置源）
     settings_file = settings.claude_config_dir / "settings.json"
 
     if not settings_file.exists():
-        raise HTTPException(status_code=404, detail="settings.json not found")
+        raise HTTPException(status_code=404, detail="No configuration found (neither cc-switch nor settings.json)")
 
     try:
         # 读取现有配置
@@ -372,9 +435,142 @@ async def update_claude_settings(update: ClaudeSettingsUpdate):
         with open(settings_file, 'w', encoding='utf-8') as f:
             json.dump(current_settings, f, indent=2, ensure_ascii=False)
 
+        logger.info("Updated settings.json")
         return current_settings
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update settings.json: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update settings: {str(e)}")
+
+
+@router.post("/initialize")
+async def initialize_system(session: AsyncSession = Depends(get_db)):
+    """
+    系统初始化接口，按顺序同步所有数据
+
+    Returns:
+        {
+            "success": true,
+            "steps": [
+                {"name": "check_health", "status": "completed", "message": "检查 Claude 环境"},
+                {"name": "load_models", "status": "completed", "message": "加载可用模型"},
+                {"name": "sync_skills", "status": "completed", "count": 15, "message": "同步 Skills"},
+                {"name": "sync_agents", "status": "completed", "count": 8, "message": "同步 Agents"},
+                {"name": "sync_teams", "status": "completed", "count": 3, "message": "同步 Teams"},
+                {"name": "scan_marketplace", "status": "completed", "count": 5, "message": "扫描 Marketplace"}
+            ],
+            "total_synced": 26,
+            "duration_ms": 1234
+        }
+    """
+    import time
+    from app.core.logging import get_logger
+    from app.repositories.plugin_repository import PluginRepository
+
+    logger = get_logger(__name__)
+    start_time = time.time()
+
+    sync_service = SyncService(session)
+    steps = []
+    total_synced = 0
+
+    try:
+        # Step 1: 检查 Claude 环境健康状态
+        logger.info("Checking Claude environment health...")
+        adapter = ClaudeAdapter()
+        health = await adapter.check_health()
+        steps.append({
+            "name": "check_health",
+            "status": "completed",
+            "message": "检查 Claude 环境"
+        })
+
+        # Step 2: 加载可用模型列表
+        logger.info("Loading available models...")
+        model_count = len(health.get("model_info", {}).get("available_models", []))
+        steps.append({
+            "name": "load_models",
+            "status": "completed",
+            "count": model_count,
+            "message": f"加载可用模型"
+        })
+
+        # Step 3: 同步 Skills
+        logger.info("Starting skills synchronization...")
+        skills_result = await sync_service.sync_skills()
+        synced_skills = skills_result.get("synced", 0)
+        steps.append({
+            "name": "sync_skills",
+            "status": "completed",
+            "count": synced_skills,
+            "message": f"同步 Skills"
+        })
+        total_synced += synced_skills
+
+        # Step 4: 同步 Agents
+        logger.info("Starting agents synchronization...")
+        agents_result = await sync_service.sync_agents()
+        synced_agents = agents_result.get("synced", 0)
+        steps.append({
+            "name": "sync_agents",
+            "status": "completed",
+            "count": synced_agents,
+            "message": f"同步 Agents"
+        })
+        total_synced += synced_agents
+
+        # Step 5: 同步 Agent Teams
+        logger.info("Starting agent teams synchronization...")
+        teams_result = await sync_service.sync_agent_teams()
+        synced_teams = teams_result.get("synced", 0)
+        steps.append({
+            "name": "sync_teams",
+            "status": "completed",
+            "count": synced_teams,
+            "message": f"同步 Teams"
+        })
+        total_synced += synced_teams
+
+        # Step 6: 扫描 Marketplace 插件
+        logger.info("Scanning marketplace plugins...")
+        try:
+            plugin_repo = PluginRepository(session)
+            from app.services.plugin_service import PluginService
+            plugin_service = PluginService(plugin_repo)
+            marketplace_result = await plugin_service.scan_marketplace()
+            plugin_count = len(marketplace_result.get("items", []))
+            steps.append({
+                "name": "scan_marketplace",
+                "status": "completed",
+                "count": plugin_count,
+                "message": f"扫描 Marketplace"
+            })
+        except Exception as e:
+            logger.warning(f"Failed to scan marketplace: {e}")
+            steps.append({
+                "name": "scan_marketplace",
+                "status": "completed",
+                "count": 0,
+                "message": "扫描 Marketplace"
+            })
+
+        duration_ms = int((time.time() - start_time) * 1000)
+        logger.info(f"Initialization completed in {duration_ms}ms, total synced: {total_synced}")
+
+        return {
+            "success": True,
+            "steps": steps,
+            "total_synced": total_synced,
+            "duration_ms": duration_ms
+        }
+    except Exception as e:
+        logger.error(f"Initialization failed: {e}")
+        duration_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": False,
+            "steps": steps,
+            "total_synced": total_synced,
+            "duration_ms": duration_ms,
+            "error": str(e)
+        }
 
 
 @router.post("/optimize-prompt", response_model=PromptOptimizeResponse)

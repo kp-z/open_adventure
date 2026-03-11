@@ -17,7 +17,13 @@ import {
   Info,
   Package,
   Trash2,
-  HardDrive
+  HardDrive,
+  FileText,
+  Save,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  Plus
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -27,6 +33,7 @@ import { MarketplacePluginsManager } from '../components/MarketplacePluginsManag
 import { motion } from 'motion/react';
 import { useLocation } from 'react-router';
 import { cache } from '../../lib/storage';
+import { configApi, type AppConfig, type ModelConfig } from '@/lib/api';
 
 const Settings = () => {
   const { mode, setMode, lang, setLang } = useMode();
@@ -35,6 +42,23 @@ const Settings = () => {
   const [activeTab, setActiveTab] = useState('general');
   const [isClearing, setIsClearing] = useState(false);
 
+  // 折叠状态
+  const [isAppConfigCollapsed, setIsAppConfigCollapsed] = useState(true);
+
+  // 配置管理状态
+  const [config, setConfig] = useState<AppConfig>({});
+  const [configFile, setConfigFile] = useState<string>('');
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  // 模型配置状态
+  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [currentModel, setCurrentModel] = useState<string>('');
+  const [customModels, setCustomModels] = useState<ModelConfig[]>([]);
+  const [customFile, setCustomFile] = useState<string>('');
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [isSavingModels, setIsSavingModels] = useState(false);
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
@@ -42,6 +66,136 @@ const Settings = () => {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  // 加载配置
+  useEffect(() => {
+    if (activeTab === 'general') {
+      loadConfig();
+      loadModels();
+    }
+  }, [activeTab]);
+
+  const loadConfig = async () => {
+    setIsLoadingConfig(true);
+    try {
+      const response = await configApi.getConfig();
+      setConfig(response.config);
+      setConfigFile(response.config_file);
+    } catch (error) {
+      console.error('Failed to load config:', error);
+    } finally {
+      setIsLoadingConfig(false);
+    }
+  };
+
+  const loadModels = async () => {
+    setIsLoadingModels(true);
+    try {
+      // 1. 从 health API 获取当前可用的所有模型（默认 + 自定义合并后的）
+      const healthData = await claudeApi.health();
+      setAvailableModels(healthData.model_info?.available_models || []);
+      setCurrentModel(healthData.model_info?.current_model || '');
+
+      // 2. 从 config API 获取自定义模型配置
+      const configData = await configApi.getModels();
+      setCustomModels(configData.custom_models || []);
+      setCustomFile(configData.custom_file);
+    } catch (error) {
+      console.error('Failed to load models:', error);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const handleConfigChange = (key: keyof AppConfig, value: string) => {
+    setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveConfig = async () => {
+    setIsSavingConfig(true);
+    try {
+      await configApi.updateConfig(config);
+      alert('✅ 配置已保存成功！');
+    } catch (error) {
+      console.error('Failed to save config:', error);
+      alert('❌ 保存配置失败，请重试');
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleResetConfig = async () => {
+    if (!confirm('确定要重置配置为默认值吗？这将清除所有自定义配置。')) {
+      return;
+    }
+
+    try {
+      await configApi.resetConfig();
+      await loadConfig();
+      alert('✅ 配置已重置为默认值！');
+    } catch (error) {
+      console.error('Failed to reset config:', error);
+      alert('❌ 重置配置失败，请重试');
+    }
+  };
+
+  const handleModelChange = (index: number, field: keyof ModelConfig, value: string) => {
+    setCustomModels(prev => {
+      if (!Array.isArray(prev)) return [];
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleAddModel = () => {
+    setCustomModels(prev => {
+      if (!Array.isArray(prev)) return [{ alias: '', full_name: '', description: '' }];
+      return [...prev, { alias: '', full_name: '', description: '' }];
+    });
+  };
+
+  const handleRemoveModel = (index: number) => {
+    setCustomModels(prev => {
+      if (!Array.isArray(prev)) return [];
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleSaveModels = async () => {
+    // 验证模型配置
+    const invalidModels = customModels.filter(m => !m.alias || !m.full_name);
+    if (invalidModels.length > 0) {
+      alert('❌ 请填写所有模型的 alias 和 full_name');
+      return;
+    }
+
+    setIsSavingModels(true);
+    try {
+      await configApi.updateModels(customModels);
+      alert('✅ 自定义模型配置已保存成功！');
+    } catch (error) {
+      console.error('Failed to save models:', error);
+      alert('❌ 保存模型配置失败，请重试');
+    } finally {
+      setIsSavingModels(false);
+    }
+  };
+
+  const handleResetModels = async () => {
+    if (!confirm('确定要清空自定义模型配置吗？')) {
+      return;
+    }
+
+    try {
+      await configApi.resetModels();
+      await loadModels();
+      alert('✅ 自定义模型配置已清空！');
+    } catch (error) {
+      console.error('Failed to reset models:', error);
+      alert('❌ 清空模型配置失败，请重试');
+    }
+  };
 
   const handleClearCache = async () => {
     if (!confirm('确定要清除所有缓存吗？这将删除 Service Worker 缓存和 IndexedDB 数据，下次加载时间会变长。')) {
@@ -92,7 +246,7 @@ const Settings = () => {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 activeTab === item.id
-                  ? (mode === 'adventure' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-blue-600/20 text-blue-400 border border-blue-500/30')
+                  ? (false ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-blue-600/20 text-blue-400 border border-blue-500/30')
                   : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
@@ -107,10 +261,176 @@ const Settings = () => {
           {/* General Tab */}
           {activeTab === 'general' && (
             <>
-              {/* Interface Mode */}
+              {/* 应用配置 */}
               <section className="space-y-4">
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setIsAppConfigCollapsed(!isAppConfigCollapsed)}
+                >
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <FileText size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
+                    应用配置
+                  </h2>
+                  <div className="flex items-center gap-2">
+                    {!isAppConfigCollapsed && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleResetConfig();
+                          }}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+                        >
+                          <RotateCcw size={16} />
+                          重置
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSaveConfig();
+                          }}
+                          disabled={isSavingConfig}
+                          className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-all ${
+                            isSavingConfig
+                              ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                              : false
+                              ? 'bg-yellow-500 hover:bg-yellow-600 text-black'
+                              : 'bg-blue-500 hover:bg-blue-600 text-white'
+                          }`}
+                        >
+                          <Save size={16} />
+                          {isSavingConfig ? '保存中...' : '保存'}
+                        </button>
+                      </>
+                    )}
+                    {isAppConfigCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                  </div>
+                </div>
+
+                {!isAppConfigCollapsed && (
+                  <>
+                    {isLoadingConfig ? (
+                      <div className="text-center py-8 text-gray-400">加载配置中...</div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="text-xs text-gray-500 mb-4">
+                          配置文件: {configFile}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* APP_NAME */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">应用名称</label>
+                            <input
+                              type="text"
+                              value={config.APP_NAME || ''}
+                              onChange={(e) => handleConfigChange('APP_NAME', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                              placeholder="Open Adventure"
+                            />
+                          </div>
+
+                          {/* APP_VERSION */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">应用版本</label>
+                            <input
+                              type="text"
+                              value={config.APP_VERSION || ''}
+                              onChange={(e) => handleConfigChange('APP_VERSION', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                              placeholder="0.2.0"
+                            />
+                          </div>
+
+                          {/* ENV */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">运行环境</label>
+                            <select
+                              value={config.ENV || 'production'}
+                              onChange={(e) => handleConfigChange('ENV', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                            >
+                              <option value="development">development</option>
+                              <option value="production">production</option>
+                            </select>
+                          </div>
+
+                          {/* DEBUG */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">调试模式</label>
+                            <select
+                              value={config.DEBUG || 'false'}
+                              onChange={(e) => handleConfigChange('DEBUG', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                            >
+                              <option value="false">关闭</option>
+                              <option value="true">开启</option>
+                            </select>
+                          </div>
+
+                          {/* LOG_LEVEL */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">日志级别</label>
+                            <select
+                              value={config.LOG_LEVEL || 'INFO'}
+                              onChange={(e) => handleConfigChange('LOG_LEVEL', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                            >
+                              <option value="DEBUG">DEBUG</option>
+                              <option value="INFO">INFO</option>
+                              <option value="WARNING">WARNING</option>
+                              <option value="ERROR">ERROR</option>
+                            </select>
+                          </div>
+
+                          {/* CLAUDE_CLI_PATH */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-300">Claude CLI 路径</label>
+                            <input
+                              type="text"
+                              value={config.CLAUDE_CLI_PATH || ''}
+                              onChange={(e) => handleConfigChange('CLAUDE_CLI_PATH', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all font-mono"
+                              placeholder="claude"
+                            />
+                          </div>
+
+                          {/* ANTHROPIC_API_KEY */}
+                          <div className="space-y-2 md:col-span-2">
+                            <label className="text-sm font-medium text-gray-300">Anthropic API Key</label>
+                            <input
+                              type="password"
+                              value={config.ANTHROPIC_API_KEY || ''}
+                              onChange={(e) => handleConfigChange('ANTHROPIC_API_KEY', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all font-mono"
+                              placeholder="sk-ant-..."
+                            />
+                            <p className="text-xs text-gray-500">留空则使用 Claude Code CLI 的默认配置</p>
+                          </div>
+
+                          {/* SECRET_KEY */}
+                          <div className="space-y-2 md:col-span-2">
+                            <label className="text-sm font-medium text-gray-300">Secret Key（安全密钥）</label>
+                            <input
+                              type="password"
+                              value={config.SECRET_KEY || ''}
+                              onChange={(e) => handleConfigChange('SECRET_KEY', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all font-mono"
+                              placeholder="change-this-to-a-random-secret-key-in-production"
+                            />
+                            <p className="text-xs text-gray-500">用于加密和签名，生产环境请修改为随机字符串</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </section>
+
+              {/* Interface Mode */}
+              <section className="space-y-4 pt-8 border-t border-white/10">
                 <h2 className="text-xl font-bold flex items-center gap-2">
-                  <Palette size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                  <Palette size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                   {t("interfaceMode")}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -129,14 +449,14 @@ const Settings = () => {
                   <button
                     onClick={() => setMode('adventure')}
                     className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${
-                      mode === 'adventure' ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-white/10 bg-white/5 hover:border-white/20'
+                      false ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-white/10 bg-white/5 hover:border-white/20'
                     }`}
                   >
-                    {mode === 'adventure' && <div className="absolute top-4 right-4 text-yellow-500"><Check size={20} /></div>}
-                    <Sword className={`mb-4 ${mode === 'adventure' ? 'text-yellow-500' : 'text-gray-500'}`} size={32} />
+                    {false && <div className="absolute top-4 right-4 text-yellow-500"><Check size={20} /></div>}
+                    <Sword className={`mb-4 ${false ? 'text-yellow-500' : 'text-gray-500'}`} size={32} />
                     <h3 className="font-bold text-lg">{t("advTitle")}</h3>
                     <p className="text-xs text-gray-400 mt-1">{t("advDesc")}</p>
-                    {mode === 'adventure' && <div className="absolute inset-0 bg-yellow-500/5 animate-pulse pointer-events-none" />}
+                    {false && <div className="absolute inset-0 bg-yellow-500/5 animate-pulse pointer-events-none" />}
                   </button>
                 </div>
               </section>
@@ -144,7 +464,7 @@ const Settings = () => {
               {/* Language Settings */}
               <section className="space-y-4">
                 <h2 className="text-xl font-bold flex items-center gap-2">
-                  <Languages size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                  <Languages size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                   {t("langSettings")}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -152,12 +472,12 @@ const Settings = () => {
                     onClick={() => setLang('en')}
                     className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${
                       lang === 'en'
-                        ? (mode === 'adventure' ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-blue-500 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.2)]')
+                        ? (false ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-blue-500 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.2)]')
                         : 'border-white/10 bg-white/5 hover:border-white/20'
                     }`}
                   >
-                    {lang === 'en' && <div className={`absolute top-4 right-4 ${mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}`}><Check size={20} /></div>}
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${lang === 'en' ? (mode === 'adventure' ? 'bg-yellow-500 text-black' : 'bg-blue-600 text-white') : 'bg-white/10 text-gray-400'}`}>
+                    {lang === 'en' && <div className={`absolute top-4 right-4 ${false ? 'text-yellow-500' : 'text-blue-500'}`}><Check size={20} /></div>}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${lang === 'en' ? (false ? 'bg-yellow-500 text-black' : 'bg-blue-600 text-white') : 'bg-white/10 text-gray-400'}`}>
                       EN
                     </div>
                     <h3 className="font-bold text-lg">{t("enLang")}</h3>
@@ -168,18 +488,199 @@ const Settings = () => {
                     onClick={() => setLang('zh')}
                     className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${
                       lang === 'zh'
-                        ? (mode === 'adventure' ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-blue-500 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.2)]')
+                        ? (false ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-blue-500 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.2)]')
                         : 'border-white/10 bg-white/5 hover:border-white/20'
                     }`}
                   >
-                    {lang === 'zh' && <div className={`absolute top-4 right-4 ${mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}`}><Check size={20} /></div>}
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${lang === 'zh' ? (mode === 'adventure' ? 'bg-yellow-500 text-black' : 'bg-blue-600 text-white') : 'bg-white/10 text-gray-400'}`}>
+                    {lang === 'zh' && <div className={`absolute top-4 right-4 ${false ? 'text-yellow-500' : 'text-blue-500'}`}><Check size={20} /></div>}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${lang === 'zh' ? (false ? 'bg-yellow-500 text-black' : 'bg-blue-600 text-white') : 'bg-white/10 text-gray-400'}`}>
                       ZH
                     </div>
                     <h3 className="font-bold text-lg">{t("zhLang")}</h3>
                     <p className="text-xs text-gray-400 mt-1">中文简体界面</p>
                   </button>
                 </div>
+              </section>
+
+              {/* Model Configuration */}
+              <section className="space-y-4 pt-8 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold flex items-center gap-2">
+                      <Zap size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
+                      模型配置
+                    </h2>
+                    <p className="text-sm text-gray-400 mt-2">
+                      配置可用的 Claude 模型列表，用于 Agent 和 Workflow 选择
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleResetModels}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+                    >
+                      <RotateCcw size={16} />
+                      清空自定义
+                    </button>
+                    <button
+                      onClick={handleSaveModels}
+                      disabled={isSavingModels}
+                      className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg transition-all ${
+                        isSavingModels
+                          ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                          : false
+                          ? 'bg-yellow-500 hover:bg-yellow-600 text-black'
+                          : 'bg-blue-500 hover:bg-blue-600 text-white'
+                      }`}
+                    >
+                      <Save size={16} />
+                      {isSavingModels ? '保存中...' : '保存'}
+                    </button>
+                  </div>
+                </div>
+
+                {isLoadingModels ? (
+                  <div className="text-center py-8 text-gray-400">加载模型配置中...</div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* 当前可用模型（只读） */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-gray-300">当前可用模型</h3>
+                        <span className="text-xs text-gray-500">来自 default_models.json + custom_models.json</span>
+                      </div>
+                      <div className="space-y-2">
+                        {availableModels && availableModels.length > 0 ? (
+                          availableModels.map((model, index) => (
+                            <div
+                              key={index}
+                              className={`border rounded-lg p-3 ${
+                                model.alias === currentModel || model.full_name === currentModel
+                                  ? false
+                                    ? 'bg-yellow-500/10 border-yellow-500/30'
+                                    : 'bg-blue-500/10 border-blue-500/30'
+                                  : 'bg-white/5 border-white/10'
+                              }`}
+                            >
+                              <div className="grid grid-cols-4 gap-3 text-sm items-center">
+                                <div>
+                                  <span className="text-gray-500">Alias:</span>
+                                  <span className="ml-2 text-gray-300">{model.alias}</span>
+                                  {(model.alias === currentModel || model.full_name === currentModel) && (
+                                    <span className={`ml-2 text-xs px-2 py-0.5 rounded ${
+                                      false ? 'bg-yellow-500 text-black' : 'bg-blue-500 text-white'
+                                    }`}>
+                                      当前
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Model:</span>
+                                  <span className="ml-2 text-gray-300 font-mono text-xs">{model.full_name}</span>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">描述:</span>
+                                  <span className="ml-2 text-gray-400">{model.description}</span>
+                                </div>
+                                <div className="text-right">
+                                  {model.available ? (
+                                    <span className="text-xs text-green-400">✓ 可用</span>
+                                  ) : (
+                                    <span className="text-xs text-red-400">✗ 不可用</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-center py-4 text-gray-500 text-sm">
+                            暂无可用模型
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* 自定义模型编辑区（可编辑） */}
+                    <div className="space-y-3 pt-6 border-t border-white/10">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-300">编辑自定义模型</h3>
+                          <p className="text-xs text-gray-500 mt-1">修改后需要保存并刷新页面才能在上方列表中看到</p>
+                        </div>
+                        <span className="text-xs text-gray-500">{customFile}</span>
+                      </div>
+
+                      {customModels && customModels.length === 0 ? (
+                        <div className="text-center py-6 text-gray-500 text-sm">
+                          暂无自定义模型，点击下方按钮添加
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {customModels && customModels.map((model, index) => (
+                            <div key={index} className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm font-medium text-gray-300">自定义模型 #{index + 1}</div>
+                                <button
+                                  onClick={() => handleRemoveModel(index)}
+                                  className="text-red-400 hover:text-red-300 transition-all"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-400">Alias (别名)</label>
+                                  <input
+                                    type="text"
+                                    value={model.alias}
+                                    onChange={(e) => handleModelChange(index, 'alias', e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                                    placeholder="my-model"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-400">Full Name (完整名称)</label>
+                                  <input
+                                    type="text"
+                                    value={model.full_name}
+                                    onChange={(e) => handleModelChange(index, 'full_name', e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all font-mono"
+                                    placeholder="claude-custom-20260101"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <label className="text-xs text-gray-400">Description (描述)</label>
+                                  <input
+                                    type="text"
+                                    value={model.description}
+                                    onChange={(e) => handleModelChange(index, 'description', e.target.value)}
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-all"
+                                    placeholder="My custom model"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <button
+                        onClick={handleAddModel}
+                        className={`w-full py-3 rounded-xl border-2 border-dashed transition-all flex items-center justify-center gap-2 ${
+                          false
+                            ? 'border-yellow-500/30 hover:border-yellow-500 hover:bg-yellow-500/5 text-yellow-400'
+                            : 'border-blue-500/30 hover:border-blue-500 hover:bg-blue-500/5 text-blue-400'
+                        }`}
+                      >
+                        <Plus size={18} />
+                        添加自定义模型
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
             </>
           )}
@@ -188,7 +689,7 @@ const Settings = () => {
           {activeTab === 'integration' && (
             <section className="space-y-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
-                <Monitor size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                <Monitor size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                 {t("integration")}
               </h2>
               <div className="space-y-4">
@@ -202,13 +703,13 @@ const Settings = () => {
                 </div>
                 <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/10">
                   <div className="flex items-center gap-3">
-                    <Globe size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-400'} />
+                    <Globe size={20} className={false ? 'text-yellow-500' : 'text-blue-400'} />
                     <div>
                       <p className="font-bold text-sm">Auto-Sync Skills</p>
                       <p className="text-xs text-gray-500">Automatically update local skills from cloud.</p>
                     </div>
                   </div>
-                  <div className={`w-12 h-6 rounded-full ${mode === 'adventure' ? 'bg-yellow-600' : 'bg-blue-600'} p-1 flex justify-end cursor-pointer`}>
+                  <div className={`w-12 h-6 rounded-full ${false ? 'bg-yellow-600' : 'bg-blue-600'} p-1 flex justify-end cursor-pointer`}>
                     <div className="w-4 h-4 rounded-full bg-white" />
                   </div>
                 </div>
@@ -222,7 +723,7 @@ const Settings = () => {
               <section className="space-y-4">
                 <div>
                   <h2 className="text-xl font-bold flex items-center gap-2">
-                    <FolderGit2 size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                    <FolderGit2 size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                     项目路径配置
                   </h2>
                   <p className="text-sm text-gray-400 mt-2">
@@ -236,7 +737,7 @@ const Settings = () => {
               <section className="space-y-4 pt-8 border-t border-white/10">
                 <div>
                   <h2 className="text-xl font-bold flex items-center gap-2">
-                    <HardDrive size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                    <HardDrive size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                     缓存管理
                   </h2>
                   <p className="text-sm text-gray-400 mt-2">
@@ -246,8 +747,8 @@ const Settings = () => {
 
                 <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-4">
                   <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-xl ${mode === 'adventure' ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
-                      <Database size={24} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                    <div className={`p-3 rounded-xl ${false ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
+                      <Database size={24} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                     </div>
                     <div className="flex-1">
                       <h3 className="font-bold text-lg mb-2">PWA 缓存</h3>
@@ -284,7 +785,7 @@ const Settings = () => {
             <section className="space-y-4">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
-                  <Package size={20} className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'} />
+                  <Package size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
                   Marketplace Plugins
                 </h2>
                 <p className="text-sm text-gray-400 mt-2">
@@ -307,14 +808,14 @@ const Settings = () => {
 
               <div className="space-y-4">
                 <h3 className="text-2xl font-bold flex items-center gap-2">
-                  <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>🎯</span>
+                  <span className={false ? 'text-yellow-500' : 'text-blue-500'}>🎯</span>
                   设计理念
                 </h3>
 
                 <div className="space-y-8">
                   <div>
                     <h4 className="text-xl font-bold mb-3 flex items-center gap-2">
-                      <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>🤖</span>
+                      <span className={false ? 'text-yellow-500' : 'text-blue-500'}>🤖</span>
                       AI Agent 管理与编排
                     </h4>
                     <p className="text-gray-300 mb-3">统一管理平台 - 一站式管理 Skills、Agents、Teams、Workflows 和 Tasks</p>
@@ -336,7 +837,7 @@ const Settings = () => {
 
                   <div>
                     <h4 className="text-xl font-bold mb-3 flex items-center gap-2">
-                      <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>📱</span>
+                      <span className={false ? 'text-yellow-500' : 'text-blue-500'}>📱</span>
                       移动端优先设计
                     </h4>
                     <p className="text-gray-300 mb-3">响应式界面 - 完美适配桌面、平板和移动设备</p>
@@ -358,7 +859,7 @@ const Settings = () => {
 
                   <div>
                     <h4 className="text-xl font-bold mb-3 flex items-center gap-2">
-                      <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>🎮</span>
+                      <span className={false ? 'text-yellow-500' : 'text-blue-500'}>🎮</span>
                       游戏化体验
                     </h4>
                     <p className="text-gray-300 mb-3">双模式界面 - 专业模式 + 冒险模式，让 AI 管理更有趣</p>
@@ -392,7 +893,7 @@ const Settings = () => {
 
               <div className="space-y-4">
                 <h3 className="text-2xl font-bold flex items-center gap-2">
-                  <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>🏗️</span>
+                  <span className={false ? 'text-yellow-500' : 'text-blue-500'}>🏗️</span>
                   技术架构
                 </h3>
                 <div className="bg-black/30 rounded-xl p-6 font-mono text-sm text-gray-300 space-y-1">
@@ -408,7 +909,7 @@ const Settings = () => {
 
               <div className="space-y-4">
                 <h3 className="text-2xl font-bold flex items-center gap-2">
-                  <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>⚙️</span>
+                  <span className={false ? 'text-yellow-500' : 'text-blue-500'}>⚙️</span>
                   技术栈
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -435,7 +936,7 @@ const Settings = () => {
 
               <div className="space-y-4">
                 <h3 className="text-2xl font-bold flex items-center gap-2">
-                  <span className={mode === 'adventure' ? 'text-yellow-500' : 'text-blue-500'}>✨</span>
+                  <span className={false ? 'text-yellow-500' : 'text-blue-500'}>✨</span>
                   核心功能
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -73,3 +73,8 @@ release/
 venv/
 node_modules/
 frontend/node_modules/
+
+# Microverse
+/microverse/export/
+/microverse/.godot/
+/microverse/.import/

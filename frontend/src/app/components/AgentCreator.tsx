@@ -131,7 +131,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
           <div className={cn(
             "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-500",
             step >= s 
-              ? (mode === 'adventure' ? "bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.5)]" : "bg-blue-600 text-white shadow-lg")
+              ? (false ? "bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.5)]" : "bg-blue-600 text-white shadow-lg")
               : "bg-white/5 text-gray-500 border border-white/10"
           )}>
             {step > s ? <Check size={16} /> : s}
@@ -153,17 +153,17 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
       {/* Header */}
       <div className={cn(
         "h-16 flex items-center justify-between px-6 border-b shrink-0",
-        mode === 'adventure' ? "bg-[#121225] border-yellow-500/20" : "bg-white/[0.02] border-white/5 backdrop-blur-md"
+        false ? "bg-[#121225] border-yellow-500/20" : "bg-white/[0.02] border-white/5 backdrop-blur-md"
       )}>
         <div className="flex items-center gap-4">
           <div>
             <h2 className={cn(
               "font-bold",
-              mode === 'adventure' ? "text-yellow-500 uppercase tracking-widest text-sm" : "text-lg"
+              false ? "text-yellow-500 uppercase tracking-widest text-sm" : "text-lg"
             )}>
               {creationMode === 'ai'
-                ? (mode === 'adventure' ? 'Oracle Ritual' : 'AI Architect')
-                : mode === 'adventure' ? 'Summon New Hero' : 'Create AI Agent'}
+                ? (false ? 'Oracle Ritual' : 'AI Architect')
+                : false ? 'Summon New Hero' : 'Create AI Agent'}
             </h2>
             <p className="text-[10px] text-gray-500 font-mono">
               {creationMode === 'ai' ? 'Neural Synthesis Engine' : 'Agent Configuration Protocol v2.4'}
@@ -180,7 +180,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
               </div>
               <ActionButton className="h-9 px-6 py-0 text-xs">
                 <Save size={14} className="mr-2" />
-                Finalize {mode === 'adventure' ? 'Summoning' : 'Agent'}
+                Finalize {false ? 'Summoning' : 'Agent'}
               </ActionButton>
             </>
           )}
@@ -203,12 +203,12 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                   <div className="space-y-4">
                     <h1 className={cn(
                       "text-5xl font-black italic tracking-tighter uppercase",
-                      mode === 'adventure' ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-orange-600" : "text-white"
+                      false ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-orange-600" : "text-white"
                     )}>
-                      {mode === 'adventure' ? 'Choose Your Path' : 'Select Creation Method'}
+                      {false ? 'Choose Your Path' : 'Select Creation Method'}
                     </h1>
                     <p className="text-gray-400 max-w-lg mx-auto">
-                      {mode === 'adventure' 
+                      {false 
                         ? 'Will you forge your hero manually or seek the Oracle for a predestined champion?'
                         : 'Describe what you need and let our AI architect build it, or configure every detail yourself.'}
                     </p>
@@ -219,22 +219,22 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                       onClick={() => setCreationMode('ai')}
                       className={cn(
                         "group relative p-8 rounded-3xl border text-left transition-all duration-500 overflow-hidden",
-                        mode === 'adventure' 
+                        false 
                           ? "bg-yellow-500/5 border-yellow-500/20 hover:border-yellow-500 hover:shadow-[0_0_30px_rgba(234,179,8,0.2)]" 
                           : "bg-blue-600/5 border-blue-600/20 hover:border-blue-600 hover:shadow-[0_0_30px_rgba(37,99,235,0.2)]"
                       )}
                     >
                       <div className={cn(
                         "w-16 h-16 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 duration-500",
-                        mode === 'adventure' ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20" : "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
+                        false ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20" : "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                       )}>
                         <Sparkles size={32} />
                       </div>
                       <h3 className="text-2xl font-black italic uppercase tracking-wider mb-2">
-                        {mode === 'adventure' ? 'The Oracle' : 'AI Architect'}
+                        {false ? 'The Oracle' : 'AI Architect'}
                       </h3>
                       <p className="text-sm text-gray-500 leading-relaxed mb-6">
-                        {mode === 'adventure' 
+                        {false 
                           ? 'Describe your hero and let the ancient magic forge their destiny.'
                           : 'Use natural language to describe your agent\'s role and goals.'}
                       </p>
@@ -245,7 +245,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                       {/* Decorative elements */}
                       <div className={cn(
                         "absolute -right-8 -bottom-8 w-32 h-32 opacity-10 group-hover:opacity-20 transition-opacity",
-                        mode === 'adventure' ? "text-yellow-500" : "text-blue-500"
+                        false ? "text-yellow-500" : "text-blue-500"
                       )}>
                         <Bot size={128} />
                       </div>
@@ -262,10 +262,10 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         <Keyboard size={32} />
                       </div>
                       <h3 className="text-2xl font-black italic uppercase tracking-wider mb-2">
-                        {mode === 'adventure' ? 'Manual Forge' : 'Manual Editor'}
+                        {false ? 'Manual Forge' : 'Manual Editor'}
                       </h3>
                       <p className="text-sm text-gray-500 leading-relaxed mb-6">
-                        {mode === 'adventure' 
+                        {false 
                           ? 'Take full control of every stat, skill, and instruction yourself.'
                           : 'Configure identity, models, and skills from scratch.'}
                       </p>
@@ -288,19 +288,19 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                   <div className="text-center space-y-4">
                     <div className={cn(
                       "w-20 h-20 rounded-3xl mx-auto flex items-center justify-center mb-6 relative",
-                      mode === 'adventure' ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
+                      false ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
                     )}>
                       <Bot size={40} />
                       <div className="absolute inset-0 rounded-3xl animate-ping opacity-20 bg-inherit" />
                     </div>
                     <h1 className={cn(
                       "text-4xl font-black italic tracking-tighter uppercase",
-                      mode === 'adventure' ? "text-yellow-500" : "text-white"
+                      false ? "text-yellow-500" : "text-white"
                     )}>
-                      {mode === 'adventure' ? 'Speak to the Oracle' : 'Describe your Agent'}
+                      {false ? 'Speak to the Oracle' : 'Describe your Agent'}
                     </h1>
                     <p className="text-gray-400">
-                      {mode === 'adventure' 
+                      {false 
                         ? 'What kind of legend are you looking to summon today?'
                         : 'Specify the role, required skills, and tone in plain English.'}
                     </p>
@@ -310,7 +310,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                     <div className="relative group">
                       <div className={cn(
                         "absolute inset-0 rounded-2xl blur-xl opacity-20 transition-opacity group-focus-within:opacity-40",
-                        mode === 'adventure' ? "bg-yellow-500" : "bg-blue-600"
+                        false ? "bg-yellow-500" : "bg-blue-600"
                       )} />
                       <div className="relative z-10">
                         <div className="flex justify-end mb-2">
@@ -323,10 +323,10 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         <textarea
                           value={aiPrompt}
                           onChange={(e) => setAiPrompt(e.target.value)}
-                          placeholder={mode === 'adventure' ? "e.g., A powerful mage who knows everything about the ancient databases..." : "e.g., A marketing specialist agent that can browse the web and write catchy copy..."}
+                          placeholder={false ? "e.g., A powerful mage who knows everything about the ancient databases..." : "e.g., A marketing specialist agent that can browse the web and write catchy copy..."}
                           className={cn(
                             "w-full h-40 bg-black/40 border border-white/10 rounded-2xl px-6 py-5 text-white focus:outline-none transition-all text-lg resize-none",
-                            mode === 'adventure' ? "focus:border-yellow-500/50" : "focus:border-blue-600/50"
+                            false ? "focus:border-yellow-500/50" : "focus:border-blue-600/50"
                           )}
                         />
                       </div>
@@ -340,12 +340,12 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                       {isGenerating ? (
                         <div className="flex items-center gap-3">
                           <Loader2 size={24} className="animate-spin" />
-                          <span>{mode === 'adventure' ? 'Summoning...' : 'Architecting...'}</span>
+                          <span>{false ? 'Summoning...' : 'Architecting...'}</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
                           <Wand2 size={24} />
-                          <span>{mode === 'adventure' ? 'Forged by Destiny' : 'Generate Agent'}</span>
+                          <span>{false ? 'Forged by Destiny' : 'Generate Agent'}</span>
                         </div>
                       )}
                     </ActionButton>
@@ -380,7 +380,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         <div className="space-y-2">
                           <h1 className={cn(
                             "text-3xl font-black italic tracking-tighter uppercase",
-                            mode === 'adventure' ? "text-yellow-500" : "text-white"
+                            false ? "text-yellow-500" : "text-white"
                           )}>
                             Define the Essence
                           </h1>
@@ -397,7 +397,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                               placeholder="e.g., Backend Sentinel"
                               className={cn(
                                 "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition-all",
-                                mode === 'adventure' ? "focus:border-yellow-500/50" : "focus:border-blue-500/50"
+                                false ? "focus:border-yellow-500/50" : "focus:border-blue-500/50"
                               )}
                             />
                           </div>
@@ -410,13 +410,13 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                               placeholder="e.g., Infrastructure Specialist"
                               className={cn(
                                 "w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition-all",
-                                mode === 'adventure' ? "focus:border-yellow-500/50" : "focus:border-blue-500/50"
+                                false ? "focus:border-yellow-500/50" : "focus:border-blue-500/50"
                               )}
                             />
                           </div>
                         </div>
 
-                        {mode === 'adventure' && (
+                        {false && (
                           <div className="p-6 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-6">
                             <div className="w-24 h-24 rounded-full border-4 border-yellow-500/30 shrink-0 shadow-2xl relative group bg-gradient-to-br from-yellow-500/20 to-orange-500/20 flex items-center justify-center">
                               {(() => {
@@ -448,7 +448,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                             placeholder="Define how this agent should behave, its tone, and its boundaries..."
                             className={cn(
                               "w-full h-48 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none transition-all resize-none",
-                              mode === 'adventure' ? "focus:border-yellow-500/50" : "focus:border-blue-500/50"
+                              false ? "focus:border-yellow-500/50" : "focus:border-blue-500/50"
                             )}
                           />
                         </div>
@@ -470,7 +470,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         <div className="space-y-2">
                           <h1 className={cn(
                             "text-3xl font-black italic tracking-tighter uppercase",
-                            mode === 'adventure' ? "text-yellow-500" : "text-white"
+                            false ? "text-yellow-500" : "text-white"
                           )}>
                             Choose the Intellect
                           </h1>
@@ -485,7 +485,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                               className={cn(
                                 "p-6 rounded-2xl border transition-all text-left flex items-center justify-between group",
                                 formData.model.id === model.id 
-                                  ? (mode === 'adventure' ? "bg-yellow-500/10 border-yellow-500" : "bg-blue-600/10 border-blue-600")
+                                  ? (false ? "bg-yellow-500/10 border-yellow-500" : "bg-blue-600/10 border-blue-600")
                                   : "bg-white/5 border-white/5 hover:border-white/20"
                               )}
                             >
@@ -493,7 +493,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                                 <div className={cn(
                                   "w-12 h-12 rounded-xl flex items-center justify-center transition-all",
                                   formData.model.id === model.id 
-                                    ? (mode === 'adventure' ? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.4)]" : "bg-blue-600 text-white")
+                                    ? (false ? "bg-yellow-500 text-black shadow-[0_0_20px_rgba(234,179,8,0.4)]" : "bg-blue-600 text-white")
                                     : "bg-white/10 text-gray-500"
                                 )}>
                                   <Cpu size={24} />
@@ -515,7 +515,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                                 <div className={cn(
                                   "w-6 h-6 rounded-full border-2 flex items-center justify-center ml-4",
                                   formData.model.id === model.id 
-                                    ? (mode === 'adventure' ? "border-yellow-500 bg-yellow-500 text-black" : "border-blue-600 bg-blue-600 text-white")
+                                    ? (false ? "border-yellow-500 bg-yellow-500 text-black" : "border-blue-600 bg-blue-600 text-white")
                                     : "border-white/10"
                                 )}>
                                   {formData.model.id === model.id && <Check size={14} />}
@@ -543,7 +543,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         <div className="space-y-2">
                           <h1 className={cn(
                             "text-3xl font-black italic tracking-tighter uppercase",
-                            mode === 'adventure' ? "text-yellow-500" : "text-white"
+                            false ? "text-yellow-500" : "text-white"
                           )}>
                             Equip Ancient Skills
                           </h1>
@@ -560,7 +560,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {mode === 'adventure' && (
+                          {false && (
                             <button 
                               onClick={() => setIsConfiguringSkills(true)}
                               className="col-span-1 sm:col-span-2 p-8 rounded-2xl border-2 border-dashed border-yellow-500/30 bg-yellow-500/5 hover:bg-yellow-500/10 hover:border-yellow-500 transition-all flex flex-col items-center justify-center gap-4 group mb-4"
@@ -581,17 +581,17 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                               className={cn(
                                 "p-4 rounded-xl border transition-all text-left group flex items-start gap-4",
                                 formData.selectedSkills.includes(skill.id) 
-                                  ? (mode === 'adventure' ? "bg-yellow-500/10 border-yellow-500" : "bg-blue-600/10 border-blue-600")
+                                  ? (false ? "bg-yellow-500/10 border-yellow-500" : "bg-blue-600/10 border-blue-600")
                                   : "bg-white/5 border-white/5 hover:border-white/20"
                               )}
                             >
                               <div className={cn(
                                 "w-10 h-10 rounded-lg flex items-center justify-center transition-all shrink-0 overflow-hidden",
                                 formData.selectedSkills.includes(skill.id)
-                                  ? (mode === 'adventure' ? "bg-yellow-500 text-black shadow-lg" : "bg-blue-600 text-white")
+                                  ? (false ? "bg-yellow-500 text-black shadow-lg" : "bg-blue-600 text-white")
                                   : "bg-white/10 text-gray-500"
                               )}>
-                                {mode === 'adventure' ? (
+                                {false ? (
                                   (() => {
                                     const IconComponent = getSkillIcon(skill.advIcon);
                                     return <IconComponent className="w-6 h-6" />;
@@ -617,7 +617,7 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
                               <div className={cn(
                                 "w-5 h-5 rounded-md border flex items-center justify-center shrink-0",
                                 formData.selectedSkills.includes(skill.id) 
-                                  ? (mode === 'adventure' ? "border-yellow-500 bg-yellow-500 text-black" : "border-blue-600 bg-blue-600 text-white")
+                                  ? (false ? "border-yellow-500 bg-yellow-500 text-black" : "border-blue-600 bg-blue-600 text-white")
                                   : "border-white/10"
                               )}>
                                 {formData.selectedSkills.includes(skill.id) && <Check size={12} />}
@@ -643,12 +643,12 @@ export const AgentCreator = ({ onBack }: AgentCreatorProps) => {
         {creationMode && (
           <div className={cn(
             "w-96 border-l hidden xl:flex flex-col p-8 overflow-y-auto",
-            mode === 'adventure' ? "bg-[#0c0c1a] border-yellow-500/10" : "bg-black/20 border-white/5"
+            false ? "bg-[#0c0c1a] border-yellow-500/10" : "bg-black/20 border-white/5"
           )}>
             <div className="space-y-8">
               <h2 className="text-[10px] font-black uppercase tracking-widest text-gray-500">Real-time Preview</h2>
               
-              {mode === 'adventure' ? (
+              {false ? (
                 <GameCard rarity="legendary" className="p-0 overflow-hidden">
                   <div className="h-40 bg-black/40 flex items-center justify-center relative">
                      <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a2e] to-transparent opacity-60" />

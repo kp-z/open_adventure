@@ -260,7 +260,7 @@ interface WorkflowEditorProps {
 }
 
 export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
-  const { mode } = useAppContext();
+  
   const [view, setView] = useState<WorkflowView>("flow");
   const [workflowName, setWorkflowName] = useState(workflow?.name || "Untitled Workflow");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -841,7 +841,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
       >
         <defs>
           <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-            <path d="M 0 0 L 6 3 L 0 6 z" fill={mode === "adventure" ? "#f59e0b" : "#3b82f6"} />
+            <path d="M 0 0 L 6 3 L 0 6 z" fill={"#3b82f6"} />
           </marker>
           <marker id="arrow-bidirectional" markerWidth="6" markerHeight="6" refX="1" refY="3" orient="auto-start-reverse">
             <path d="M 0 0 L 6 3 L 0 6 z" fill="#06b6d4" />
@@ -870,7 +870,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
             
             // 连接线颜色
             const strokeColor = isBlockingConnection ? "#3b82f6" : 
-                               mode === "adventure" ? "#f59e0b" : "#3b82f6";
+                               "#3b82f6";
             const strokeDash = "0";
             
             // 计算边的中点（用于放置删除按钮）
@@ -909,8 +909,8 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                         cx={midX}
                         cy={midY}
                         r="12"
-                        fill={mode === "adventure" ? "#1a1a2e" : "#0f111a"}
-                        stroke={mode === "adventure" ? "#f59e0b" : "#3b82f6"}
+                        fill={"#0f111a"}
+                        stroke={"#3b82f6"}
                         strokeWidth="2"
                         className="cursor-pointer"
                         style={{ pointerEvents: "all" }}
@@ -987,7 +987,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                         cx={midX}
                         cy={midY}
                         r="12"
-                        fill={mode === "adventure" ? "#1a1a2e" : "#0f111a"}
+                        fill={"#0f111a"}
                         stroke={strokeColor}
                         strokeWidth="2"
                         className="cursor-pointer"
@@ -1027,7 +1027,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
               y1={startY}
               x2={endX}
               y2={endY}
-              stroke={mode === "adventure" ? "#f59e0b" : "#3b82f6"}
+              stroke={"#3b82f6"}
               strokeWidth="2"
               strokeOpacity="0.5"
               strokeDasharray="5,5"
@@ -1131,7 +1131,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                   ? "border-green-500/30 hover:border-green-500/50"
                   : "border-white/10 hover:border-white/30"
                 }
-                ${mode === "adventure" ? "bg-[#1a1a2e]" : "bg-black/80 backdrop-blur-xl"}
+                ${"bg-black/80 backdrop-blur-xl"}
                 ${node.type === "team-leader" ? "bg-red-500/5" : ""}
                 ${node.type === "task" ? node.owner === "" ? "bg-gray-500/5" : "bg-blue-500/5" : ""}
                 ${node.type === "result" ? "bg-green-500/5" : ""}
@@ -1319,7 +1319,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                   className={`
                     absolute left-0 top-1/2 w-10 h-10 rounded-full shadow-2xl
                     flex items-center justify-center z-30 cursor-pointer
-                    ${mode === "adventure" 
+                    ${false 
                       ? "bg-gradient-to-br from-green-400 to-emerald-600 text-black" 
                       : "bg-gradient-to-br from-green-500 to-emerald-600 text-white"
                     }
@@ -1352,7 +1352,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                     absolute right-0 top-1/2 w-8 h-8 rounded-full shadow-lg
                     flex items-center justify-center opacity-0 group-hover:opacity-100
                     cursor-pointer z-20
-                    ${mode === "adventure" 
+                    ${false 
                       ? "bg-gradient-to-br from-yellow-500 to-orange-600 text-black" 
                       : "bg-gradient-to-br from-blue-600 to-indigo-600 text-white"
                     }
@@ -1447,7 +1447,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                           ? `ring-2 ring-white/30 ${statusConfig.border}` 
                           : "border-white/5 hover:border-white/20"
                         }
-                        ${mode === "adventure" ? "bg-[#22223b]" : "bg-white/5"}
+                        ${"bg-white/5"}
                       `}
                     >
                       <h5 className="text-sm font-bold text-white mb-2">{node.name}</h5>
@@ -1528,7 +1528,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         className={`
           w-full max-w-7xl h-full max-h-[90vh] rounded-3xl overflow-hidden flex flex-col border shadow-2xl relative
-          ${mode === "adventure" 
+          ${false 
             ? "bg-[#0f0f1a] border-yellow-500/20 shadow-yellow-500/5" 
             : "bg-[#0a0b14] border-white/10 shadow-blue-500/5"
           }
@@ -1543,7 +1543,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
               exit={{ x: 400, opacity: 0 }}
               className={`
                 absolute right-0 top-0 bottom-0 w-96 z-[200] border-l p-6 shadow-2xl backdrop-blur-3xl flex flex-col
-                ${mode === "adventure" 
+                ${false 
                   ? "bg-[#1a1a2e]/98 border-yellow-500/20" 
                   : "bg-[#0f111a]/98 border-white/10"
                 }
@@ -1725,7 +1725,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
               exit={{ x: 400, opacity: 0 }}
               className={`
                 absolute right-0 top-0 bottom-0 w-96 z-[200] border-l p-6 shadow-2xl backdrop-blur-3xl flex flex-col
-                ${mode === "adventure" 
+                ${false 
                   ? "bg-[#1a1a2e]/98 border-yellow-500/20" 
                   : "bg-[#0f111a]/98 border-white/10"
                 }
@@ -1810,7 +1810,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                 onClick={() => setSelectedNodeId(null)}
                 className={`
                   mt-6 w-full py-3 rounded-xl font-black uppercase text-white shadow-2xl
-                  ${mode === "adventure" 
+                  ${false 
                     ? "bg-gradient-to-r from-yellow-600 to-orange-600" 
                     : "bg-gradient-to-r from-blue-600 to-indigo-600"
                   }
@@ -1832,7 +1832,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
               exit={{ x: 400, opacity: 0 }}
               className={`
                 absolute right-0 top-0 bottom-0 w-[500px] z-[200] border-l p-6 shadow-2xl backdrop-blur-3xl flex flex-col overflow-y-auto
-                ${mode === "adventure" 
+                ${false 
                   ? "bg-[#1a1a2e]/98 border-yellow-500/20" 
                   : "bg-[#0f111a]/98 border-white/10"
                 }
@@ -2065,7 +2065,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                 onClick={() => setIsTaskConfigOpen(false)}
                 className={`
                   mt-6 w-full py-3 rounded-xl font-black uppercase text-white shadow-2xl
-                  ${mode === "adventure" 
+                  ${false 
                     ? "bg-gradient-to-r from-yellow-600 to-orange-600" 
                     : "bg-gradient-to-r from-blue-600 to-indigo-600"
                   }
@@ -2078,7 +2078,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
         </AnimatePresence>
 
         {/* Header */}
-        <header className={`px-8 py-6 flex items-center justify-between border-b ${mode === "adventure" ? "border-yellow-500/20" : "border-white/5"}`}>
+        <header className={`px-8 py-6 flex items-center justify-between border-b ${false ? "border-yellow-500/20" : "border-white/5"}`}>
           <div className="flex items-center gap-8">
             <div className="flex flex-col">
               <input
@@ -2086,7 +2086,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                 onChange={e => setWorkflowName(e.target.value)}
                 className={`
                   text-2xl font-black bg-transparent border-none outline-none focus:ring-0 p-0
-                  ${mode === "adventure" 
+                  ${false 
                     ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 italic uppercase" 
                     : "text-white"
                   }
@@ -2117,7 +2117,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
                   className={`
                     px-5 py-2 rounded-lg text-[10px] font-black uppercase transition-all flex items-center gap-2
                     ${view === v.key 
-                      ? (mode === "adventure" 
+                      ? (false 
                         ? "bg-yellow-500 text-black shadow-lg" 
                         : "bg-blue-600 text-white shadow-lg"
                       ) 
@@ -2138,7 +2138,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
               disabled={isGenerating || !canEdit}
               className={`
                 px-6 py-2 rounded-xl flex items-center gap-2 font-black uppercase text-[10px] transition-all shadow-xl
-                ${mode === "adventure" ? "bg-red-600 text-white" : "bg-purple-600 text-white"}
+                ${false ? "bg-red-600 text-white" : "bg-purple-600 text-white"}
                 ${(isGenerating || !canEdit) ? "opacity-50 cursor-not-allowed" : "hover:scale-105"}
               `}
             >
@@ -2183,7 +2183,7 @@ export const WorkflowEditor = ({ workflow, onClose }: WorkflowEditorProps) => {
         </main>
 
         {/* Footer */}
-        <footer className={`px-8 py-5 border-t ${mode === "adventure" ? "border-yellow-500/20 bg-black/60" : "border-white/5 bg-black/40"} flex items-center justify-between backdrop-blur-xl`}>
+        <footer className={`px-8 py-5 border-t ${false ? "border-yellow-500/20 bg-black/60" : "border-white/5 bg-black/40"} flex items-center justify-between backdrop-blur-xl`}>
           {/* Left: Status Indicator */}
           <div className="flex items-center gap-3">
             <div className={`px-4 py-2 rounded-xl border ${

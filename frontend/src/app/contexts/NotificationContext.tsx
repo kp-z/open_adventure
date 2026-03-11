@@ -12,12 +12,15 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 function getNotificationFingerprint(notification: Omit<Notification, 'id' | 'timestamp'> | Notification) {
-  const normalizedMessage = notification.message
+  const message = notification.message || '';
+  const title = notification.title || '';
+
+  const normalizedMessage = message
     .replace(/client-\d+/g, 'client-*')
     .replace(/\s+/g, ' ')
     .trim();
 
-  return `${notification.type}::${notification.title.trim()}::${normalizedMessage}`;
+  return `${notification.type}::${title.trim()}::${normalizedMessage}`;
 }
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {

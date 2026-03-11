@@ -51,7 +51,7 @@ export function PromptOptimizeButton({
       });
 
       if (response.success) {
-        onChange(response.optimized_prompt);
+        onChange(response.optimized_prompt || '');
         addNotification({
           type: 'success',
           title: 'Prompt 优化成功',

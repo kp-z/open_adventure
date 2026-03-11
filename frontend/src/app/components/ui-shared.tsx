@@ -72,7 +72,7 @@ export const ActionButton = ({ children, className, onClick, variant = 'primary'
 }) => {
   const { mode } = useMode();
 
-  if (mode === 'adventure') {
+  if (false) {
     return (
       <motion.button
         whileHover={{ scale: disabled ? 1 : 1.05, boxShadow: disabled ? undefined : "0 0 15px rgba(255,215,0,0.5)" }}

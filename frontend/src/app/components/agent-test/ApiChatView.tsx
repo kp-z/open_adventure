@@ -148,7 +148,7 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
 
   // 发送消息
   const handleSend = () => {
-    if (!input.trim() || !ws || !isReady || isSending) return;
+    if (!input || !input.trim() || !ws || !isReady || isSending) return;
 
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -235,7 +235,7 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value || '')}
             onKeyDown={handleKeyDown}
             placeholder={isReady ? `Message ${agentName}...` : 'Waiting for connection...'}
             disabled={!isReady || isSending}
@@ -253,7 +253,7 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || !isReady || isSending}
+            disabled={!input || !input.trim() || !isReady || isSending}
             className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
           >
             {isSending ? (

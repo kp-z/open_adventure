@@ -66,6 +66,7 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
   }, [messages]);
 
   const handleSend = useCallback(() => {
+    if (!input) return;
     const messageContent = input.trim();
     if (!messageContent || isRunning || !state.isConnected) return;
 
@@ -111,7 +112,7 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
         <div className="flex gap-2">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => setInput(e.target.value || '')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -132,7 +133,7 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
             />
             <button
               onClick={handleSend}
-              disabled={!input.trim() || isRunning || !state.isConnected}
+              disabled={!input || !input.trim() || isRunning || !state.isConnected}
               className="p-2 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all"
               title="发送消息"
             >

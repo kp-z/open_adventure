@@ -26,9 +26,14 @@
 - `frontend/` - 前端开发指南
   - `Guidelines.md` - 前端开发规范
 - `backend/` - 后端开发指南
+- `启动参数说明.md` - start.sh 启动参数详细说明
+- `端口配置指南.md` - 端口占用处理和配置指南
+- `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（12 个文件）
+技术文档和修复记录（13 个文件）
+- `20260311-terminal-claude-auto-resume.md` - Terminal Claude 会话自动恢复功能
+- `20260311-terminal-mobile-input-optimization.md` - Terminal 移动端输入优化
 - `20260302-01-LAN-IP检测失败修复.md` - LAN IP 检测失败问题修复（v1.2.2）
 - `20260302-skill-sync-and-cli-health-fix.md` - Skills 同步失败和 CLI Status 误报修复
 - `PACKAGING_FIX_SUMMARY.md` - 打包修复总结
@@ -94,7 +99,7 @@
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
 - **技术文档**: 12 个文件
-- **指南文档**: 8 个文件
+- **指南文档**: 11 个文件
 
 ## 🔍 快速查找
 
@@ -115,4 +120,4 @@
 
 ---
 
-*最后更新: 2026-02-27*
+*最后更新: 2026-03-10*

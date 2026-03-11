@@ -337,7 +337,7 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
 
   // 测试 Agent - 使用流式 API
   const handleTest = async () => {
-    if (!input.trim() || isRunning) return;
+    if (!input || !input.trim() || isRunning) return;
 
     setIsRunning(true);
     setCurrentOutput(null);
@@ -654,7 +654,7 @@ Agent 描述: ${agent.description}
   return (
     <div className="max-w-7xl mx-auto pb-20">
       {/* 头部 - 融入 Agent 信息 */}
-      <div className="flex items-start gap-4 mb-8">
+      <header className="flex items-start gap-4 mb-8">
         {/* Agent 图标 */}
         <div
           className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 flex-shrink-0"
@@ -673,7 +673,7 @@ Agent 描述: ${agent.description}
         {/* Agent 信息 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold tracking-tight truncate">{agent.name}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate uppercase">{agent.name}</h1>
             {/* 标签 */}
             <span
               className="px-2 py-0.5 rounded-full text-xs font-bold capitalize"
@@ -699,7 +699,7 @@ Agent 描述: ${agent.description}
               </span>
             )}
           </div>
-          <p className="text-gray-400 text-sm line-clamp-2">{agent.description}</p>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-2">{agent.description}</p>
         </div>
 
         {/* 右侧操作区 */}
@@ -721,7 +721,7 @@ Agent 描述: ${agent.description}
             </button>
           )}
         </div>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* 左侧 - 测试区域 */}
@@ -804,7 +804,7 @@ Agent 描述: ${agent.description}
               {getSuggestedTests().map((test, index) => (
                 <button
                   key={index}
-                  onClick={() => setInput(test)}
+                  onClick={() => setInput(test || '')}
                   disabled={isRunning}
                   className="px-4 py-2 bg-white/5 hover:bg-white/10 disabled:hover:bg-white/5 rounded-xl border border-white/10 hover:border-blue-500/30 transition-all text-sm"
                 >

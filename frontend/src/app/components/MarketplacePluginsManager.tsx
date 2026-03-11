@@ -12,7 +12,7 @@ interface MarketplaceRepo {
 }
 
 export const MarketplacePluginsManager: React.FC = () => {
-  const { mode } = useMode();
+  
   const { addNotification } = useNotifications();
   const [repos, setRepos] = useState<MarketplaceRepo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,7 @@ export const MarketplacePluginsManager: React.FC = () => {
   const [newRepoBranch, setNewRepoBranch] = useState('main');
   const [newRepoAutoUpdate, setNewRepoAutoUpdate] = useState(false);
 
-  const accentColor = mode === 'adventure' ? 'yellow' : 'blue';
+  const accentColor = 'blue';
 
   useEffect(() => {
     loadRepos();
@@ -156,7 +156,7 @@ export const MarketplacePluginsManager: React.FC = () => {
         <button
           onClick={() => setShowAddForm(!showAddForm)}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all ${
-            mode === 'adventure'
+            false
               ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border border-yellow-500/30'
               : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30'
           }`}
@@ -199,7 +199,7 @@ export const MarketplacePluginsManager: React.FC = () => {
                   onClick={() => setNewRepoAutoUpdate(!newRepoAutoUpdate)}
                   className={`w-12 h-6 rounded-full p-1 transition-all ${
                     newRepoAutoUpdate
-                      ? mode === 'adventure' ? 'bg-yellow-600' : 'bg-blue-600'
+                      ? false ? 'bg-yellow-600' : 'bg-blue-600'
                       : 'bg-gray-600'
                   }`}
                 >
@@ -231,7 +231,7 @@ export const MarketplacePluginsManager: React.FC = () => {
             <button
               onClick={handleAddRepo}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                mode === 'adventure'
+                false
                   ? 'bg-yellow-500 text-black hover:bg-yellow-400'
                   : 'bg-blue-600 text-white hover:bg-blue-500'
               }`}
@@ -295,7 +295,7 @@ export const MarketplacePluginsManager: React.FC = () => {
                     className={`p-2 rounded-xl transition-all ${
                       syncing === repo.id
                         ? 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
-                        : mode === 'adventure'
+                        : false
                         ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
                         : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30'
                     }`}

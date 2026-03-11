@@ -7,6 +7,7 @@ import { ModeProvider } from './contexts/ModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ExecutionProvider } from './contexts/ExecutionContext';
 import { TerminalProvider } from './contexts/TerminalContext';
+import { InitializationProvider, useInitialization } from './contexts/InitializationContext';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import '../styles/theme.css';
 import '../styles/fonts.css';
@@ -151,6 +152,13 @@ const router = createBrowserRouter(
             return { Component: Terminal.default };
           },
         },
+        {
+          path: 'microverse',
+          lazy: async () => {
+            const Microverse = await import('./pages/Microverse');
+            return { Component: Microverse.default };
+          },
+        },
       ],
     },
   ],
@@ -165,23 +173,34 @@ const router = createBrowserRouter(
   }
 );
 
+// 创建一个内部组件来使用 useInitialization hook
+function AppContent() {
+  return (
+    <>
+      <OfflineIndicator />
+      <RouterProvider router={router} />
+    </>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <NotificationProvider>
         <ModeProvider>
-          <AppProvider>
-            <AgentsProvider>
-              <TeamsProvider>
-                <ExecutionProvider>
-                  <TerminalProvider>
-                    <OfflineIndicator />
-                    <RouterProvider router={router} />
-                  </TerminalProvider>
-                </ExecutionProvider>
-              </TeamsProvider>
-            </AgentsProvider>
-          </AppProvider>
+          <InitializationProvider>
+            <AppProvider>
+              <AgentsProvider>
+                <TeamsProvider>
+                  <ExecutionProvider>
+                    <TerminalProvider>
+                      <AppContent />
+                    </TerminalProvider>
+                  </ExecutionProvider>
+                </TeamsProvider>
+              </AgentsProvider>
+            </AppProvider>
+          </InitializationProvider>
         </ModeProvider>
       </NotificationProvider>
     </ErrorBoundary>

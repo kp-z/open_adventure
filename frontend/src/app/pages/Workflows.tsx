@@ -47,7 +47,7 @@ const Workflows = () => {
     setSelectedWorkflow(null);
   };
 
-  if (mode === 'adventure') {
+  if (false) {
     return (
       <div className="space-y-8 relative pt-6">
         <AnimatePresence>

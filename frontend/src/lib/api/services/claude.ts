@@ -14,7 +14,26 @@ export interface SyncSkillsResult {
   errors: string[];
 }
 
+// 初始化结果类型
+export interface InitializeResult {
+  success: boolean;
+  steps: Array<{
+    name: string;
+    status: string;
+    count: number;
+    message: string;
+  }>;
+  total_synced: number;
+  duration_ms: number;
+  error?: string;
+}
+
 export const claudeApi = {
+  /**
+   * 系统初始化接口，按顺序同步所有数据
+   */
+  initialize: () => apiClient.post<InitializeResult>('/claude/initialize'),
+
   /**
    * 同步所有 Claude 数据（skills/agents/teams）到数据库
    */

@@ -9,11 +9,6 @@ import {
   History,
   Settings,
   Zap,
-  Sword,
-  Shield,
-  BookOpen,
-  Map,
-  Trophy,
   Search,
   User,
   X,
@@ -35,7 +30,6 @@ import { ActionButton } from "./ui-shared";
 import { useNotifications } from "../contexts/NotificationContext";
 
 const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
-  const { mode } = useMode();
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
@@ -89,41 +83,41 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
     {
       name: t("dashboard"),
       path: "/",
-      icon: mode === "adventure" ? Sword : LayoutDashboard,
+      icon: LayoutDashboard,
     },
     {
       name: t("library"),
       path: "/library",
-      icon: mode === "adventure" ? BookOpen : Wrench,
+      icon: Wrench,
       id: 'library',
       subItems: [
         {
           name: t("skills"),
           path: "/skills",
-          icon: mode === "adventure" ? BookOpen : Wrench,
+          icon: Wrench,
         },
         {
           name: t("agents"),
           path: "/agents",
-          icon: mode === "adventure" ? Shield : Users,
+          icon: Users,
         },
         {
           name: t("teams"),
           path: "/teams",
-          icon: mode === "adventure" ? UsersRound : Network,
+          icon: Network,
         },
       ],
     },
     {
       name: t("automation"),
       path: "/automation",
-      icon: mode === "adventure" ? Map : GitBranch,
+      icon: GitBranch,
       id: 'automation',
       subItems: [
         {
           name: t("workflows"),
           path: "/workflows",
-          icon: mode === "adventure" ? Map : GitBranch,
+          icon: GitBranch,
         },
         {
           name: t("opp"),
@@ -133,7 +127,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
         {
           name: t("history"),
           path: "/history",
-          icon: mode === "adventure" ? Trophy : History,
+          icon: History,
         },
       ],
     },
@@ -170,13 +164,9 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                     w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all
                     ${
                       menuState === 'active'
-                        ? mode === "adventure"
-                          ? "bg-yellow-500/30 text-yellow-300 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                          : "bg-blue-600/30 text-blue-300 border border-blue-500/50"
+                        ? "bg-blue-600/30 text-blue-300 border border-blue-500/50"
                         : menuState === 'partial'
-                        ? mode === "adventure"
-                          ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                          : "bg-blue-600/10 text-blue-400 border border-blue-500/20"
+                        ? "bg-blue-600/10 text-blue-400 border border-blue-500/20"
                         : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }
                   `}
@@ -214,9 +204,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                             flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all
                             ${
                               isActive
-                                ? mode === "adventure"
-                                  ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
-                                  : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
                                 : "text-gray-400 hover:bg-white/5 hover:text-white"
                             }
                           `}
@@ -244,9 +232,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                         w-full flex items-center justify-center py-3 rounded-xl transition-all
                         ${
                           hasActiveChild
-                            ? mode === "adventure"
-                              ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                              : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                            ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
                             : "text-gray-400 hover:bg-white/5 hover:text-white"
                         }
                       `}
@@ -278,9 +264,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                                   flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
                                   ${
                                     isActive
-                                      ? mode === "adventure"
-                                        ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
-                                        : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                                      ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
                                       : "text-gray-400 hover:bg-white/5 hover:text-white"
                                   }
                                 `}
@@ -305,9 +289,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                       flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
                       ${
                         isActive
-                          ? mode === "adventure"
-                            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                            : "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                          ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
                           : "text-gray-400 hover:bg-white/5 hover:text-white"
                       }
                     `}
@@ -333,9 +315,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
             flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
             ${
               isActive
-                ? mode === "adventure"
-                  ? "bg-yellow-500/20 text-yellow-400"
-                  : "bg-blue-600/20 text-blue-400"
+                ? "bg-blue-600/20 text-blue-400"
                 : "text-gray-400 hover:bg-white/5 hover:text-white"
             }
           `}
@@ -349,7 +329,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
 };
 
 export const Layout = () => {
-  const { mode, toggleMode, lang } = useMode();
+  const { lang } = useMode();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -369,17 +349,17 @@ export const Layout = () => {
     {
       name: t("skills"),
       path: "/skills",
-      icon: mode === "adventure" ? BookOpen : Wrench,
+      icon: Wrench,
     },
     {
       name: t("agents"),
       path: "/agents",
-      icon: mode === "adventure" ? Shield : Users,
+      icon: Users,
     },
     {
       name: t("teams"),
       path: "/teams",
-      icon: mode === "adventure" ? UsersRound : Network,
+      icon: Network,
     },
   ];
 
@@ -387,7 +367,7 @@ export const Layout = () => {
     {
       name: t("workflows"),
       path: "/workflows",
-      icon: mode === "adventure" ? Map : GitBranch,
+      icon: GitBranch,
     },
     {
       name: t("opp"),
@@ -397,7 +377,7 @@ export const Layout = () => {
     {
       name: t("history"),
       path: "/history",
-      icon: mode === "adventure" ? Trophy : History,
+      icon: History,
     },
   ];
 
@@ -414,7 +394,7 @@ export const Layout = () => {
 
   // 动态更新浏览器标签栏颜色
   React.useEffect(() => {
-    const themeColor = mode === "adventure" ? "#0a0a14" : "#0f111a";
+    const themeColor = "#0f111a";
 
     // 更新 meta theme-color
     let metaThemeColor = document.querySelector('meta[name="theme-color"]');
@@ -424,7 +404,7 @@ export const Layout = () => {
       document.head.appendChild(metaThemeColor);
     }
     metaThemeColor.setAttribute('content', themeColor);
-  }, [mode]);
+  }, []);
 
   // 检测移动端并设置侧边栏初始状态
   React.useEffect(() => {
@@ -487,105 +467,57 @@ export const Layout = () => {
 
   return (
     <div
-      className={`app-shell min-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} ${mode === "adventure" ? "bg-[#0a0a14]" : "bg-[#0f111a]"}`}
+      className={`app-shell min-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} bg-[#0f111a]`}
     >
       {/* 桌面端侧边栏 - 仅在 ≥md 显示，保持原样 */}
       <aside
         className={`
         ${isSidebarOpen ? "w-72" : "w-20"}
         hidden md:flex flex-col border-r border-white/5 transition-all duration-300 relative z-50
-        ${mode === "adventure" ? "bg-[#121225]" : "bg-[#0a0b14]/80 backdrop-blur-2xl"}
+        bg-[#0a0b14]/80 backdrop-blur-2xl
       `}
       >
-        {/* Logo / Mode Switcher */}
-        <button
-          onClick={toggleMode}
+        {/* Logo */}
+        <div
           className={`
-            h-20 flex items-center ${isSidebarOpen ? 'px-6' : 'px-4 justify-center'} gap-4 group transition-all duration-500 hover:bg-white/5
-            ${mode === "adventure" ? "border-b border-yellow-500/20" : "border-b border-blue-500/20"}
+            h-20 flex items-center ${isSidebarOpen ? 'px-6' : 'px-4 justify-center'} gap-4 transition-all duration-500
+            border-b border-blue-500/20
           `}
         >
           <div
             className={`
-              w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
-              ${
-                mode === "adventure"
-                  ? "bg-gradient-to-br from-yellow-400 to-orange-600 shadow-yellow-500/20"
-                  : "bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10"
-              }
+              w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg relative overflow-hidden
+              bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10
             `}
           >
-            {mode === "adventure" ? (
-              <>
-                <div className="absolute inset-0 flex items-center justify-center opacity-40">
-                   <Sparkles className="w-10 h-10 scale-125 rotate-12" />
-                </div>
-                <div className="relative z-10 flex items-center justify-center">
-                  <Sword
-                    size={24}
-                    className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-                  />
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.5, 1],
-                      opacity: [0.3, 0.8, 0.3],
-                      rotate: [0, 90, 180] 
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="absolute -top-1 -right-1 text-yellow-200"
-                  >
-                    <Sparkles size={12} fill="currentColor" />
-                  </motion.div>
-                </div>
-              </>
-            ) : (
-              <div className="relative">
-                <Zap
-                  size={24}
-                  fill="currentColor"
-                  className="text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] animate-pulse"
-                />
-                <div className="absolute inset-0 bg-blue-400/20 blur-xl scale-150 rounded-full" />
-              </div>
-            )}
+            <Zap
+              size={24}
+              className="text-blue-400"
+            />
           </div>
 
           {isSidebarOpen && (
             <div className="flex flex-col items-start overflow-hidden">
               <motion.div
-                key={`${mode}-${lang}`}
+                key={lang}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 className="flex flex-col"
               >
                 <span
-                  className={`
-                  text-lg font-black tracking-tighter uppercase italic leading-[0.85]
-                  ${
-                    mode === "adventure"
-                      ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500"
-                      : "text-white"
-                  }
-                `}
+                  className="text-lg font-black tracking-tighter uppercase italic leading-[0.85] text-white"
                 >
                   Open
                 </span>
                 <span
-                  className={`
-                  text-sm font-black tracking-[0.2em] uppercase leading-tight
-                  ${
-                    mode === "adventure"
-                      ? "text-yellow-500/80 italic"
-                      : "text-blue-500/80"
-                  }
-                `}
+                  className="text-sm font-black tracking-[0.2em] uppercase leading-tight text-blue-400/80"
                 >
                   Adventure
                 </span>
               </motion.div>
             </div>
           )}
-        </button>
+        </div>
 
         <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />
       </aside>
@@ -610,78 +542,44 @@ export const Layout = () => {
               transition={{ type: 'tween', duration: 0.3 }}
               className={`
                 md:hidden fixed inset-y-0 left-0 w-64 z-50 border-r border-white/5 flex flex-col safe-area-top
-                ${mode === "adventure" ? "bg-[#121225]" : "bg-[#0a0b14]"}
+                bg-[#0a0b14]
               `}
             >
-              {/* Logo / Mode Switcher */}
-              <button
-                onClick={toggleMode}
+              {/* Logo */}
+              <div
                 className={`
-                  h-14 flex items-center px-4 gap-3 group transition-all duration-500 hover:bg-white/5
-                  ${mode === "adventure" ? "border-b border-yellow-500/20" : "border-b border-blue-500/20"}
+                  h-14 flex items-center px-4 gap-3 transition-all duration-500
+                  border-b border-blue-500/20
                 `}
               >
                 <div
                   className={`
-                    w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
-                    ${
-                      mode === "adventure"
-                        ? "bg-gradient-to-br from-yellow-400 to-orange-600 shadow-yellow-500/20"
-                        : "bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10"
-                    }
+                    w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 shadow-lg relative overflow-hidden
+                    bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10
                   `}
                 >
-                  {mode === "adventure" ? (
-                    <>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-40">
-                        <Sparkles className="w-8 h-8 scale-125 rotate-12" />
-                      </div>
-                      <div className="relative z-10 flex items-center justify-center">
-                        <Sword
-                          size={20}
-                          className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="relative">
-                      <Zap
-                        size={20}
-                        fill="currentColor"
-                        className="text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] animate-pulse"
-                      />
-                      <div className="absolute inset-0 bg-blue-400/20 blur-xl scale-150 rounded-full" />
-                    </div>
-                  )}
+                  <div className="relative">
+                    <Zap
+                      size={20}
+                      fill="currentColor"
+                      className="text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] animate-pulse"
+                    />
+                    <div className="absolute inset-0 bg-blue-400/20 blur-xl scale-150 rounded-full" />
+                  </div>
                 </div>
 
                 <div className="flex flex-col items-start overflow-hidden">
                   <span
-                    className={`
-                    text-base font-black tracking-tighter uppercase italic leading-[0.85]
-                    ${
-                      mode === "adventure"
-                        ? "text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500"
-                        : "text-white"
-                    }
-                  `}
                   >
                     Open
                   </span>
                   <span
-                    className={`
-                    text-xs font-black tracking-[0.2em] uppercase leading-tight
-                    ${
-                      mode === "adventure"
-                        ? "text-yellow-500/80 italic"
-                        : "text-blue-500/80"
-                    }
-                  `}
+                    className="text-xs font-black tracking-[0.2em] uppercase leading-tight text-blue-400/80"
                   >
                     Adventure
                   </span>
                 </div>
-              </button>
+              </div>
 
               <Navigation collapsed={false} />
 
@@ -703,7 +601,7 @@ export const Layout = () => {
         <header
           className={`
           hidden md:flex h-20 items-center justify-between px-8 border-b border-white/5
-          ${mode === "adventure" ? "bg-[#121225]" : "bg-white/[0.02] backdrop-blur-xl"}
+          bg-white/[0.02] backdrop-blur-xl
         `}
         >
           <div className="flex items-center gap-4 flex-1">
@@ -714,9 +612,7 @@ export const Layout = () => {
                 hidden md:flex p-2.5 rounded-xl transition-all duration-200
                 ${isSidebarOpen
                   ? 'hover:bg-white/5 text-gray-400 hover:text-white'
-                  : mode === "adventure"
-                    ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
-                    : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
+                  : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'
                 }
               `}
               title={isSidebarOpen ? '收起侧边栏' : '展开侧边栏'}
@@ -805,20 +701,9 @@ export const Layout = () => {
             <div className="flex items-center gap-3 pl-6 border-l border-white/10">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-bold">Local</p>
-                {mode === "adventure" ? (
-                  <div className="flex items-center gap-1 justify-end">
-                    <span className="text-[10px] text-yellow-500 font-bold uppercase">
-                      LVL 42
-                    </span>
-                    <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div className="w-3/4 h-full bg-yellow-500"></div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-gray-400">
-                    {t("userRole")}
-                  </p>
-                )}
+                <p className="text-[10px] text-gray-400">
+                  {t("userRole")}
+                </p>
               </div>
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 p-0.5">
                 <div className="w-full h-full rounded-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden">
@@ -833,7 +718,7 @@ export const Layout = () => {
         <div className={`flex-1 overflow-y-auto relative safe-area-top ${isTerminalPage ? '' : 'p-4 md:p-8'} pb-24 md:pb-4 safe-area-bottom`}>
           <AnimatePresence mode="wait">
             <motion.div
-              key={mode}
+              key={location.pathname}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -884,10 +769,7 @@ export const Layout = () => {
                     absolute bottom-20 left-0 right-0 mx-4 p-3 rounded-2xl max-h-[400px] overflow-y-auto
                     backdrop-blur-2xl backdrop-saturate-150
                     border border-white/20 shadow-2xl
-                    ${mode === "adventure"
-                      ? "bg-gradient-to-br from-yellow-500/20 via-orange-500/20 to-yellow-500/20"
-                      : "bg-white/15"
-                    }
+                    bg-white/15
                   `}
                 >
                   {notifications.length === 0 ? (
@@ -951,10 +833,7 @@ export const Layout = () => {
                     absolute bottom-20 left-0 right-0 mx-4 p-2 rounded-2xl
                     backdrop-blur-2xl backdrop-saturate-150
                     border border-white/20 shadow-2xl
-                    ${mode === "adventure"
-                      ? "bg-gradient-to-br from-yellow-500/20 via-orange-500/20 to-yellow-500/20"
-                      : "bg-white/15"
-                    }
+                    bg-white/15
                   `}
                 >
                   <div className="space-y-1">
@@ -1015,15 +894,29 @@ export const Layout = () => {
         </AnimatePresence>
 
         {/* 主导航栏 */}
-        <div className={`
-          grid grid-cols-5 items-center gap-1 px-2 h-16 rounded-3xl
-          backdrop-blur-2xl backdrop-saturate-150
-          border border-white/20 shadow-2xl
-          ${mode === "adventure"
-            ? "bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-yellow-500/10"
-            : "bg-white/10"
-          }
-        `}>
+        <div className="relative">
+          {/* 毛玻璃渐变层 - 从上往下 */}
+          <div
+            className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none"
+            style={{
+              background: `linear-gradient(to bottom,
+                rgba(255, 255, 255, 0.15) 0%,
+                rgba(255, 255, 255, 0.08) 30%,
+                rgba(255, 255, 255, 0.03) 60%,
+                rgba(255, 255, 255, 0) 100%
+              )`,
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }}
+          />
+
+          {/* 主导航栏内容 */}
+          <div className={`
+            relative grid grid-cols-5 items-center gap-1 px-2 h-16 rounded-3xl
+            backdrop-blur-2xl backdrop-saturate-150
+            border border-white/20 shadow-2xl
+            bg-white/10
+          `}>
           {/* Dashboard */}
           <NavLink
             to="/"
@@ -1042,7 +935,7 @@ export const Layout = () => {
           >
             {({ isActive }) => (
               <>
-                {mode === "adventure" ? <Sword size={20} className="relative z-10" /> : <LayoutDashboard size={20} className="relative z-10" />}
+                <LayoutDashboard size={20} className="relative z-10" />
                 <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">{t("dashboard")}</span>
               </>
             )}
@@ -1065,7 +958,7 @@ export const Layout = () => {
             {activeLibraryItem ? (
               <activeLibraryItem.icon size={20} className="relative z-10" />
             ) : (
-              mode === "adventure" ? <BookOpen size={20} className="relative z-10" /> : <Wrench size={20} className="relative z-10" />
+              <Wrench size={20} className="relative z-10" />
             )}
             <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">
               {activeLibraryItem ? activeLibraryItem.name : t("library")}
@@ -1089,7 +982,7 @@ export const Layout = () => {
             {activeAutomationItem ? (
               <activeAutomationItem.icon size={20} className="relative z-10" />
             ) : (
-              mode === "adventure" ? <Map size={20} className="relative z-10" /> : <GitBranch size={20} className="relative z-10" />
+              <GitBranch size={20} className="relative z-10" />
             )}
             <span className="text-[10px] font-medium relative z-10 w-full truncate text-center">
               {activeAutomationItem ? activeAutomationItem.name : t("automation")}
@@ -1139,6 +1032,7 @@ export const Layout = () => {
               </span>
             )}
           </button>
+          </div>
         </div>
       </nav>
     </div>

@@ -8,6 +8,7 @@ cd "$SCRIPT_DIR"
 PID_DIR="$SCRIPT_DIR/.run"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
+MICROVERSE_PID_FILE="$PID_DIR/microverse.pid"
 
 echo "🛑 Stopping Open Adventure..."
 echo ""
@@ -78,6 +79,38 @@ else
     echo "ℹ️  No frontend PID file found"
 fi
 
+# 停止 Microverse
+if [ -f "$MICROVERSE_PID_FILE" ]; then
+    MICROVERSE_PID=$(cat "$MICROVERSE_PID_FILE")
+    if [ -n "$MICROVERSE_PID" ] && kill -0 "$MICROVERSE_PID" 2>/dev/null; then
+        echo "Stopping Microverse (PID: $MICROVERSE_PID)..."
+        kill "$MICROVERSE_PID" 2>/dev/null || true
+
+        # 等待进程退出（最多 5 秒）
+        for i in {1..10}; do
+            if ! kill -0 "$MICROVERSE_PID" 2>/dev/null; then
+                echo "✅ Microverse stopped"
+                STOPPED_ANY=true
+                break
+            fi
+            sleep 0.5
+        done
+
+        # 如果还没停止，强制 kill
+        if kill -0 "$MICROVERSE_PID" 2>/dev/null; then
+            echo "⚠️  Microverse didn't stop gracefully, forcing..."
+            kill -9 "$MICROVERSE_PID" 2>/dev/null || true
+            echo "✅ Microverse force stopped"
+            STOPPED_ANY=true
+        fi
+    else
+        echo "⚠️  Microverse PID file exists but process is not running"
+    fi
+    rm -f "$MICROVERSE_PID_FILE"
+else
+    echo "ℹ️  No Microverse PID file found"
+fi
+
 # 额外保险：清理可能残留的进程
 echo ""
 echo "Checking for any remaining processes..."
@@ -102,6 +135,13 @@ if pgrep -f "vite.*--port 5173" > /dev/null 2>&1; then
     STOPPED_ANY=true
 fi
 
+# 检查并清理 Microverse 进程
+if pgrep -f "python3 -m http.server 5174" > /dev/null 2>&1; then
+    echo "Found remaining Microverse processes, cleaning up..."
+    pkill -f "python3 -m http.server 5174" 2>/dev/null || true
+    STOPPED_ANY=true
+fi
+
 # 验证端口是否释放
 echo ""
 echo "Verifying ports are released..."
@@ -115,6 +155,12 @@ fi
 if lsof -Pi :5173 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "⚠️  Port 5173 still occupied, forcing cleanup..."
     lsof -ti :5173 | xargs kill -9 2>/dev/null || true
+    STOPPED_ANY=true
+fi
+
+if lsof -Pi :5174 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠️  Port 5174 still occupied, forcing cleanup..."
+    lsof -ti :5174 | xargs kill -9 2>/dev/null || true
     STOPPED_ANY=true
 fi
 

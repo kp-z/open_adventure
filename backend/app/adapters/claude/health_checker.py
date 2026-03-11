@@ -200,7 +200,7 @@ class ClaudeHealthChecker:
 
     async def get_model_info(self) -> Dict[str, Any]:
         """
-        获取 Claude 模型配置信息
+        获取 Claude 模型配置信息（支持 cc-switch 和 settings.json）
 
         Returns:
             Dict: 包含当前模型、可用模型列表等信息
@@ -208,21 +208,49 @@ class ClaudeHealthChecker:
         model_info = {
             "current_model": None,
             "available_models": [],
-            "model_source": None  # "settings" 或 "default"
+            "model_source": None  # "cc-switch", "settings" 或 "default"
         }
 
-        # 1. 读取 ~/.claude/settings.json 获取配置的模型
-        settings_file = self.config_dir / "settings.json"
-        if settings_file.exists():
+        # 1. 优先检查 cc-switch 配置
+        cc_switch_db = Path.home() / ".cc-switch" / "cc-switch.db"
+        if cc_switch_db.exists():
             try:
-                with open(settings_file, 'r') as f:
-                    settings_data = json.load(f)
-                    model_info["current_model"] = settings_data.get("model")
-                    model_info["model_source"] = "settings" if model_info["current_model"] else "default"
-                    logger.info(f"Read model from settings: {model_info['current_model']}")
+                import sqlite3
+                conn = sqlite3.connect(str(cc_switch_db))
+                cursor = conn.cursor()
+
+                # 查询当前激活的 provider
+                cursor.execute("""
+                    SELECT settings_config
+                    FROM providers
+                    WHERE app_type = 'claude' AND is_current = 1
+                    LIMIT 1
+                """)
+
+                row = cursor.fetchone()
+                if row:
+                    settings_config = json.loads(row[0])
+                    model_info["current_model"] = settings_config.get("model")
+                    model_info["model_source"] = "cc-switch"
+                    logger.info(f"Read model from cc-switch: {model_info['current_model']}")
+
+                conn.close()
             except Exception as e:
-                logger.error(f"Failed to read settings.json: {e}")
-                model_info["model_source"] = "default"
+                logger.warning(f"Failed to read cc-switch config: {e}")
+
+        # 2. 如果 cc-switch 没有配置，读取 settings.json
+        if not model_info["current_model"]:
+            settings_file = self.config_dir / "settings.json"
+            if settings_file.exists():
+                try:
+                    with open(settings_file, 'r') as f:
+                        settings_data = json.load(f)
+                        model_info["current_model"] = settings_data.get("model")
+                        model_info["model_source"] = "settings" if model_info["current_model"] else "default"
+                        logger.info(f"Read model from settings: {model_info['current_model']}")
+                except Exception as e:
+                    logger.error(f"Failed to read settings.json: {e}")
+                    model_info["model_source"] = "default"
 
         # 2. 加载模型列表（默认 + 自定义）
         models = self._load_default_models()

@@ -696,7 +696,7 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
   return (
     <div className="max-w-6xl mx-auto pb-20">
       {/* 头部 */}
-      <div className="flex items-center gap-4 mb-8">
+      <header className="flex items-center gap-4 mb-8">
         <div className="flex items-center gap-4 flex-1">
           <div
             className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-${color}-500/20 border border-${color}-500/30`}
@@ -706,11 +706,11 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
           >
             <CurrentIcon size={28} className={`text-${color}-400`} />
           </div>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
               {isCreateMode ? '创建新子代理' : '编辑子代理'}
             </h1>
-            <p className="text-gray-400 mt-1">
+            <p className="text-sm md:text-base text-gray-400 mt-1 line-clamp-1 md:line-clamp-none">
               {isCreateMode ? '配置你的 AI 子代理' : agent?.meta?.path || agent?.name}
             </p>
           </div>
@@ -758,7 +758,7 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
             )}
           </button>
         </div>
-      </div>
+      </header>
 
       {/* 错误提示 */}
       {error && (

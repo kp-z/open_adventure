@@ -26,7 +26,9 @@ import {
   Rocket,
   Copy,
   Pin,
-  PinOff
+  PinOff,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -392,6 +394,14 @@ const Skills = () => {
 
   const filteredSkills = skills
     .filter(s => {
+      // 当选择 'all' 时，默认不显示 builtin/global skills
+      if (selectedCategory === 'all') {
+        let source = s.source.toLowerCase();
+        if (source === 'global' || source === 'builtin') {
+          return false;
+        }
+      }
+
       const name = s.name[lang] || s.name.en;
       const matchesSearch = name.toLowerCase().includes(search.toLowerCase());
 
@@ -475,7 +485,7 @@ const Skills = () => {
     return <SkillEditor onBack={handleSkillSaved} initialMode={initialEditorMode} editingSkillId={editingSkillId} />;
   }
 
-  if (mode === 'adventure') {
+  if (false) {
     return (
       <div className="space-y-8 pb-20 pt-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -733,7 +743,7 @@ const Skills = () => {
         <div className="flex-1 min-w-0">
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">SKILLS</h1>
           <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
-            {mode === 'adventure'
+            {false
               ? '收集和强化技能宝珠，赋予英雄强大能力'
               : '创建和管理可复用的 AI 技能模块，扩展系统能力'}
           </p>

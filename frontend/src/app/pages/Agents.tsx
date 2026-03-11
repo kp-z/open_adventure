@@ -109,6 +109,7 @@ const Agents = () => {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncResult, setSyncResult] = useState<AgentSyncResponse | null>(null);
+  const [availableModels, setAvailableModels] = useState<Set<string>>(new Set());
 
   // 置顶状态
   const [pinnedAgents, setPinnedAgents] = useState<Set<number>>(() => {
@@ -186,6 +187,23 @@ const Agents = () => {
       setLoading(false);
     }
   }, [showOverridden, addNotification]);
+
+  // 获取可用模型列表
+  const fetchAvailableModels = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:38080/api/claude/health');
+      const health = await response.json();
+      const models = health.model_info?.available_models || [];
+      const available = new Set(
+        models
+          .filter((m: any) => m.available)
+          .map((m: any) => m.alias)
+      );
+      setAvailableModels(available);
+    } catch (err) {
+      console.error('Failed to fetch available models:', err);
+    }
+  }, []);
 
   // 获取分类数据
   const fetchCategories = useCallback(async () => {
@@ -328,7 +346,8 @@ const Agents = () => {
   useEffect(() => {
     fetchAgents();
     fetchCategories();
-  }, [fetchAgents, fetchCategories]);
+    fetchAvailableModels();
+  }, [fetchAgents, fetchCategories, fetchAvailableModels]);
 
   // 检测 URL 参数，自动打开创建表单
   useEffect(() => {
@@ -343,6 +362,11 @@ const Agents = () => {
   // 过滤和排序 agents
   const filteredAgents = agents
     .filter(agent => {
+      // 当选择 'all' 时，默认不显示 builtin agents
+      if (selectedCategory === 'all' && agent.scope === 'builtin') {
+        return false;
+      }
+
       // Category filter
       if (selectedCategory !== 'all') {
         let scope = agent.scope.toLowerCase();
@@ -467,7 +491,7 @@ const Agents = () => {
             AGENTS
           </h1>
           <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
-            {mode === 'adventure'
+            {false
               ? '召唤和管理你的 AI 英雄，组建最强战队'
               : '创建和配置专属 AI 助手，赋予不同能力和权限'}
           </p>
@@ -639,7 +663,7 @@ const Agents = () => {
                           >
                             {[
                               { icon: Settings2, label: 'Configure', action: 'configure', color: 'blue', disabled: agent.is_builtin },
-                              { icon: Play, label: 'Run', action: 'test', color: 'green', disabled: false },
+                              { icon: Play, label: 'Run', action: 'test', color: 'green', disabled: agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model) },
                               { icon: Edit, label: 'Edit', action: 'edit', color: 'gray', disabled: agent.is_builtin },
                               { icon: Copy, label: 'Duplicate', action: 'duplicate', color: 'gray', disabled: true },
                               { icon: Trash2, label: 'Delete', action: 'delete', color: 'red', disabled: agent.is_builtin },
@@ -708,16 +732,20 @@ const Agents = () => {
                     <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Status</p>
                     <div className="flex items-center gap-1">
                       <div className={`w-2 h-2 rounded-full ${
-                        !agent.enabled ? 'bg-gray-400' :
+                        agent.enabled === false ? 'bg-gray-400' :
+                        agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model) ? 'bg-red-400' :
                         agent.is_overridden ? 'bg-orange-400' :
                         'bg-green-400'
                       }`} />
                       <p className={`text-xs font-bold ${
-                        !agent.enabled ? 'text-gray-400' :
+                        agent.enabled === false ? 'text-gray-400' :
+                        agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model) ? 'text-red-400' :
                         agent.is_overridden ? 'text-orange-400' :
                         'text-green-400'
                       }`}>
-                        {!agent.enabled ? 'Off' : agent.is_overridden ? 'Over' : 'On'}
+                        {agent.enabled === false ? 'Off' :
+                         agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model) ? 'N/A' :
+                         agent.is_overridden ? 'Over' : 'On'}
                       </p>
                     </div>
                   </div>
@@ -802,12 +830,20 @@ const Agents = () => {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      setTestingAgent(agent);
+                      const isModelUnavailable = agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model);
+                      if (!isModelUnavailable) {
+                        setTestingAgent(agent);
+                      }
                     }}
-                    className="flex items-center justify-center gap-2 px-4 py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl transition-all font-bold text-sm"
+                    disabled={agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model)}
+                    className={`flex items-center justify-center gap-2 px-4 py-3 border rounded-xl transition-all font-bold text-sm ${
+                      agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model)
+                        ? 'bg-gray-500/10 border-gray-500/30 cursor-not-allowed opacity-50'
+                        : 'bg-green-500/20 hover:bg-green-500/30 border-green-500/30'
+                    }`}
                   >
-                    <Play size={16} className="text-green-400" />
-                    <span className="text-green-400">Run</span>
+                    <Play size={16} className={agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model) ? 'text-gray-400' : 'text-green-400'} />
+                    <span className={agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model) ? 'text-gray-400' : 'text-green-400'}>Run</span>
                   </button>
                   <button
                     type="button"

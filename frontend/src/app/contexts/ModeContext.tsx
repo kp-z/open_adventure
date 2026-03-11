@@ -1,12 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type Mode = 'professional' | 'adventure';
 type Language = 'en' | 'zh';
 
 interface ModeContextType {
-  mode: Mode;
-  setMode: (mode: Mode) => void;
-  toggleMode: () => void;
   lang: Language;
   setLang: (lang: Language) => void;
   toggleLang: () => void;
@@ -15,13 +11,6 @@ interface ModeContextType {
 const ModeContext = createContext<ModeContextType | undefined>(undefined);
 
 export function ModeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<Mode>(() => {
-    if (typeof window !== 'undefined') {
-      return (localStorage.getItem('open-adventure-mode') as Mode) || 'professional';
-    }
-    return 'professional';
-  });
-
   const [lang, setLang] = useState<Language>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('open-adventure-lang') as Language) || 'en';
@@ -30,29 +19,16 @@ export function ModeProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    localStorage.setItem('open-adventure-mode', mode);
-    if (mode === 'adventure') {
-      document.documentElement.classList.add('open-adventure-mode');
-    } else {
-      document.documentElement.classList.remove('open-adventure-mode');
-    }
-  }, [mode]);
-
-  useEffect(() => {
     localStorage.setItem('open-adventure-lang', lang);
     document.documentElement.lang = lang;
   }, [lang]);
-
-  const toggleMode = () => {
-    setMode(prev => (prev === 'professional' ? 'adventure' : 'professional'));
-  };
 
   const toggleLang = () => {
     setLang(prev => (prev === 'en' ? 'zh' : 'en'));
   };
 
   return (
-    <ModeContext.Provider value={{ mode, setMode, toggleMode, lang, setLang, toggleLang }}>
+    <ModeContext.Provider value={{ lang, setLang, toggleLang }}>
       {children}
     </ModeContext.Provider>
   );

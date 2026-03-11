@@ -53,16 +53,20 @@ PID_DIR="$SCRIPT_DIR/.run"
 mkdir -p "$PID_DIR"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
+MICROVERSE_PID_FILE="$PID_DIR/microverse.pid"
 
 # 固定默认端口（除非用户显式选择新端口）
-BACKEND_PORT=8000
+BACKEND_PORT=38080
 FRONTEND_PORT=5173
+MICROVERSE_PORT=5174
 
 # 检查运行模式参数
 DAEMON_MODE=false
 NON_INTERACTIVE=false
 FORCE_RESET=false
 PREVENT_SLEEP=false
+CLEAR_CACHE=false
+WITH_MICROVERSE=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -74,6 +78,12 @@ for arg in "$@"; do
             ;;
         --no-sleep)
             PREVENT_SLEEP=true
+            ;;
+        --clear-cache)
+            CLEAR_CACHE=true
+            ;;
+        --with-microverse)
+            WITH_MICROVERSE=true
             ;;
     esac
 done
@@ -92,6 +102,12 @@ if [ "$FORCE_RESET" = true ]; then
 fi
 if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
     echo "☕ Preventing system sleep (macOS)"
+fi
+if [ "$CLEAR_CACHE" = true ]; then
+    echo "🧹 Running in clear cache mode (--clear-cache)"
+fi
+if [ "$WITH_MICROVERSE" = true ]; then
+    echo "🎮 Microverse mode enabled"
 fi
 echo ""
 
@@ -213,6 +229,17 @@ if [ -f "$FRONTEND_PID_FILE" ]; then
         sleep 1
     fi
     rm -f "$FRONTEND_PID_FILE"
+fi
+
+if [ -f "$MICROVERSE_PID_FILE" ]; then
+    OLD_MICROVERSE_PID=$(cat "$MICROVERSE_PID_FILE")
+    if [ -n "$OLD_MICROVERSE_PID" ] && kill -0 "$OLD_MICROVERSE_PID" 2>/dev/null; then
+        echo "⚠️  Found running Microverse process from previous session (PID: $OLD_MICROVERSE_PID)"
+        echo "Cleaning up old process..."
+        kill "$OLD_MICROVERSE_PID" 2>/dev/null || true
+        sleep 1
+    fi
+    rm -f "$MICROVERSE_PID_FILE"
 fi
 
 # 强制清理后端进程的函数
@@ -366,6 +393,25 @@ resolve_port_conflict() {
     done
 }
 
+# 清除缓存模式：清理前端缓存和 localStorage
+if [ "$CLEAR_CACHE" = true ]; then
+    echo ""
+    echo "🧹 Clear cache mode enabled: cleaning frontend cache and localStorage..."
+
+    # 清理前端构建缓存
+    rm -rf "$SCRIPT_DIR/frontend/.vite"
+    rm -rf "$SCRIPT_DIR/frontend/dist"
+    rm -rf "$SCRIPT_DIR/frontend/node_modules/.vite"
+
+    # 创建一个标记文件，前端启动时会读取并清除 localStorage
+    mkdir -p "$SCRIPT_DIR/frontend/public"
+    echo "clear" > "$SCRIPT_DIR/frontend/public/.clear-cache"
+
+    echo "✅ Cache cleanup completed"
+    echo "📝 Frontend will clear localStorage on next load"
+    echo ""
+fi
+
 # 强制全量重置模式：清理进程、依赖和配置
 if [ "$FORCE_RESET" = true ]; then
     echo ""
@@ -385,6 +431,13 @@ if [ "$FORCE_RESET" = true ]; then
     # 删除配置文件（下次启动自动从 example 重建）
     rm -f "$SCRIPT_DIR/backend/.env"
     rm -f "$SCRIPT_DIR/frontend/.env.local"
+
+    # 清除缓存（包含在 --reset-all 中）
+    rm -rf "$SCRIPT_DIR/frontend/.vite"
+    rm -rf "$SCRIPT_DIR/frontend/dist"
+    rm -rf "$SCRIPT_DIR/frontend/node_modules/.vite"
+    mkdir -p "$SCRIPT_DIR/frontend/public"
+    echo "clear" > "$SCRIPT_DIR/frontend/public/.clear-cache"
 
     echo "✅ Force reset cleanup completed"
 fi
@@ -592,6 +645,44 @@ if [ "$DAEMON_MODE" = true ]; then
     echo "🛑 To stop all servers, run: ./stop.sh"
     echo "============================================"
     echo ""
+
+    # 启动 Microverse（如果启用）
+    if [ "$WITH_MICROVERSE" = true ]; then
+        echo ""
+        echo "🎮 Starting Microverse..."
+
+        # 检查导出文件是否存在
+        if [ ! -f "$SCRIPT_DIR/microverse/export/index.html" ]; then
+            echo "⚠️  Microverse not exported yet"
+            echo "👉 Please run: cd microverse && ./export.sh"
+            echo "⏭️  Skipping Microverse startup"
+        else
+            cd "$SCRIPT_DIR/microverse/export"
+            python3 -m http.server $MICROVERSE_PORT > "$SCRIPT_DIR/docs/logs/microverse.log" 2>&1 &
+            MICROVERSE_PID=$!
+            echo "$MICROVERSE_PID" > "$MICROVERSE_PID_FILE"
+
+            # 等待 Microverse 启动
+            echo "Waiting for Microverse to start..."
+            for i in {1..10}; do
+                if lsof -Pi :$MICROVERSE_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+                    echo "✅ Microverse is ready (PID: $MICROVERSE_PID)"
+                    echo "🌐 Microverse: http://localhost:${MICROVERSE_PORT}"
+                    if [ -n "$DISPLAY_IP" ]; then
+                        echo "🌍 Network: http://${DISPLAY_IP}:${MICROVERSE_PORT}"
+                    fi
+                    break
+                fi
+                if [ $i -eq 10 ]; then
+                    echo "⚠️  Microverse may not have started properly"
+                fi
+                sleep 0.5
+            done
+
+            cd "$SCRIPT_DIR"
+        fi
+        echo ""
+    fi
 else
     # 前台模式：前端在前台运行
     echo ""

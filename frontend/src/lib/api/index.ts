@@ -15,6 +15,7 @@ export { executionsApi } from './services/executions';
 export { dashboardApi } from './services/dashboard';
 export { statsApi } from './services/stats';
 export { claudeApi } from './services/claude';
+export { configApi, type AppConfig, type ConfigResponse, type ConfigUpdateResponse, type ModelConfig, type ModelsConfigResponse, type ModelsConfigUpdateResponse } from './services/config';
 export * as projectPathsApi from './services/project-paths';
 export type { ProjectPath, ProjectPathCreate, ProjectPathUpdate } from './services/project-paths';
 export * as pluginsApi from './services/plugins';

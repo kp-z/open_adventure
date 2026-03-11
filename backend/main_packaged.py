@@ -21,14 +21,8 @@ import time
 # 设置资源路径（PyInstaller 打包后的临时目录）
 if getattr(sys, 'frozen', False):
     # 运行在 PyInstaller 打包环境
-    # --onedir 模式: 可执行文件在目录中，资源在同一目录
-    if hasattr(sys, '_MEIPASS'):
-        # 单文件模式（不应该到这里，但保留兼容）
-        BASE_DIR = Path(sys._MEIPASS)
-    else:
-        # 目录模式
-        BASE_DIR = Path(sys.executable).parent
-
+    # onefile 模式: 使用 _MEIPASS 临时目录
+    BASE_DIR = Path(sys._MEIPASS)
     FRONTEND_DIR = BASE_DIR / "frontend_dist"
     DB_TEMPLATE = BASE_DIR / "open_adventure.db"
 
@@ -51,20 +45,85 @@ os.environ["DB_TEMPLATE_PATH"] = str(DB_TEMPLATE)
 
 def init_database():
     """初始化数据库"""
+    global FRONTEND_DIR  # 声明全局变量
+    import shutil
+
     user_dir = Path.home() / ".open_adventure"
     user_db = user_dir / "open_adventure.db"
     user_dir.mkdir(parents=True, exist_ok=True)
 
     if not user_db.exists() and DB_TEMPLATE.exists():
-        import shutil
         shutil.copy(DB_TEMPLATE, user_db)
         print(f"✓ 数据库已初始化: {user_db}")
 
     # 更新数据库 URL
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{user_db}"
 
-    # 加载用户配置文件
+    # 复制前端资源到持久化目录（解决 PyInstaller onefile 模式临时目录被清理的问题）
+    user_frontend = user_dir / "frontend_dist"
+
+    # 调试信息
+    print(f"调试: FRONTEND_DIR = {FRONTEND_DIR}")
+    print(f"调试: FRONTEND_DIR.exists() = {FRONTEND_DIR.exists()}")
+    print(f"调试: user_frontend = {user_frontend}")
+    print(f"调试: user_frontend.exists() = {user_frontend.exists()}")
+
+    if FRONTEND_DIR.exists():
+        if not user_frontend.exists() or not (user_frontend / "index.html").exists():
+            if user_frontend.exists():
+                shutil.rmtree(user_frontend)
+            shutil.copytree(FRONTEND_DIR, user_frontend)
+            print(f"✓ 前端资源已复制: {user_frontend}")
+        else:
+            print(f"✓ 前端资源已存在: {user_frontend}")
+    else:
+        print(f"⚠️  警告: 源前端目录不存在: {FRONTEND_DIR}")
+        if not user_frontend.exists():
+            print(f"⚠️  错误: 用户前端目录也不存在，前端将无法访问")
+
+    # 更新前端资源路径为持久化目录
+    FRONTEND_DIR = user_frontend
+    os.environ["FRONTEND_DIST_DIR"] = str(user_frontend)
+
+    # 初始化配置文件
     user_env = user_dir / ".env"
+    if not user_env.exists():
+        # 创建默认配置文件
+        default_config = """# Open Adventure Configuration
+# 应用配置
+APP_NAME=Open Adventure
+APP_VERSION=0.2.0
+DEBUG=false
+ENV=production
+
+# API 配置
+API_PREFIX=/api
+
+# 安全配置（请修改为随机字符串）
+SECRET_KEY=change-this-to-a-random-secret-key-in-production
+
+# 数据库配置（自动设置）
+# DATABASE_URL=sqlite+aiosqlite:///~/.open_adventure/open_adventure.db
+
+# Claude 配置
+# ANTHROPIC_API_KEY=your-api-key-here
+CLAUDE_CLI_PATH=claude
+
+# 模型提供商配置
+DEFAULT_MODEL_PROVIDER=anthropic
+
+# 日志配置
+LOG_LEVEL=INFO
+
+# CORS 配置（生产环境）
+# CORS_ORIGIN_REGEX=^https?://(localhost|127\\.0\\.0\\.1)(?::\\d{1,5})?$
+"""
+        with open(user_env, 'w', encoding='utf-8') as f:
+            f.write(default_config)
+        print(f"✓ 配置文件已创建: {user_env}")
+        print(f"  提示: 请编辑配置文件设置 ANTHROPIC_API_KEY")
+
+    # 加载用户配置文件
     if user_env.exists():
         from dotenv import load_dotenv
         load_dotenv(user_env)
@@ -85,10 +144,11 @@ def check_port_available(port: int) -> bool:
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="Open Adventure - AI Configuration Management System")
-    parser.add_argument("--port", type=int, default=None, help="服务端口 (默认: 8000)")
+    parser.add_argument("--port", type=int, default=None, help="服务端口 (默认: 38080)")
     parser.add_argument("--host", type=str, default="0.0.0.0", help="监听地址 (默认: 0.0.0.0)")
     parser.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
-    parser.add_argument("-d", "--daemon", action="store_true", help="后台运行模式")
+    parser.add_argument("-d", "--daemon", action="store_true", default=False, help="后台运行模式（需要手动使用 nohup 或 &）")
+    parser.add_argument("-f", "--foreground", action="store_true", default=True, help="前台运行模式（默认）")
     return parser.parse_args()
 
 
@@ -122,100 +182,27 @@ if __name__ == "__main__":
     # 解析命令行参数
     args = parse_args()
 
-    # 后台运行模式
+    # 如果指定了前台模式，则覆盖默认的后台模式
+    if args.foreground:
+        args.daemon = False
+
+    # 后台运行模式提示
     if args.daemon:
-        import subprocess
-        import signal
-
-        # 获取当前可执行文件路径
-        exe_path = sys.executable if getattr(sys, 'frozen', False) else sys.argv[0]
-
-        # 构建后台运行命令（去掉 --daemon 参数）
-        daemon_args = [exe_path]
-        if args.port:
-            daemon_args.extend(["--port", str(args.port)])
-        if args.host != "0.0.0.0":
-            daemon_args.extend(["--host", args.host])
-        daemon_args.append("--no-browser")  # 后台模式强制不打开浏览器
-
-        # 创建 PID 文件目录
-        user_dir = Path.home() / ".open_adventure"
-        user_dir.mkdir(parents=True, exist_ok=True)
-        pid_file = user_dir / "open_adventure.pid"
-        log_file = user_dir / "open_adventure.log"
-
-        # 检查是否已有进程在运行
-        if pid_file.exists():
-            try:
-                with open(pid_file, 'r') as f:
-                    old_pid = int(f.read().strip())
-                # 检查进程是否存在
-                os.kill(old_pid, 0)
-                print(f"⚠️  Open Adventure 已在运行 (PID: {old_pid})")
-                print(f"如需重启，请先运行: kill {old_pid}")
-                sys.exit(1)
-            except (OSError, ValueError):
-                # 进程不存在，删除旧的 PID 文件
-                pid_file.unlink()
-
-        # 启动后台进程
-        print(f"🚀 启动后台服务...")
-        print(f"📝 日志文件: {log_file}")
-
-        with open(log_file, 'w') as log:
-            process = subprocess.Popen(
-                daemon_args,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                start_new_session=True  # 创建新会话，脱离终端
-            )
-
-        # 保存 PID
-        with open(pid_file, 'w') as f:
-            f.write(str(process.pid))
-
-        # 等待服务启动
-        port = args.port or int(os.environ.get("PORT", 8000))
-        print(f"⏳ 等待服务启动...")
-        time.sleep(3)
-
-        # 获取局域网 IP
-        local_ip = get_local_ip()
-
-        # 验证服务是否启动成功
-        try:
-            import urllib.request
-            urllib.request.urlopen(f"http://localhost:{port}/api/system/health", timeout=5)
-            print(f"✅ 服务已启动 (PID: {process.pid})")
-            print(f"\n============================================")
-            print(f"✅ Open Adventure is running in background!")
-            print(f"============================================")
-            print(f"\n🌐 本地访问:")
-            print(f"   Frontend: http://localhost:{port}/")
-            print(f"   Backend API: http://localhost:{port}/api")
-            print(f"   API Docs: http://localhost:{port}/docs")
-            if local_ip:
-                print(f"\n🌍 局域网访问:")
-                print(f"   Frontend: http://{local_ip}:{port}/")
-                print(f"   Backend API: http://{local_ip}:{port}/api")
-            print(f"\n📋 进程信息:")
-            print(f"   PID: {process.pid}")
-            print(f"\n📝 日志文件:")
-            print(f"   {log_file}")
-            print(f"\n🛑 停止服务: kill {process.pid}")
-            print(f"📊 查看日志: tail -f {log_file}")
-            print(f"============================================")
-        except Exception as e:
-            print(f"⚠️  服务可能未正常启动，请查看日志: {log_file}")
-            print(f"错误: {e}")
-
+        # 在 PyInstaller onefile 模式下，不能 fork 子进程
+        # 因为父进程退出后临时目录会被清理
+        port = args.port or 38080
+        print("⚠️  后台模式说明:")
+        print(f"   由于打包限制，请手动使用以下命令后台运行:")
+        print(f"   nohup {sys.executable} -f --no-browser --port {port} > ~/.open_adventure/open_adventure.log 2>&1 &")
+        print(f"\n   或者直接使用前台模式（推荐）:")
+        print(f"   {sys.executable} -f --port {port}")
         sys.exit(0)
 
     # 初始化数据库
     init_database()
 
     # 确定端口（优先级: 命令行 > 环境变量 > 默认值）
-    port = args.port or int(os.environ.get("PORT", 8000))
+    port = args.port or int(os.environ.get("PORT", 38080))
     host = args.host
 
     # 检查端口是否可用
@@ -226,6 +213,22 @@ if __name__ == "__main__":
 
     # 获取局域网 IP
     local_ip = get_local_ip()
+
+    # 生成前端运行时配置文件
+    config_js_content = f"""// Auto-generated runtime configuration
+window.__RUNTIME_CONFIG__ = {{
+  API_BASE_URL: 'http://localhost:{port}/api',
+  WS_BASE_URL: 'ws://localhost:{port}/api',
+  PORT: {port}
+}};
+"""
+    config_js_path = FRONTEND_DIR / "config.js"
+    try:
+        with open(config_js_path, 'w', encoding='utf-8') as f:
+            f.write(config_js_content)
+        print(f"✓ 前端配置已生成: {config_js_path}", flush=True)
+    except Exception as e:
+        print(f"⚠️  警告: 无法生成前端配置文件: {e}", flush=True)
 
     # 启动 FastAPI 服务器
     print(f"\n🚀 启动服务器...", flush=True)

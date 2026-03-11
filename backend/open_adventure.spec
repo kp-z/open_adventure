@@ -38,6 +38,16 @@ if db_template.exists():
 else:
     print("⚠️  警告: 数据库模板不存在")
 
+# 收集配置文件（default_models.json 等）
+config_dir = app_dir / 'config'
+if config_dir.exists():
+    for config_file in config_dir.glob('*.json'):
+        if config_file.name != '__pycache__':
+            datas.append((str(config_file), 'app/config'))
+            print(f"✓ 收集配置文件: {config_file.name}")
+else:
+    print("⚠️  警告: app/config 目录不存在")
+
 # 隐藏导入（只保留运行时确实需要的模块，避免引用不存在的旧路径）
 hiddenimports = [
     'app',

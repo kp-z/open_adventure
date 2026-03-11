@@ -101,12 +101,58 @@ const Dashboard = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const fetchDashboardData = async () => {
+  // 统一的缓存更新函数
+  const updateCache = (updates: {
+    stats?: DashboardStats;
+    health?: ClaudeHealthResponse;
+    projectPaths?: ProjectPath[];
+  }) => {
+    try {
+      const cacheData = localStorage.getItem('open-adventure-cache');
+      const cache = cacheData ? JSON.parse(cacheData) : {};
+
+      // 合并更新
+      const newCache = {
+        ...cache,
+        ...updates,
+        timestamp: Date.now()
+      };
+
+      localStorage.setItem('open-adventure-cache', JSON.stringify(newCache));
+    } catch (err) {
+      console.warn('Failed to update cache:', err);
+    }
+  };
+
+  const fetchDashboardData = async (useCache = true) => {
     try {
       setLoadingStats(true);
+
+      // 优先使用缓存数据
+      if (useCache) {
+        const cacheData = localStorage.getItem('open-adventure-cache');
+        if (cacheData) {
+          try {
+            const cache = JSON.parse(cacheData);
+            const cacheAge = Date.now() - cache.timestamp;
+            // 缓存有效期 5 分钟
+            if (cacheAge < 5 * 60 * 1000 && cache.stats) {
+              setStats(cache.stats);
+              setLoadingStats(false);
+              return;
+            }
+          } catch (err) {
+            console.warn('Failed to parse cache:', err);
+          }
+        }
+      }
+
       // 获取仪表板统计数据
       const statsData = await dashboardApi.getStats();
       setStats(statsData);
+
+      // 保存到缓存
+      updateCache({ stats: statsData });
 
       const usageWarning = typeof statsData.usage_warning === 'string' ? statsData.usage_warning : null;
       if (usageWarning && usageWarning !== lastUsageWarningRef.current) {
@@ -128,14 +174,44 @@ const Dashboard = () => {
     }
   };
 
-  const fetchClaudeHealth = async () => {
+  const fetchClaudeHealth = async (useCache = true) => {
     try {
       setLoadingHealth(true);
+
+      // 优先使用缓存数据
+      if (useCache) {
+        const cacheData = localStorage.getItem('open-adventure-cache');
+        if (cacheData) {
+          try {
+            const cache = JSON.parse(cacheData);
+            const cacheAge = Date.now() - cache.timestamp;
+            // 缓存有效期 5 分钟
+            if (cacheAge < 5 * 60 * 1000 && cache.health) {
+              setClaudeHealth(cache.health);
+              setLoadingHealth(false);
+              // 仍然获取 token 使用情况（实时数据）
+              try {
+                const tokenData = await dashboardApi.getTokenUsage();
+                setTokenUsage({ percentage: tokenData.percentage ?? 0 });
+              } catch (err) {
+                console.error('Failed to fetch token usage:', err);
+              }
+              return;
+            }
+          } catch (err) {
+            console.warn('Failed to parse cache:', err);
+          }
+        }
+      }
+
       // 获取 Claude 健康状态
       const healthData = await claudeApi.health();
       console.log('Claude Health Data:', healthData);
       console.log('Available Models:', healthData.model_info?.available_models);
       setClaudeHealth(healthData);
+
+      // 保存到缓存
+      updateCache({ health: healthData });
 
       // 获取 token 使用情况
       try {
@@ -174,11 +250,34 @@ const Dashboard = () => {
     }
   };
 
-  const fetchProjectPaths = async () => {
+  const fetchProjectPaths = async (useCache = true) => {
     try {
       setLoadingProjectPaths(true);
+
+      // 优先使用缓存数据
+      if (useCache) {
+        const cacheData = localStorage.getItem('open-adventure-cache');
+        if (cacheData) {
+          try {
+            const cache = JSON.parse(cacheData);
+            const cacheAge = Date.now() - cache.timestamp;
+            // 缓存有效期 5 分钟
+            if (cacheAge < 5 * 60 * 1000 && cache.projectPaths) {
+              setProjectPaths(cache.projectPaths);
+              setLoadingProjectPaths(false);
+              return;
+            }
+          } catch (err) {
+            console.warn('Failed to parse cache:', err);
+          }
+        }
+      }
+
       const response = await projectPathsApi.listProjectPaths({ enabled: true });
       setProjectPaths(response?.items || []);
+
+      // 保存到缓存
+      updateCache({ projectPaths: response?.items || [] });
     } catch (err) {
       console.error('Failed to fetch project paths:', err);
       if (lastExecutionErrorRef.current !== 'project_paths_fetch_failed') {
@@ -195,14 +294,51 @@ const Dashboard = () => {
   };
 
   const handleModelSwitch = async (modelAlias: string, isAvailable: boolean, isCurrent: boolean) => {
+    console.log('[handleModelSwitch] Called with:', { modelAlias, isAvailable, isCurrent });
+
     // 如果是当前模型或不可用，不执行切换
     if (isCurrent || !isAvailable) {
+      console.log('[handleModelSwitch] Skipped: isCurrent or not available');
       return;
     }
 
+    // 乐观更新：立即更新 UI，先切换高亮
+    if (claudeHealth) {
+      const optimisticHealth = {
+        ...claudeHealth,
+        model_info: {
+          ...claudeHealth.model_info,
+          current_model: modelAlias
+        }
+      };
+      setClaudeHealth(optimisticHealth);
+    }
+
     try {
+      console.log('[handleModelSwitch] Updating settings to:', modelAlias);
       // 调用 API 更新配置
       await claudeApi.updateSettings({ model: modelAlias });
+
+      console.log('[handleModelSwitch] Fetching new health status...');
+      // 获取真实的健康状态
+      const health = await claudeApi.health();
+      console.log('[handleModelSwitch] New current model:', health.model_info?.current_model);
+
+      // 更新为真实数据
+      setClaudeHealth({ ...health });
+
+      // 更新缓存
+      const cacheData = localStorage.getItem('open-adventure-cache');
+      if (cacheData) {
+        try {
+          const cache = JSON.parse(cacheData);
+          cache.health = health;
+          cache.timestamp = Date.now();
+          localStorage.setItem('open-adventure-cache', JSON.stringify(cache));
+        } catch (err) {
+          console.warn('Failed to update cache:', err);
+        }
+      }
 
       // 显示成功通知
       addNotification({
@@ -210,10 +346,13 @@ const Dashboard = () => {
         title: '模型切换成功',
         message: `已切换到 ${modelAlias}`,
       });
-
-      // 刷新健康状态以获取新的当前模型
-      await fetchClaudeHealth();
     } catch (error) {
+      console.error('[handleModelSwitch] Error:', error);
+
+      // 切换失败，回滚 UI
+      const health = await claudeApi.health();
+      setClaudeHealth({ ...health });
+
       // 显示错误通知
       addNotification({
         type: 'error',
@@ -226,11 +365,11 @@ const Dashboard = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      // 并行刷新所有数据
+      // 并行刷新所有数据，强制不使用缓存
       await Promise.all([
-        fetchDashboardData(),
-        fetchClaudeHealth(),
-        fetchProjectPaths()
+        fetchDashboardData(false),
+        fetchClaudeHealth(false),
+        fetchProjectPaths(false)
       ]);
     } catch (err) {
       console.error('Failed to refresh data:', err);
@@ -255,10 +394,55 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // 独立加载各个数据源，不阻塞界面渲染
-    fetchDashboardData();
-    fetchClaudeHealth();
-    fetchProjectPaths();
+    // 优先从缓存加载，避免每次刷新都请求 API
+    // 用户可以通过点击 Refresh 或 Sync 按钮手动刷新数据
+    const loadFromCache = () => {
+      const cacheData = localStorage.getItem('open-adventure-cache');
+      if (cacheData) {
+        try {
+          const cache = JSON.parse(cacheData);
+          const cacheAge = Date.now() - cache.timestamp;
+          // 缓存有效期 5 分钟
+          if (cacheAge < 5 * 60 * 1000) {
+            // 从缓存加载数据
+            if (cache.stats) {
+              setStats(cache.stats);
+              setLoadingStats(false);
+            }
+            if (cache.health) {
+              setClaudeHealth(cache.health);
+              setLoadingHealth(false);
+            }
+            if (cache.projectPaths) {
+              setProjectPaths(cache.projectPaths);
+              setLoadingProjectPaths(false);
+            }
+
+            // 仍然获取实时 token 使用情况（轻量级请求）
+            dashboardApi.getTokenUsage()
+              .then(tokenData => {
+                setTokenUsage({ percentage: tokenData.percentage ?? 0 });
+              })
+              .catch(err => console.error('Failed to fetch token usage:', err));
+
+            return true; // 缓存加载成功
+          }
+        } catch (err) {
+          console.warn('Failed to parse cache:', err);
+        }
+      }
+      return false; // 缓存不可用
+    };
+
+    // 尝试从缓存加载
+    const cacheLoaded = loadFromCache();
+
+    // 如果缓存不可用，则从 API 加载
+    if (!cacheLoaded) {
+      fetchDashboardData(false);
+      fetchClaudeHealth(false);
+      fetchProjectPaths(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -297,7 +481,7 @@ const Dashboard = () => {
     );
   }
 
-  if (mode === 'adventure') {
+  if (false) {
     return (
       <div className="space-y-6 md:space-y-8 pt-6">
         <header className="flex flex-col gap-2">
@@ -464,14 +648,18 @@ const Dashboard = () => {
                   ];
 
                   if (!claudeHealth?.model_info?.available_models) {
+                    console.log('[Dashboard] No available_models found');
                     return null;
                   }
 
                   const currentModel = claudeHealth.model_info.current_model;
                   const availableModels = claudeHealth.model_info.available_models;
 
-                  // 构建气泡列表：优先显示当前模型，然后是可用模型，最后是不可用模型
-                  const bubbleConfigs = [];
+                  console.log('[Dashboard] Model info:', {
+                    currentModel,
+                    availableModelsCount: availableModels.length,
+                    availableModels: availableModels.map(m => m.alias)
+                  });
 
                   // 辅助函数：检查模型名称是否精确匹配
                   const isExactMatch = (modelName: string, targetName: string) => {
@@ -485,46 +673,23 @@ const Dashboard = () => {
                     return cleanModelName === cleanTargetName;
                   };
 
-                  // 1. 始终优先添加当前模型（使用原始名称显示）
-                  if (currentModel) {
-                    // 检查当前模型是否在 available_models 中（精确匹配）
-                    const currentModelInList = availableModels.find(m =>
-                      isExactMatch(currentModel, m.alias) ||
-                      isExactMatch(currentModel, m.full_name)
-                    );
-
-                    // 如果没有精确匹配，尝试基础匹配（用于获取 alias）
-                    const baseMatchModel = !currentModelInList ? availableModels.find(m =>
-                      isBaseMatch(currentModel, m.alias) ||
-                      isBaseMatch(currentModel, m.full_name)
-                    ) : null;
-
-                    // 始终添加当前模型，使用原始名称
-                    bubbleConfigs.push({
-                      name: currentModel,  // 使用原始名称（如 opus[1m]）
-                      alias: currentModelInList?.alias || baseMatchModel?.alias || currentModel,  // 用于切换的 alias
-                      available: currentModelInList?.available ?? true,  // 如果在列表中，使用列表的 available 状态
-                      isCurrent: true
-                    });
-                  }
-
-                  // 2. 添加所有非当前的 available_models
-                  availableModels.forEach(model => {
-                    // 只进行精确匹配，不同后缀的模型视为不同模型
+                  // 构建气泡列表：使用固定顺序（按 available_models 的顺序），只标记当前模型
+                  const bubbleConfigs = availableModels.map(model => {
+                    // 检查是否是当前模型（精确匹配）
                     const isCurrent = currentModel && (
                       isExactMatch(currentModel, model.alias) ||
                       isExactMatch(currentModel, model.full_name)
                     );
 
-                    // 跳过当前模型（已经在步骤1中添加）
-                    if (!isCurrent) {
-                      bubbleConfigs.push({
-                        name: model.alias,
-                        alias: model.alias,
-                        available: model.available,
-                        isCurrent: false
-                      });
-                    }
+                    // 如果是当前模型且有后缀（如 opus[1m]），使用原始名称显示
+                    const displayName = isCurrent && currentModel ? currentModel : model.alias;
+
+                    return {
+                      name: displayName,
+                      alias: model.alias,
+                      available: model.available,
+                      isCurrent: isCurrent
+                    };
                   });
 
                   // 限制最多显示8个气泡
@@ -611,7 +776,7 @@ const Dashboard = () => {
                               </div>
                             )}
                           </>
-                        ) : isAvailable && tokenUsage ? (
+                        ) : isAvailable ? (
                           /* 可用但非当前模型：绿色高亮 */
                           <>
                             <div
@@ -726,9 +891,6 @@ const Dashboard = () => {
                 const currentModel = claudeHealth.model_info.current_model;
                 const availableModels = claudeHealth.model_info.available_models;
 
-                // 构建气泡列表：优先显示当前模型，然后是可用模型，最后是不可用模型
-                const bubbleConfigs = [];
-
                 // 辅助函数：检查模型名称是否精确匹配
                 const isExactMatch = (modelName: string, targetName: string) => {
                   return modelName.toLowerCase() === targetName.toLowerCase();
@@ -741,46 +903,23 @@ const Dashboard = () => {
                   return cleanModelName === cleanTargetName;
                 };
 
-                // 1. 始终优先添加当前模型（使用原始名称显示）
-                if (currentModel) {
-                  // 检查当前模型是否在 available_models 中（精确匹配）
-                  const currentModelInList = availableModels.find(m =>
-                    isExactMatch(currentModel, m.alias) ||
-                    isExactMatch(currentModel, m.full_name)
-                  );
-
-                  // 如果没有精确匹配，尝试基础匹配（用于获取 alias）
-                  const baseMatchModel = !currentModelInList ? availableModels.find(m =>
-                    isBaseMatch(currentModel, m.alias) ||
-                    isBaseMatch(currentModel, m.full_name)
-                  ) : null;
-
-                  // 始终添加当前模型，使用原始名称
-                  bubbleConfigs.push({
-                    name: currentModel,  // 使用原始名称（如 opus[1m]）
-                    alias: currentModelInList?.alias || baseMatchModel?.alias || currentModel,  // 用于切换的 alias
-                    available: currentModelInList?.available ?? true,  // 如果在列表中，使用列表的 available 状态
-                    isCurrent: true
-                  });
-                }
-
-                // 2. 添加所有非当前的 available_models
-                availableModels.forEach(model => {
-                  // 只进行精确匹配，不同后缀的模型视为不同模型
+                // 构建气泡列表：使用固定顺序（按 available_models 的顺序），只标记当前模型
+                const bubbleConfigs = availableModels.map(model => {
+                  // 检查是否是当前模型（精确匹配）
                   const isCurrent = currentModel && (
                     isExactMatch(currentModel, model.alias) ||
                     isExactMatch(currentModel, model.full_name)
                   );
 
-                  // 跳过当前模型（已经在步骤1中添加）
-                  if (!isCurrent) {
-                    bubbleConfigs.push({
-                      name: model.alias,
-                      alias: model.alias,
-                      available: model.available,
-                      isCurrent: false
-                    });
-                  }
+                  // 如果是当前模型且有后缀（如 opus[1m]），使用原始名称显示
+                  const displayName = isCurrent && currentModel ? currentModel : model.alias;
+
+                  return {
+                    name: displayName,
+                    alias: model.alias,
+                    available: model.available,
+                    isCurrent: isCurrent
+                  };
                 });
 
                 // 限制最多显示8个气泡
@@ -828,7 +967,7 @@ const Dashboard = () => {
                           >
                             <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
                             <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
-                            <WaterLevel percentage={tokenUsage.percentage} size={position.size} />
+                            <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={position.size} />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
                               <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
                                 {bubble.name}
@@ -858,7 +997,7 @@ const Dashboard = () => {
                             </div>
                           )}
                         </>
-                      ) : isAvailable && tokenUsage ? (
+                      ) : isAvailable ? (
                         /* 可用但非当前模型：绿色高亮 */
                         <>
                           <div
@@ -878,7 +1017,7 @@ const Dashboard = () => {
                           >
                             <div className="absolute top-[18%] left-[28%] w-[30%] h-[30%] rounded-full bg-gradient-to-br from-white/50 via-white/20 to-transparent blur-[3px]" />
                             <div className="absolute top-[12%] right-[22%] w-[18%] h-[18%] rounded-full bg-white/30 blur-[1px]" />
-                            <WaterLevel percentage={tokenUsage.percentage} size={position.size} />
+                            <WaterLevel percentage={tokenUsage?.percentage ?? 0} size={position.size} />
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
                               <span className="text-[8px] font-bold text-white drop-shadow-lg text-center leading-tight px-1">
                                 {bubble.name}

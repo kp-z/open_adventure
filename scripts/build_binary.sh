@@ -88,10 +88,6 @@ echo ""
 
 # 清理旧的构建产物
 echo -e "${YELLOW}[4/6] 清理旧的构建产物...${NC}"
-if [ -d "$DIST_DIR" ]; then
-    rm -rf "$DIST_DIR"
-    echo -e "${GREEN}✓ 已删除旧的 dist 目录${NC}"
-fi
 if [ -d "$BACKEND_DIR/dist" ]; then
     rm -rf "$BACKEND_DIR/dist"
     echo -e "${GREEN}✓ 已删除旧的 backend/dist 目录${NC}"
@@ -116,43 +112,47 @@ echo ""
 
 # 验证构建产物
 echo -e "${YELLOW}[6/6] 验证构建产物...${NC}"
-# PyInstaller onefile 模式输出到 backend/dist 目录，直接是可执行文件
-ACTUAL_DIST_DIR="$BACKEND_DIR/dist"
-BINARY_PATH="$ACTUAL_DIST_DIR/open-adventure"
+# PyInstaller onefile 模式输出到 backend/dist 目录，需要移动到项目根目录的 dist
+BACKEND_DIST_DIR="$BACKEND_DIR/dist"
+BINARY_PATH="$BACKEND_DIST_DIR/open-adventure"
 
 # 检查是否是 onefile 模式（单个可执行文件）
 if [ -f "$BINARY_PATH" ]; then
     echo -e "${GREEN}✓ 找到 onefile 模式的可执行文件${NC}"
     ONEFILE_MODE=true
 
-    # 创建目录结构用于打包
-    PACKAGE_DIR="$ACTUAL_DIST_DIR/open-adventure-package"
-    rm -rf "$PACKAGE_DIR"
-    mkdir -p "$PACKAGE_DIR"
-    cp "$BINARY_PATH" "$PACKAGE_DIR/open-adventure"
+    # 创建项目根目录的 dist 目录
+    mkdir -p "$DIST_DIR/open-adventure"
 
-    # 更新路径指向打包目录
-    ACTUAL_DIST_DIR="$ACTUAL_DIST_DIR"
-    BINARY_PATH="$PACKAGE_DIR/open-adventure"
+    # 移动可执行文件到项目根目录的 dist
+    cp "$BINARY_PATH" "$DIST_DIR/open-adventure/open-adventure"
+
+    # 更新路径指向项目根目录的 dist
+    BINARY_PATH="$DIST_DIR/open-adventure/open-adventure"
 else
     # 检查是否是 onedir 模式（目录）
-    BINARY_PATH="$ACTUAL_DIST_DIR/open-adventure/open-adventure"
+    BINARY_PATH="$BACKEND_DIST_DIR/open-adventure/open-adventure"
     if [ ! -f "$BINARY_PATH" ]; then
         echo -e "${RED}❌ 可执行文件不存在: $BINARY_PATH${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ 找到 onedir 模式的可执行文件${NC}"
     ONEFILE_MODE=false
+
+    # 移动整个目录到项目根目录的 dist
+    mkdir -p "$DIST_DIR"
+    cp -r "$BACKEND_DIST_DIR/open-adventure" "$DIST_DIR/"
+    BINARY_PATH="$DIST_DIR/open-adventure/open-adventure"
 fi
 
 # onefile 模式不需要检查源码文件
 if [ "$ONEFILE_MODE" = false ]; then
     # 检查是否包含源码文件（不应该有）
-    PY_FILES=$(find "$ACTUAL_DIST_DIR/open-adventure" -name "*.py" 2>/dev/null | wc -l)
+    PY_FILES=$(find "$DIST_DIR/open-adventure" -name "*.py" 2>/dev/null | wc -l)
     if [ "$PY_FILES" -gt 0 ]; then
         echo -e "${RED}❌ 警告: 构建产物中仍包含 $PY_FILES 个 .py 源码文件${NC}"
         echo -e "${YELLOW}前 10 个文件:${NC}"
-        find "$ACTUAL_DIST_DIR/open-adventure" -name "*.py" | head -10
+        find "$DIST_DIR/open-adventure" -name "*.py" | head -10
         echo ""
         echo -e "${YELLOW}这可能表示配置有问题，但构建已完成${NC}"
     else
@@ -161,21 +161,13 @@ if [ "$ONEFILE_MODE" = false ]; then
 fi
 
 # 获取构建产物大小
-if [ "$ONEFILE_MODE" = true ]; then
-    DIST_SIZE=$(du -sh "$PACKAGE_DIR/open-adventure" | cut -f1)
-else
-    DIST_SIZE=$(du -sh "$ACTUAL_DIST_DIR/open-adventure" | cut -f1)
-fi
+DIST_SIZE=$(du -sh "$DIST_DIR/open-adventure" | cut -f1)
 echo -e "${GREEN}✓ 构建产物大小: $DIST_SIZE${NC}"
 echo ""
 
 # 创建启动脚本
 echo -e "${YELLOW}创建启动脚本...${NC}"
-if [ "$ONEFILE_MODE" = true ]; then
-    TARGET_DIR="$PACKAGE_DIR"
-else
-    TARGET_DIR="$ACTUAL_DIST_DIR/open-adventure"
-fi
+TARGET_DIR="$DIST_DIR/open-adventure"
 
 cat > "$TARGET_DIR/start.sh" << 'EOF'
 #!/bin/bash
@@ -206,9 +198,9 @@ check_port() {
 }
 
 # 检查后端端口
-if check_port 8000; then
-    echo "⚠️  警告: 端口 8000 已被占用"
-    echo "如果是旧的 Claude Manager 进程，请先停止它"
+if check_port 38080; then
+    echo "⚠️  警告: 端口 38080 已被占用"
+    echo "如果是旧的 Open Adventure 进程，请先停止它"
     read -p "是否继续启动？(y/N) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -220,12 +212,94 @@ echo "=========================================="
 echo "Open Adventure - Claude Manager"
 echo "=========================================="
 echo ""
-echo "正在启动服务..."
-echo ""
 
-# 启动应用
-./open-adventure
+# 获取局域网 IP
+get_local_ip() {
+    # macOS/Linux 通用方法
+    if command -v ip &> /dev/null; then
+        ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo ""
+    elif command -v ifconfig &> /dev/null; then
+        ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1
+    else
+        echo ""
+    fi
+}
 
+# 解析命令行参数
+DAEMON_MODE=true  # 默认后台模式
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -f|--foreground)
+            DAEMON_MODE=false
+            shift
+            ;;
+        -d|--daemon)
+            DAEMON_MODE=true
+            shift
+            ;;
+        *)
+            echo "未知参数: $1"
+            echo "用法: $0 [-f|--foreground] [-d|--daemon]"
+            echo "  -f, --foreground  前台运行模式"
+            echo "  -d, --daemon      后台运行模式（默认）"
+            exit 1
+            ;;
+    esac
+done
+
+# 后台运行模式
+if [ "$DAEMON_MODE" = true ]; then
+    LOG_DIR="$HOME/.open_adventure"
+    mkdir -p "$LOG_DIR"
+    LOG_FILE="$LOG_DIR/open_adventure.log"
+    PID_FILE="$LOG_DIR/open_adventure.pid"
+
+    echo "🚀 启动后台服务..."
+    echo "📝 日志文件: $LOG_FILE"
+
+    nohup ./open-adventure --no-browser > "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+
+    sleep 3
+
+    if ps -p $(cat "$PID_FILE") > /dev/null 2>&1; then
+        LOCAL_IP=$(get_local_ip)
+
+        echo "✅ 服务已启动 (PID: $(cat "$PID_FILE"))"
+        echo ""
+        echo "============================================"
+        echo "✅ Open Adventure is running in background!"
+        echo "============================================"
+        echo ""
+        echo "🌐 本地访问:"
+        echo "   Frontend: http://localhost:38080/"
+        echo "   Backend API: http://localhost:38080/api"
+        echo "   API Docs (Swagger): http://localhost:38080/docs"
+
+        if [ -n "$LOCAL_IP" ]; then
+            echo ""
+            echo "🌍 局域网访问:"
+            echo "   Frontend: http://$LOCAL_IP:38080/"
+            echo "   Backend API: http://$LOCAL_IP:38080/api"
+            echo "   API Docs (Swagger): http://$LOCAL_IP:38080/docs"
+        fi
+
+        echo ""
+        echo "📝 日志文件: $LOG_FILE"
+        echo "📊 查看日志: tail -f $LOG_FILE"
+        echo "🛑 停止服务: kill $(cat "$PID_FILE")"
+        echo "============================================"
+    else
+        echo "❌ 服务启动失败，请查看日志: $LOG_FILE"
+        exit 1
+    fi
+else
+    # 前台运行模式
+    echo "正在启动服务（前台模式）..."
+    echo "提示: 默认使用后台模式，使用 -f 参数可切换到前台模式"
+    echo ""
+    ./open-adventure
+fi
 EOF
 
 chmod +x "$TARGET_DIR/start.sh"
@@ -246,22 +320,9 @@ TARBALL_PATH="$PROJECT_ROOT/docs/releases/$TARBALL_NAME"
 # 确保 releases 目录存在
 mkdir -p "$PROJECT_ROOT/docs/releases"
 
-# 打包（根据模式选择不同的打包方式）
-if [ "$ONEFILE_MODE" = true ]; then
-    # onefile 模式：使用临时目录组装 open-adventure 目录后打包
-    PACKAGE_STAGING_DIR="$ACTUAL_DIST_DIR/package-staging"
-    rm -rf "$PACKAGE_STAGING_DIR"
-    mkdir -p "$PACKAGE_STAGING_DIR/open-adventure"
-    cp "$PACKAGE_DIR/open-adventure" "$PACKAGE_STAGING_DIR/open-adventure/open-adventure"
-    cp "$PACKAGE_DIR/start.sh" "$PACKAGE_STAGING_DIR/open-adventure/start.sh"
-    cd "$PACKAGE_STAGING_DIR"
-    tar -czf "$TARBALL_PATH" open-adventure/
-    rm -rf "$PACKAGE_STAGING_DIR"
-else
-    # onedir 模式：打包 open-adventure 目录
-    cd "$ACTUAL_DIST_DIR"
-    tar -czf "$TARBALL_PATH" open-adventure/
-fi
+# 打包 open-adventure 目录
+cd "$DIST_DIR"
+tar -czf "$TARBALL_PATH" open-adventure/
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}❌ 打包失败${NC}"

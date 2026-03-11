@@ -173,7 +173,7 @@ const History = () => {
     );
   }
 
-  if (mode === 'adventure') {
+  if (false) {
     const avatars = ['blackpanther', 'harleyquinn', 'captainamerica', 'wonderwoman', 'spiderman', 'blackwidow'];
 
     return (

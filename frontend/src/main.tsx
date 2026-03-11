@@ -4,8 +4,7 @@ import "./styles/index.css";
 
 // 在应用渲染前同步 theme-color，避免与页面背景色不一致
 const syncInitialThemeColor = () => {
-  const mode = localStorage.getItem('open-adventure-mode');
-  const themeColor = mode === 'adventure' ? '#0a0a14' : '#0f111a';
+  const themeColor = '#0f111a';
 
   let metaThemeColor = document.querySelector('meta[name="theme-color"]');
   if (!metaThemeColor) {

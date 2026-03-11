@@ -628,17 +628,17 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
   return (
     <div className="max-w-7xl mx-auto pb-20 px-4 md:px-0">
       {/* 头部 */}
-      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-8">
+      <header className="flex flex-col md:flex-row items-start md:items-center gap-4 mb-8">
         <div className="flex items-center gap-4 flex-1 w-full md:w-auto">
           <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center bg-purple-500/20 border border-purple-500/30">
             <Sparkles size={24} className="text-purple-400 md:hidden" />
             <Sparkles size={28} className="text-purple-400 hidden md:block" />
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate uppercase">
               {editingSkillId ? '编辑技能' : '创建新技能'}
             </h1>
-            <p className="text-gray-400 mt-1 text-sm md:text-base truncate">
+            <p className="text-sm md:text-base text-gray-400 mt-1 line-clamp-1 md:line-clamp-none">
               {editingSkillId ? (skillPath || `~/.claude/skills/${generatedSkillName}`) : '配置你的 AI 技能'}
             </p>
           </div>
@@ -688,7 +688,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
             )}
           </button>
         </div>
-      </div>
+      </header>
 
       {/* 左右两栏布局 - 移动端单列，桌面端双列 */}
       <div className="flex flex-col lg:flex-row gap-6">
@@ -1376,12 +1376,12 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
               {/* Dedicated AI Assistant Panel */}
               <div className={cn(
                 "w-80 shrink-0 flex flex-col",
-                mode === 'adventure' ? "bg-[#0c0c1a]" : "bg-black/20"
+                false ? "bg-[#0c0c1a]" : "bg-black/20"
               )}>
                 <div className="p-4 border-b border-white/5 flex items-center gap-2">
                   <div className={cn(
                     "w-6 h-6 rounded-lg flex items-center justify-center",
-                    mode === 'adventure' ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
+                    false ? "bg-yellow-500 text-black" : "bg-blue-600 text-white"
                   )}>
                     <Sparkles size={12} />
                   </div>
@@ -1391,7 +1391,7 @@ export const SkillEditor = ({ onBack, initialMode = 'ai', editingSkillId }: Skil
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   <div className={cn(
                     "p-4 rounded-xl border leading-relaxed",
-                    mode === 'adventure' ? "bg-[#121225] border-yellow-500/20" : "bg-white/5 border-white/10"
+                    false ? "bg-[#121225] border-yellow-500/20" : "bg-white/5 border-white/10"
                   )}>
                     <div className="flex items-center gap-2 mb-2">
                       <Bot size={14} className="text-blue-400" />
