@@ -1,0 +1,99 @@
+/* 移动端终端滚动条样式 */
+.mobile-scrollbar {
+  position: absolute;
+  right: 56px; /* 调整位置避免与按钮重叠 */
+  top: 16px;
+  bottom: 16px;
+  width: 24px;
+  background: rgba(255, 255, 255, 0.1); /* 降低背景透明度 */
+  backdrop-filter: blur(4px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15); /* 降低边框透明度 */
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease-out;
+  z-index: 50;
+}
+
+.mobile-scrollbar:hover {
+  background: rgba(255, 255, 255, 0.15);
+  width: 28px;
+}
+
+.mobile-scrollbar.dragging {
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mobile-scrollbar.hidden {
+  opacity: 0.7;
+  transform: translateX(0);
+}
+
+.mobile-scrollbar-thumb {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  background: rgba(59, 130, 246, 0.8); /* 保持蓝色拇指 */
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  min-height: 40px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.mobile-scrollbar-thumb:active {
+  cursor: grabbing;
+}
+
+.mobile-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 1);
+}
+
+.mobile-scrollbar.dragging .mobile-scrollbar-thumb {
+  background: rgba(34, 197, 94, 0.9); /* 拖拽时变绿色 */
+  transform: scale(1.1);
+}
+
+.mobile-scrollbar-indicator {
+  position: absolute;
+  left: -60px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 移除调试模式的红色背景 */
+.mobile-scrollbar.debug-mode {
+  display: block !important;
+  opacity: 1 !important;
+  /* 移除红色背景 */
+}
+
+/* 仅在移动端显示 - 暂时注释掉用于调试 */
+/*
+@media (min-width: 768px) {
+  .mobile-scrollbar {
+    display: none;
+  }
+}
+*/
+
+/* 触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+  .mobile-scrollbar {
+    width: 28px;
+  }
+
+  .mobile-scrollbar-thumb {
+    min-height: 50px;
+  }
+}

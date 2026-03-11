@@ -477,13 +477,12 @@ export const Layout = () => {
       {/* 桌面端侧边栏 - Microverse 模式下变成浮动按钮 */}
       {isMicroverse ? (
         /* Microverse 模式：浮动返回按钮 - 与侧边栏 Logo 位置和大小一致 */
-        <div className="hidden md:block fixed top-0 left-0 z-50 bg-[#0a0b14]/80 backdrop-blur-2xl border-r border-b border-white/5">
+        <div className="hidden md:block fixed top-0 left-0 z-50 bg-transparent">
           <button
             onClick={() => navigate('/')}
             title="Open Adventure"
             className={`
               h-20 flex items-center px-6 gap-4 transition-all duration-500 hover:bg-white/5 group
-              border-b border-purple-500/20
             `}
           >
             <div
@@ -499,10 +498,10 @@ export const Layout = () => {
             </div>
             <div className="flex flex-col items-start overflow-hidden">
               <span className="text-lg font-black tracking-tighter uppercase italic leading-[0.85] text-white">
-                Game
+                Open
               </span>
               <span className="text-sm font-black tracking-[0.2em] uppercase leading-tight text-purple-400/80">
-                Mode
+                Adventure
               </span>
             </div>
           </button>
@@ -689,77 +688,81 @@ export const Layout = () => {
               )}
             </button>
 
-            {/* 前进/后退按钮 */}
-            <div className="hidden sm:flex items-center gap-1">
-              <button
-                onClick={handleGoBack}
-                disabled={!canGoBack}
-                className={`
-                  p-2 rounded-lg transition-all duration-200
-                  ${canGoBack
-                    ? 'hover:bg-white/5 text-gray-400 hover:text-white'
-                    : 'text-gray-600 cursor-not-allowed opacity-40'
-                  }
-                `}
-                title="后退"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={handleGoForward}
-                className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all duration-200"
-                title="前进"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </div>
-
-            {/* 搜索框 - 可收起展开 */}
-            <div className="relative hidden sm:flex items-center">
-              <motion.div
-                initial={false}
-                animate={{
-                  width: isSearchOpen ? 320 : 42,
-                }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
-                className={`
-                  relative flex items-center overflow-hidden rounded-xl
-                  ${isSearchOpen 
-                    ? 'bg-white/5 border border-white/10' 
-                    : 'hover:bg-white/5'
-                  }
-                `}
-              >
+            {/* 前进/后退按钮 - 游戏模式下隐藏 */}
+            {!isMicroverse && (
+              <div className="hidden sm:flex items-center gap-1">
                 <button
-                  onClick={() => setIsSearchOpen(!isSearchOpen)}
+                  onClick={handleGoBack}
+                  disabled={!canGoBack}
                   className={`
-                    flex-shrink-0 p-3 transition-colors
-                    ${isSearchOpen ? 'text-gray-400' : 'text-gray-400 hover:text-white'}
+                    p-2 rounded-lg transition-all duration-200
+                    ${canGoBack
+                      ? 'hover:bg-white/5 text-gray-400 hover:text-white'
+                      : 'text-gray-600 cursor-not-allowed opacity-40'
+                    }
+                  `}
+                  title="后退"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  onClick={handleGoForward}
+                  className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all duration-200"
+                  title="前进"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            )}
+
+            {/* 搜索框 - 可收起展开 - 游戏模式下隐藏 */}
+            {!isMicroverse && (
+              <div className="relative hidden sm:flex items-center">
+                <motion.div
+                  initial={false}
+                  animate={{
+                    width: isSearchOpen ? 320 : 42,
+                  }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  className={`
+                    relative flex items-center overflow-hidden rounded-xl
+                    ${isSearchOpen
+                      ? 'bg-white/5 border border-white/10'
+                      : 'hover:bg-white/5'
+                    }
                   `}
                 >
-                  <Search size={18} />
-                </button>
-                
-                <AnimatePresence>
-                  {isSearchOpen && (
-                    <motion.input
-                      ref={searchInputRef}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      type="text"
-                      placeholder={t("search")}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setIsSearchOpen(false);
-                        }
-                      }}
-                      className="flex-1 bg-transparent py-2 pr-4 focus:outline-none text-sm"
-                    />
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            </div>
+                  <button
+                    onClick={() => setIsSearchOpen(!isSearchOpen)}
+                    className={`
+                      flex-shrink-0 p-3 transition-colors
+                      ${isSearchOpen ? 'text-gray-400' : 'text-gray-400 hover:text-white'}
+                    `}
+                  >
+                    <Search size={18} />
+                  </button>
+
+                  <AnimatePresence>
+                    {isSearchOpen && (
+                      <motion.input
+                        ref={searchInputRef}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        type="text"
+                        placeholder={t("search")}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setIsSearchOpen(false);
+                          }
+                        }}
+                        className="flex-1 bg-transparent py-2 pr-4 focus:outline-none text-sm"
+                      />
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-6">

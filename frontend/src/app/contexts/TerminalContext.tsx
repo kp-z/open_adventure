@@ -38,6 +38,8 @@ export interface TerminalInstance {
   reconnecting: boolean;
   reconnectAttempts: number;
   maxReconnectAttempts: number;
+  heartbeatInterval?: ReturnType<typeof setInterval>; // 心跳定时器
+  lastHeartbeat: number; // 最后心跳时间
 }
 
 interface ClaudeConversation {
@@ -431,7 +433,9 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       backendPid: 0,
       reconnecting: false,
       reconnectAttempts: 0,
-      maxReconnectAttempts: 3,
+      maxReconnectAttempts: 50, // 增加重连次数，支持长时间保持连接
+      heartbeatInterval: undefined,
+      lastHeartbeat: Date.now(),
     };
 
     logLifecycle(terminal, 'ws_connecting', `${mode}:ws create`);
@@ -449,6 +453,19 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     ws.onopen = () => {
       console.log(`[TerminalContext] ws opened: terminal=${id}, mode=${mode}`);
       syncReadyLifecycle(terminal, 'ws open');
+
+      // 启动心跳保活机制
+      terminal.heartbeatInterval = setInterval(() => {
+        if (terminal.ws.readyState === WebSocket.OPEN) {
+          try {
+            terminal.ws.send(JSON.stringify({ type: 'ping' }));
+            terminal.lastHeartbeat = Date.now();
+            console.log(`[TerminalContext] Heartbeat sent: terminal=${id}`);
+          } catch (error) {
+            console.error(`[TerminalContext] Failed to send heartbeat: terminal=${id}`, error);
+          }
+        }
+      }, 30000); // 每30秒发送一次心跳
 
       if (mode === 'restore' && restoreSessionId) {
         localStorage.setItem(`terminal_session_${id}`, restoreSessionId);
@@ -514,6 +531,13 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
           return;
         }
 
+        if (parsed?.type === 'pong') {
+          // 收到心跳响应，更新最后心跳时间
+          terminal.lastHeartbeat = Date.now();
+          console.log(`[TerminalContext] Heartbeat pong received: terminal=${id}`);
+          return;
+        }
+
         if (raw.includes('SESSION_ID:')) {
           const extracted = extractSessionId(raw);
           if (extracted) {
@@ -563,8 +587,9 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       }
 
       // 写入终端输出
-      console.log(`[TerminalContext] 📤 Writing to terminal: ${id}, length=${raw.length}, preview=${raw.substring(0, 50)}`);
-      term.write(raw);
+      const rawStr = typeof raw === 'string' ? raw : String(raw);
+      console.log(`[TerminalContext] 📤 Writing to terminal: ${id}, length=${rawStr.length}, preview=${rawStr.substring(0, 50)}`);
+      term.write(rawStr);
       terminal.lastOutputAt = Date.now();
       terminal.backendOutputFrames += 1;
     };
@@ -580,6 +605,14 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     ws.onclose = (event) => {
       logLifecycle(terminal, 'disposed', `ws close:${event.code}`);
+
+      // 清理心跳定时器
+      if (terminal.heartbeatInterval) {
+        clearInterval(terminal.heartbeatInterval);
+        terminal.heartbeatInterval = undefined;
+        console.log(`[TerminalContext] Heartbeat cleared: terminal=${id}`);
+      }
+
       if (event.code !== 1000) {
         term.writeln('\x1b[31m✗ Connection closed\x1b[0m');
       }
@@ -665,7 +698,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     }
 
     // 检查是否已经有这个会话的终端
-    const existing = terminals.find((terminal) => terminal.sessionId === sessionId);
+    const existing = terminals.find((terminal) => terminal.claudeCodeId === sessionId);
     if (existing) {
       setActiveTabId(existing.id);
       addNotification({
@@ -676,37 +709,67 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       return existing;
     }
 
-    // 获取 Claude 状态，包括 initial_dir
-    const claudeStatus = await checkClaudeStatus(sessionId);
-    // 使用当前 terminals 数量作为索引
-    const terminalIndex = terminals.length;
-    // 使用 initial_dir 作为 projectPath，claude_resume_session 作为 claudeCodeId
-    const title = getTerminalTitle(claudeStatus.initial_dir || undefined, claudeStatus.claude_resume_session || sessionId, terminalIndex);
+    // 从 Claude 会话列表中获取会话信息
+    try {
+      const conversations = await syncClaudeConversations();
+      const conversation = conversations.find(c => c.session_id === sessionId);
 
-    console.log('[TerminalContext] restoreClaudeConversation - title:', title, 'claudeStatus:', claudeStatus);
-
-    // 创建新终端，使用 claudeResumeSession 参数
-    const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
-    const terminal = initTerminal({
-      id,
-      title,
-      claudeResumeSession: sessionId,  // 传递 Claude 会话恢复参数
-      mode: 'create',  // 使用 create 模式，因为这是创建新的 terminal session
-    });
-
-    // 更新 terminal 的 claudeCodeId
-    terminal.claudeCodeId = claudeStatus.claude_resume_session || sessionId;
-
-    setTerminals((prev) => {
-      if (prev.some((item) => item.id === id)) {
-        return prev;
+      // 从 project_hint 或 cwd 中提取项目路径
+      let projectPath: string | undefined;
+      if (conversation?.cwd) {
+        // 直接使用 cwd，并转换为相对于 home 的路径
+        projectPath = conversation.cwd;
+        // 将绝对路径转换为 ~ 路径
+        const homeDir = '/Users/kp';
+        if (projectPath.startsWith(homeDir)) {
+          projectPath = projectPath.replace(homeDir, '~');
+        }
+        console.log('[TerminalContext] Using cwd as project path:', projectPath);
+      } else if (conversation?.project_hint) {
+        // 备用：如果有 project_hint，尝试转换
+        // 但优先使用 cwd，因为它更准确
+        console.log('[TerminalContext] project_hint available but using cwd instead');
       }
-      return [...prev, terminal];
-    });
-    setActiveTabId(id);
 
-    return terminal;
-  }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification, checkClaudeStatus, getTerminalTitle]);
+      // 使用当前 terminals 数量作为索引
+      const terminalIndex = terminals.length;
+      // 使用 projectPath 和 sessionId 生成标题
+      const title = getTerminalTitle(projectPath, sessionId, terminalIndex);
+
+      console.log('[TerminalContext] restoreClaudeConversation - title:', title, 'projectPath:', projectPath, 'sessionId:', sessionId);
+
+      // 创建新终端，使用 claudeResumeSession 参数
+      const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
+      const terminal = initTerminal({
+        id,
+        title,
+        projectPath,  // 传递项目路径
+        claudeResumeSession: sessionId,  // 传递 Claude 会话恢复参数
+        mode: 'create',  // 使用 create 模式，因为这是创建新的 terminal session
+      });
+
+      // 更新 terminal 的 claudeCodeId
+      terminal.claudeCodeId = sessionId;
+
+      setTerminals((prev) => {
+        if (prev.some((item) => item.id === id)) {
+          return prev;
+        }
+        return [...prev, terminal];
+      });
+      setActiveTabId(id);
+
+      return terminal;
+    } catch (error) {
+      console.error('[TerminalContext] Failed to restore Claude conversation:', error);
+      addNotification({
+        type: 'error',
+        title: '恢复失败',
+        message: '无法获取 Claude 会话信息，请重试。',
+      });
+      return null;
+    }
+  }, [initTerminal, terminals, restoreSettled, isRestoring, addNotification, syncClaudeConversations, getTerminalTitle]);
 
   const reconnectTerminal = useCallback(async (terminalId: string): Promise<boolean> => {
     const terminal = terminals.find((t) => t.id === terminalId);
@@ -892,7 +955,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
       // 如果未超过最大重连次数，延迟后重试
       if (terminal.reconnectAttempts < terminal.maxReconnectAttempts) {
-        const delay = Math.pow(2, terminal.reconnectAttempts - 1) * 1000; // 指数退避：1s, 2s, 4s
+        const delay = Math.min(Math.pow(2, terminal.reconnectAttempts - 1) * 1000, 30000); // 指数退避，最大30秒
         console.log(`[TerminalContext] Retrying reconnect in ${delay}ms...`);
         setTimeout(() => {
           reconnectTerminal(terminalId);
@@ -1101,6 +1164,14 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     }
 
     logLifecycle(terminal, 'disposed', 'closeTerminal');
+
+    // 清理心跳定时器
+    if (terminal.heartbeatInterval) {
+      clearInterval(terminal.heartbeatInterval);
+      terminal.heartbeatInterval = undefined;
+      console.log(`[TerminalContext] Heartbeat cleared on close: terminal=${id}`);
+    }
+
     terminal.term.dispose();
     terminal.ws.close();
 

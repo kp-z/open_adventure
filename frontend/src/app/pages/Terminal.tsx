@@ -6,6 +6,8 @@ import { ActionButton } from '../components/ui-shared';
 import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useIsMobile } from '../components/ui/use-mobile';
+import { MobileScrollbar } from '../components/MobileScrollbar';
+import { MobileScrollButtons } from '../components/MobileScrollButtons';
 import { API_CONFIG } from '../../config/api';
 import 'xterm/css/xterm.css';
 
@@ -219,6 +221,19 @@ const TerminalPane: React.FC<{
         backgroundColor: '#000', // 确保有背景色
       }}
     >
+      {/* 移动端滚动条 */}
+      <MobileScrollbar
+        terminal={terminal.term}
+        containerRef={terminalRef}
+        className="z-10"
+      />
+
+      {/* 移动端滚动按钮 */}
+      <MobileScrollButtons
+        terminal={terminal.term}
+        containerRef={terminalRef}
+        className="z-20"
+      />
     </div>
   );
 };
@@ -257,7 +272,6 @@ const Terminal = () => {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isFullscreenInput, setIsFullscreenInput] = useState(false);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [debugExpanded, setDebugExpanded] = useState(false);
   const viewportRafRef = useRef<number | null>(null);
   const viewportBaselineRef = useRef<number>(0);
@@ -728,59 +742,7 @@ const Terminal = () => {
     }
   }, [terminals, activeTabId, setActiveTabId]);
 
-  // 滚动到底部函数
-  const scrollToBottom = () => {
-    if (activeTerminal) {
-      activeTerminal.term.scrollToBottom();
-      setShowScrollToBottom(false);
-    }
-  };
 
-  // 监听终端滚动位置，显示/隐藏"滚动到底部"按钮
-  useEffect(() => {
-    if (!activeTerminal) return;
-
-    const checkScrollPosition = () => {
-      const terminal = activeTerminal.term;
-      const buffer = terminal.buffer.active;
-      const viewport = terminal.rows;
-      const scrollback = buffer.length;
-      const scrollTop = terminal.buffer.active.viewportY;
-
-      // 内容不足一屏时不显示按钮
-      if (scrollback <= viewport + 1) {
-        setShowScrollToBottom(false);
-        return;
-      }
-
-      // 如果不在底部（距离底部超过 3 行），显示按钮
-      const isAtBottom = scrollTop >= scrollback - viewport - 3;
-      setShowScrollToBottom(!isAtBottom);
-    };
-
-    const viewportElement = activeTerminal.term.element?.querySelector('.xterm-viewport') as HTMLElement | null;
-
-    // 监听 xterm 内部滚动事件
-    const disposable = activeTerminal.term.onScroll(() => {
-      checkScrollPosition();
-    });
-
-    // 补充监听原生 viewport 滚动，提升移动端稳定性
-    const handleViewportScroll = () => {
-      checkScrollPosition();
-    };
-    viewportElement?.addEventListener('scroll', handleViewportScroll, { passive: true });
-
-    // 初始检查，并在首帧后再次检查一次
-    checkScrollPosition();
-    const rafId = requestAnimationFrame(checkScrollPosition);
-
-    return () => {
-      cancelAnimationFrame(rafId);
-      viewportElement?.removeEventListener('scroll', handleViewportScroll);
-      disposable.dispose();
-    };
-  }, [activeTerminal]);
 
   // 移除键盘弹出时自动滚动到底部，避免意外聚焦
   // useEffect(() => {
@@ -1180,24 +1142,6 @@ const Terminal = () => {
                 onActivate={() => handleActivateTerminal(activeTerminal.id)}
               />
 
-              {showScrollToBottom && (
-                <div
-                  className="absolute right-3 z-30 pointer-events-none"
-                  style={{
-                    bottom: `${terminalWorkspacePaddingBottom + 12}px`,
-                    transition: 'bottom 0.3s ease-out',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={scrollToBottom}
-                    className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950/88 text-cyan-200 shadow-[0_10px_24px_rgba(6,182,212,0.22)] backdrop-blur-xl transition active:scale-95 md:hover:scale-105"
-                    aria-label="滚动到底部"
-                  >
-                    <ChevronDown size={18} />
-                  </button>
-                </div>
-              )}
             </div>
           )}
 

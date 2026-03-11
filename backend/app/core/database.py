@@ -81,3 +81,35 @@ async def init_db() -> None:
 async def close_db() -> None:
     """Close database connections."""
     await engine.dispose()
+
+
+async def get_connection_pool_status() -> dict:
+    """获取数据库连接池状态信息"""
+    pool = engine.pool
+    pool_class_name = type(pool).__name__
+
+    if pool_class_name == "NullPool":
+        return {
+            "type": "NullPool",
+            "description": "SQLite 使用 NullPool（无连接池）",
+            "checked_out": 0,
+            "size": 0,
+        }
+    else:
+        # 其他数据库的连接池状态
+        try:
+            return {
+                "type": pool_class_name,
+                "size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+                "invalid": pool.invalid(),
+            }
+        except Exception as e:
+            return {
+                "type": pool_class_name,
+                "error": f"无法获取连接池状态: {str(e)}",
+                "checked_out": 0,
+                "size": 0,
+            }

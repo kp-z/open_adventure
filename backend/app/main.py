@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
     # 启动 Agent Session 清理任务
     import asyncio
-    from app.core.database import get_db
+    from app.core.database import AsyncSessionLocal
     from app.services.agent_session_service_async import AgentSessionServiceAsync
 
     cleanup_task = None
@@ -44,14 +44,30 @@ async def lifespan(app: FastAPI):
         while True:
             try:
                 await asyncio.sleep(300)  # 每 5 分钟执行一次
-                async for db in get_db():
+
+                # 监控连接池状态
+                try:
+                    from app.core.database import get_connection_pool_status
+                    pool_status = await get_connection_pool_status()
+                    logger.info(f"Connection pool status: {pool_status}")
+
+                    # 如果连接池使用率过高，发出警告
+                    if pool_status.get('checked_out', 0) > 15:  # 超过75%使用率
+                        logger.warning(f"High connection pool usage: {pool_status['checked_out']}/20 connections in use")
+                except Exception as e:
+                    logger.error(f"Failed to get connection pool status: {e}")
+
+                # 使用正确的数据库连接管理
+                async with AsyncSessionLocal() as db:
                     session_service = AgentSessionServiceAsync(db)
                     count = await session_service.cleanup_inactive_sessions()
                     if count > 0:
                         logger.info(f"Cleaned up {count} inactive agent sessions")
-                    break
             except Exception as e:
                 logger.error(f"Error cleaning up agent sessions: {e}")
+                # 添加更详细的错误信息
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
 
     cleanup_task = asyncio.create_task(cleanup_agent_sessions())
     logger.info("Agent session cleanup task started")

@@ -37,6 +37,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,jpg,svg,ico}'],
+        navigateFallback: '/index.html',
+        navigateFallbackDenylist: [/^\/microverse/], // 排除 microverse 路由，让它直接访问 iframe
         runtimeCaching: [
           // API 缓存策略 - Network First
           {

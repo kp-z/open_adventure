@@ -447,6 +447,8 @@ async def terminal_websocket(
     print(f"[Terminal] ========== NEW WEBSOCKET CONNECTION ==========")
     print(f"[Terminal] Requested session ID: {session_id}")
     print(f"[Terminal] Project path param: {project_path}")
+    print(f"[Terminal] Project path repr: {repr(project_path)}")
+    print(f"[Terminal] Project path type: {type(project_path)}")
     print(f"[Terminal] Auto-start Claude param: {auto_start_claude}")
     print(f"[Terminal] Claude resume session param: {claude_resume_session}")
     print(f"[Terminal] Active sessions before: {len(sessions)}")
@@ -675,6 +677,16 @@ async def terminal_websocket(
                 print(f"[Terminal] Claude resume session enabled, will send 'claude --resume {session.claude_resume_session}' command")
                 # 等待 shell 初始化（加载 .zshrc 等）
                 await asyncio.sleep(1.5)
+                # 如果有 initial_dir，先切换到该目录
+                if session.initial_dir:
+                    try:
+                        cd_command = f'cd "{session.initial_dir}"\n'
+                        session.write(cd_command)
+                        print(f"[Terminal] ✅ Sent 'cd' command to terminal: {session.initial_dir}")
+                        # 等待 cd 命令执行完成
+                        await asyncio.sleep(0.3)
+                    except Exception as e:
+                        print(f"[Terminal] ❌ Failed to send 'cd' command: {e}")
                 # 发送 claude --resume 命令
                 try:
                     resume_command = f'claude --resume {session.claude_resume_session}\n'
@@ -853,6 +865,14 @@ async def terminal_websocket(
                                 cols,
                             )
                             continue
+                    elif msg_type == 'ping':
+                        # 处理心跳 ping，回复 pong
+                        try:
+                            await websocket.send_text(json.dumps({"type": "pong"}))
+                            print(f"[Terminal] Heartbeat pong sent: session_id={session_id}")
+                        except Exception as e:
+                            print(f"[Terminal] Failed to send pong: session_id={session_id}, error={e}")
+                        continue
                     elif msg_type == 'restore_ready':
                         # 前端已完成首次稳定 fit，可以开始回放
                         if hasattr(session, 'waiting_for_restore_ready') and session.waiting_for_restore_ready:
