@@ -780,7 +780,7 @@ export const Layout = () => {
         </header>
 
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
-        <div className={`flex-1 overflow-y-auto relative safe-area-top ${isTerminalPage ? '' : 'p-4 md:p-8'} pb-24 md:pb-4 safe-area-bottom`}>
+        <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse ? '' : isTerminalPage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
@@ -788,7 +788,7 @@ export const Layout = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
-              className={isTerminalPage ? 'h-full' : ''}
+              className={isTerminalPage || isMicroverse ? 'h-full' : ''}
             >
               <Outlet />
             </motion.div>

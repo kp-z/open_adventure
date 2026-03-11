@@ -544,10 +544,11 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
                   // 更新 terminal 的 claudeCodeId 和标题
                   setTerminals((currentTerminals) => {
-                    const term = currentTerminals.find(t => t.id === id);
+                    const termIndex = currentTerminals.findIndex(t => t.id === id);
+                    const term = currentTerminals[termIndex];
                     if (term) {
                       term.claudeCodeId = claudeStatus.claude_resume_session;
-                      term.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session);
+                      term.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session, termIndex);
                       localStorage.setItem(`terminal_title_${id}`, term.title);
                     }
                     return [...currentTerminals];
@@ -677,8 +678,12 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     // 获取 Claude 状态，包括 initial_dir
     const claudeStatus = await checkClaudeStatus(sessionId);
+    // 使用当前 terminals 数量作为索引
+    const terminalIndex = terminals.length;
     // 使用 initial_dir 作为 projectPath，claude_resume_session 作为 claudeCodeId
-    const title = getTerminalTitle(claudeStatus.initial_dir || undefined, claudeStatus.claude_resume_session || sessionId);
+    const title = getTerminalTitle(claudeStatus.initial_dir || undefined, claudeStatus.claude_resume_session || sessionId, terminalIndex);
+
+    console.log('[TerminalContext] restoreClaudeConversation - title:', title, 'claudeStatus:', claudeStatus);
 
     // 创建新终端，使用 claudeResumeSession 参数
     const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
@@ -688,6 +693,9 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       claudeResumeSession: sessionId,  // 传递 Claude 会话恢复参数
       mode: 'create',  // 使用 create 模式，因为这是创建新的 terminal session
     });
+
+    // 更新 terminal 的 claudeCodeId
+    terminal.claudeCodeId = claudeStatus.claude_resume_session || sessionId;
 
     setTerminals((prev) => {
       if (prev.some((item) => item.id === id)) {
@@ -945,11 +953,12 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
             // 使用 setTerminals 的回调形式获取最新的 terminals 状态
             setTerminals((currentTerminals) => {
-              const terminal = currentTerminals.find(t => t.sessionId === sessionId);
+              const terminalIndex = currentTerminals.findIndex(t => t.sessionId === sessionId);
+              const terminal = currentTerminals[terminalIndex];
               if (terminal && terminal.ws && terminal.ws.readyState === WebSocket.OPEN) {
                 // 更新 terminal 的 claudeCodeId 和标题
                 terminal.claudeCodeId = claudeStatus.claude_resume_session;
-                terminal.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session);
+                terminal.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session, terminalIndex);
 
                 // 保存到 localStorage
                 localStorage.setItem(`terminal_title_${terminal.id}`, terminal.title);
