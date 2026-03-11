@@ -476,13 +476,35 @@ export const Layout = () => {
     >
       {/* 桌面端侧边栏 - Microverse 模式下变成浮动按钮 */}
       {isMicroverse ? (
-        /* Microverse 模式：浮动返回按钮 */
-        <div className="hidden md:block fixed top-4 left-4 z-50">
+        /* Microverse 模式：浮动返回按钮 - 与侧边栏 Logo 位置和大小一致 */
+        <div className="hidden md:block fixed top-0 left-0 z-50 bg-[#0a0b14]/80 backdrop-blur-2xl border-r border-b border-white/5">
           <button
             onClick={() => navigate('/')}
-            className="w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500 hover:scale-110 shadow-lg bg-purple-500/10 backdrop-blur-xl border border-purple-400/30 shadow-purple-500/20 hover:bg-purple-500/20"
+            title="返回正常模式"
+            className={`
+              h-20 flex items-center px-6 gap-4 transition-all duration-500 hover:bg-white/5 group
+              border-b border-purple-500/20
+            `}
           >
-            <Gamepad2 size={24} className="text-purple-400" />
+            <div
+              className={`
+                w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
+                bg-purple-500/10 backdrop-blur-xl border border-purple-400/30 shadow-purple-500/10
+              `}
+            >
+              <Gamepad2
+                size={24}
+                className="text-purple-400"
+              />
+            </div>
+            <div className="flex flex-col items-start overflow-hidden">
+              <span className="text-lg font-black tracking-tighter uppercase italic leading-[0.85] text-white">
+                Game
+              </span>
+              <span className="text-sm font-black tracking-[0.2em] uppercase leading-tight text-purple-400/80">
+                Mode
+              </span>
+            </div>
           </button>
         </div>
       ) : (

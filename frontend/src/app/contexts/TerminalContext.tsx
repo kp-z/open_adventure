@@ -99,8 +99,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const restoreActiveSetRef = useRef(false);
   const queueOverflowNotifyRef = useRef<Record<string, number>>({});
 
-  const getTerminalTitle = (projectPath?: string, claudeCodeId?: string): string => {
-    console.log('[TerminalContext] getTerminalTitle called', { projectPath, claudeCodeId });
+  const getTerminalTitle = (projectPath?: string, claudeCodeId?: string, terminalIndex?: number): string => {
+    console.log('[TerminalContext] getTerminalTitle called', { projectPath, claudeCodeId, terminalIndex });
     let projectName = '';
     if (projectPath) {
       const pathParts = projectPath.split('/').filter((p) => p);
@@ -113,13 +113,19 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       console.log('[TerminalContext] Using default terminal name:', projectName);
     }
 
-    // 如果有 Claude Code ID，使用 "project_name(claude_code_id)" 格式
-    if (claudeCodeId) {
-      const shortId = claudeCodeId.slice(0, 8);
-      return `${projectName}(${shortId})`;
+    // 添加序号前缀
+    let titleWithIndex = projectName;
+    if (terminalIndex !== undefined && terminalIndex >= 0) {
+      titleWithIndex = `${terminalIndex + 1}. ${projectName}`;
     }
 
-    return projectName;
+    // 如果有 Claude Code ID，使用 "序号. project_name(claude_code_id)" 格式
+    if (claudeCodeId) {
+      const shortId = claudeCodeId.slice(0, 8);
+      return `${titleWithIndex}(${shortId})`;
+    }
+
+    return titleWithIndex;
   };
 
   const collectSavedSessions = () => {
@@ -148,8 +154,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
       const data = await response.json();
       const activeSessions = Array.isArray(data.active_sessions) ? data.active_sessions : [];
-      return activeSessions.map((session: any) => {
-        const title = getTerminalTitle(session.initial_dir, session.claude_code_id);
+      return activeSessions.map((session: any, index: number) => {
+        const title = getTerminalTitle(session.initial_dir, session.claude_code_id, index);
         return {
           id: `terminal-restored-${session.session_id}`,
           sessionId: session.session_id,
@@ -1055,9 +1061,11 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     }
 
     const id = `terminal-${Date.now()}`;
-    const title = getTerminalTitle(projectPath);
+    // 使用当前 terminals 数量作为索引
+    const terminalIndex = terminals.length;
+    const title = getTerminalTitle(projectPath, undefined, terminalIndex);
 
-    console.log('[TerminalContext] Creating terminal', { id, title, projectPath, autoStartClaude });
+    console.log('[TerminalContext] Creating terminal', { id, title, projectPath, autoStartClaude, terminalIndex });
     const terminal = initTerminal({ id, title, projectPath, autoStartClaude, mode: 'create' });
     console.log('[TerminalContext] initTerminal returned', terminal.id);
 
