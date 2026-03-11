@@ -308,24 +308,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
           </div>
         );
       })}
-      <div className={`mt-auto pt-4 border-t border-white/10 space-y-2`}>
-        {/* Microverse 游戏模式入口 */}
-        <NavLink
-          to="/microverse"
-          title={collapsed ? "Microverse" : undefined}
-          className={({ isActive }) => `
-            flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
-            ${
-              isActive
-                ? "bg-purple-600/20 text-purple-400 border border-purple-500/30"
-                : "text-gray-400 hover:bg-white/5 hover:text-white"
-            }
-          `}
-        >
-          <Gamepad2 size={20} />
-          {!collapsed && <span className="font-medium">Microverse</span>}
-        </NavLink>
-
+      <div className={`mt-auto pt-4 border-t border-white/10`}>
         {/* Settings */}
         <NavLink
           to="/settings"
@@ -496,16 +479,17 @@ export const Layout = () => {
         bg-[#0a0b14]/80 backdrop-blur-2xl
       `}
       >
-        {/* Logo */}
-        <div
+        {/* Logo - 点击切换到 Microverse */}
+        <button
+          onClick={() => navigate('/microverse')}
           className={`
-            h-20 flex items-center ${isSidebarOpen ? 'px-6' : 'px-4 justify-center'} gap-4 transition-all duration-500
+            h-20 flex items-center ${isSidebarOpen ? 'px-6' : 'px-4 justify-center'} gap-4 transition-all duration-500 hover:bg-white/5 group
             border-b border-blue-500/20
           `}
         >
           <div
             className={`
-              w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg relative overflow-hidden
+              w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
               bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10
             `}
           >
@@ -536,7 +520,7 @@ export const Layout = () => {
               </motion.div>
             </div>
           )}
-        </div>
+        </button>
 
         <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />
       </aside>
@@ -564,16 +548,20 @@ export const Layout = () => {
                 bg-[#0a0b14]
               `}
             >
-              {/* Logo */}
-              <div
+              {/* Logo - 点击切换到 Microverse */}
+              <button
+                onClick={() => {
+                  navigate('/microverse');
+                  setIsSidebarOpen(false);
+                }}
                 className={`
-                  h-14 flex items-center px-4 gap-3 transition-all duration-500
+                  h-14 flex items-center px-4 gap-3 transition-all duration-500 hover:bg-white/5 group w-full
                   border-b border-blue-500/20
                 `}
               >
                 <div
                   className={`
-                    w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 shadow-lg relative overflow-hidden
+                    w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden
                     bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10
                   `}
                 >
@@ -588,7 +576,7 @@ export const Layout = () => {
                 </div>
 
                 <div className="flex flex-col items-start overflow-hidden">
-                  <span
+                  <span className="text-base font-black tracking-tighter uppercase italic leading-[0.85] text-white"
                   >
                     Open
                   </span>
@@ -598,7 +586,7 @@ export const Layout = () => {
                     Adventure
                   </span>
                 </div>
-              </div>
+              </button>
 
               <Navigation collapsed={false} />
 

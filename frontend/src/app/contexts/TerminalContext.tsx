@@ -100,14 +100,17 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const queueOverflowNotifyRef = useRef<Record<string, number>>({});
 
   const getTerminalTitle = (projectPath?: string, claudeCodeId?: string): string => {
+    console.log('[TerminalContext] getTerminalTitle called', { projectPath, claudeCodeId });
     let projectName = '';
     if (projectPath) {
       const pathParts = projectPath.split('/').filter((p) => p);
       projectName = pathParts[pathParts.length - 1] || '';
+      console.log('[TerminalContext] Extracted project name:', projectName, 'from path:', projectPath);
     }
 
     if (!projectName) {
       projectName = `Terminal ${terminalCounterRef.current++}`;
+      console.log('[TerminalContext] Using default terminal name:', projectName);
     }
 
     // 如果有 Claude Code ID，使用 "project_name(claude_code_id)" 格式
@@ -668,7 +671,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     // 获取 Claude 状态，包括 initial_dir
     const claudeStatus = await checkClaudeStatus(sessionId);
-    const title = getTerminalTitle(claudeStatus.initial_dir || undefined, sessionId);
+    // 使用 initial_dir 作为 projectPath，claude_resume_session 作为 claudeCodeId
+    const title = getTerminalTitle(claudeStatus.initial_dir || undefined, claudeStatus.claude_resume_session || sessionId);
 
     // 创建新终端，使用 claudeResumeSession 参数
     const id = `terminal-claude-resume-${sessionId.slice(0, 8)}`;
