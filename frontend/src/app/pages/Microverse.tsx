@@ -3,12 +3,14 @@ import React from 'react';
 export default function Microverse() {
   return (
     <div
-      className="fixed left-0 right-0 z-40"
       style={{
-        top: '80px', // 顶部栏高度 (h-20 = 80px)
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
         bottom: 0,
-        width: '100vw',
-        height: 'calc(100vh - 80px)',
+        width: '100%',
+        height: '100%',
         overflow: 'hidden',
       }}
     >

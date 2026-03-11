@@ -480,7 +480,7 @@ export const Layout = () => {
         <div className="hidden md:block fixed top-0 left-0 z-50 bg-[#0a0b14]/80 backdrop-blur-2xl border-r border-b border-white/5">
           <button
             onClick={() => navigate('/')}
-            title="返回正常模式"
+            title="Open Adventure"
             className={`
               h-20 flex items-center px-6 gap-4 transition-all duration-500 hover:bg-white/5 group
               border-b border-purple-500/20
