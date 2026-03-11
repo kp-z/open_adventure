@@ -522,6 +522,34 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         if (raw.includes('Reconnected to existing session')) {
           return;
         }
+
+        // 检测 Claude 启动成功的标志
+        if (raw.includes('Claude Code') || raw.includes('claude-code') || raw.includes('Resuming session')) {
+          // 延迟检测 Claude 会话 ID（等待 Claude 完全启动）
+          setTimeout(async () => {
+            if (terminal.sessionId && !terminal.claudeCodeId) {
+              try {
+                const claudeStatus = await checkClaudeStatus(terminal.sessionId);
+                if (claudeStatus.running && claudeStatus.claude_resume_session) {
+                  console.log(`[TerminalContext] Detected Claude session ID: ${claudeStatus.claude_resume_session}`);
+
+                  // 更新 terminal 的 claudeCodeId 和标题
+                  setTerminals((currentTerminals) => {
+                    const term = currentTerminals.find(t => t.id === id);
+                    if (term) {
+                      term.claudeCodeId = claudeStatus.claude_resume_session;
+                      term.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session);
+                      localStorage.setItem(`terminal_title_${id}`, term.title);
+                    }
+                    return [...currentTerminals];
+                  });
+                }
+              } catch (error) {
+                console.error('[TerminalContext] Failed to detect Claude session ID:', error);
+              }
+            }
+          }, 2000);
+        }
       }
 
       // 写入终端输出
@@ -909,6 +937,13 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
             setTerminals((currentTerminals) => {
               const terminal = currentTerminals.find(t => t.sessionId === sessionId);
               if (terminal && terminal.ws && terminal.ws.readyState === WebSocket.OPEN) {
+                // 更新 terminal 的 claudeCodeId 和标题
+                terminal.claudeCodeId = claudeStatus.claude_resume_session;
+                terminal.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session);
+
+                // 保存到 localStorage
+                localStorage.setItem(`terminal_title_${terminal.id}`, terminal.title);
+
                 // 发送 claude --resume 命令
                 const resumeCommand = `claude --resume ${claudeStatus.claude_resume_session}\n`;
                 console.log(`[TerminalContext] Sending auto-resume command: ${resumeCommand.trim()}`);
@@ -929,7 +964,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
               } else {
                 console.warn(`[TerminalContext] Terminal not found or WebSocket not ready for session: ${sessionId}`);
               }
-              return currentTerminals;
+              return [...currentTerminals]; // 返回新数组触发更新
             });
           }
         } catch (error) {

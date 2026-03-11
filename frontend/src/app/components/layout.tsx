@@ -22,6 +22,7 @@ import {
   Network,
   Loader,
   Bell,
+  Gamepad2,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -307,7 +308,25 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
           </div>
         );
       })}
-      <div className={`mt-auto pt-4 border-t border-white/10`}>
+      <div className={`mt-auto pt-4 border-t border-white/10 space-y-2`}>
+        {/* Microverse 游戏模式入口 */}
+        <NavLink
+          to="/microverse"
+          title={collapsed ? "Microverse" : undefined}
+          className={({ isActive }) => `
+            flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
+            ${
+              isActive
+                ? "bg-purple-600/20 text-purple-400 border border-purple-500/30"
+                : "text-gray-400 hover:bg-white/5 hover:text-white"
+            }
+          `}
+        >
+          <Gamepad2 size={20} />
+          {!collapsed && <span className="font-medium">Microverse</span>}
+        </NavLink>
+
+        {/* Settings */}
         <NavLink
           to="/settings"
           title={collapsed ? t("settings") : undefined}
