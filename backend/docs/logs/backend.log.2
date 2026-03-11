@@ -319,3 +319,122 @@ WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_
 2026-03-11 19:27:04,572 - sqlalchemy.engine.Engine - INFO - [cached since 1.95e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 10:57:04.566284')
 2026-03-11 19:27:04,575 - sqlalchemy.engine.Engine - INFO - ROLLBACK
 2026-03-11 19:27:05,099 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 19:32:04,582 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 19:32:04,585 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 19:32:04,585 - sqlalchemy.engine.Engine - INFO - [cached since 1.98e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:02:04.578610')
+2026-03-11 19:32:04,588 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 19:32:05,101 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 19:37:04,593 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 19:37:04,596 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 19:37:04,596 - sqlalchemy.engine.Engine - INFO - [cached since 2.01e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:07:04.590791')
+2026-03-11 19:37:04,598 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 19:37:05,103 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 19:42:04,609 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 19:42:04,613 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 19:42:04,613 - sqlalchemy.engine.Engine - INFO - [cached since 2.04e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:12:04.601206')
+2026-03-11 19:42:04,617 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 19:42:05,104 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 19:47:04,631 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 19:47:04,636 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 19:47:04,636 - sqlalchemy.engine.Engine - INFO - [cached since 2.07e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:17:04.621459')
+2026-03-11 19:47:04,641 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 19:47:05,107 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 19:52:04,649 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 19:52:04,651 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 19:52:04,652 - sqlalchemy.engine.Engine - INFO - [cached since 2.1e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:22:04.645272')
+2026-03-11 19:52:04,653 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 19:52:05,110 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 19:57:04,647 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 19:57:04,651 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 19:57:04,651 - sqlalchemy.engine.Engine - INFO - [cached since 2.13e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:27:04.638589')
+2026-03-11 19:57:04,657 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 19:57:05,094 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:02:04,667 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:02:04,671 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:02:04,671 - sqlalchemy.engine.Engine - INFO - [cached since 2.16e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:32:04.659113')
+2026-03-11 20:02:04,676 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:02:05,097 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:07:04,687 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:07:04,690 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:07:04,690 - sqlalchemy.engine.Engine - INFO - [cached since 2.19e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:37:04.680091')
+2026-03-11 20:07:04,694 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:07:05,100 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:12:04,707 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:12:04,710 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:12:04,710 - sqlalchemy.engine.Engine - INFO - [cached since 2.22e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:42:04.699763')
+2026-03-11 20:12:04,714 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:12:05,104 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:17:04,728 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:17:04,731 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:17:04,731 - sqlalchemy.engine.Engine - INFO - [cached since 2.25e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:47:04.718655')
+2026-03-11 20:17:04,736 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:17:05,106 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:22:04,748 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:22:04,753 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:22:04,753 - sqlalchemy.engine.Engine - INFO - [cached since 2.28e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:52:04.739933')
+2026-03-11 20:22:04,759 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:22:05,107 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:27:04,761 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:27:04,765 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:27:04,765 - sqlalchemy.engine.Engine - INFO - [cached since 2.31e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 11:57:04.754579')
+2026-03-11 20:27:04,768 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:27:05,102 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:32:04,778 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:32:04,782 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:32:04,782 - sqlalchemy.engine.Engine - INFO - [cached since 2.34e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 12:02:04.770659')
+2026-03-11 20:32:04,785 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:32:05,103 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:37:04,792 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:37:04,793 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:37:04,793 - sqlalchemy.engine.Engine - INFO - [cached since 2.37e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 12:07:04.787895')
+2026-03-11 20:37:04,795 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:37:05,105 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:42:04,801 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:42:04,803 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:42:04,803 - sqlalchemy.engine.Engine - INFO - [cached since 2.4e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 12:12:04.800513')
+2026-03-11 20:42:04,805 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:42:05,111 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:47:04,811 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:47:04,813 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:47:04,813 - sqlalchemy.engine.Engine - INFO - [cached since 2.43e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 12:17:04.808801')
+2026-03-11 20:47:04,815 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:47:05,112 - app.services.websocket_manager - INFO - Active connections: 0/100
+2026-03-11 20:52:04,834 - sqlalchemy.engine.Engine - INFO - BEGIN (implicit)
+2026-03-11 20:52:04,836 - sqlalchemy.engine.Engine - INFO - SELECT executions.id, executions.task_id, executions.workflow_id, executions.status, executions.error_message, executions.meta, executions.execution_type, executions.agent_id, executions.test_input, executions.test_output, executions.session_id, executions.last_activity_at, executions.is_background, executions.chat_history, executions.terminal_pid, executions.terminal_command, executions.terminal_cwd, executions.terminal_output, executions.started_at, executions.created_at, executions.updated_at, executions.finished_at 
+FROM executions 
+WHERE executions.execution_type = ? AND executions.status = ? AND executions.is_background = 1 AND executions.last_activity_at < ?
+2026-03-11 20:52:04,837 - sqlalchemy.engine.Engine - INFO - [cached since 2.455e+04s ago] ('AGENT_TEST', 'RUNNING', '2026-03-11 12:22:04.830954')
+2026-03-11 20:52:04,839 - sqlalchemy.engine.Engine - INFO - ROLLBACK
+2026-03-11 20:52:05,127 - app.services.websocket_manager - INFO - Active connections: 0/100

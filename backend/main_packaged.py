@@ -215,10 +215,23 @@ if __name__ == "__main__":
     local_ip = get_local_ip()
 
     # 生成前端运行时配置文件
-    config_js_content = f"""// Auto-generated runtime configuration
+    # 根据host参数决定前端配置
+    if host == "0.0.0.0":
+        # 绑定所有接口时，前端使用相对路径（自动适配访问地址）
+        config_js_content = f"""// Auto-generated runtime configuration
 window.__RUNTIME_CONFIG__ = {{
-  API_BASE_URL: 'http://localhost:{port}/api',
-  WS_BASE_URL: 'ws://localhost:{port}/api',
+  API_BASE_URL: '/api',
+  WS_BASE_URL: (window.location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + window.location.host + '/api',
+  PORT: {port}
+}};
+"""
+    else:
+        # 绑定特定地址时，使用指定地址
+        ws_protocol = 'wss' if host.startswith('https') else 'ws'
+        config_js_content = f"""// Auto-generated runtime configuration
+window.__RUNTIME_CONFIG__ = {{
+  API_BASE_URL: 'http://{host}:{port}/api',
+  WS_BASE_URL: '{ws_protocol}://{host}:{port}/api',
   PORT: {port}
 }};
 """
