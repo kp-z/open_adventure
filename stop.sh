@@ -184,9 +184,9 @@ fi
 echo ""
 echo "Verifying ports are released..."
 
-if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+if lsof -Pi :38080 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "⚠️  Port 8000 still occupied, forcing cleanup..."
-    lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+    lsof -ti :38080 | xargs kill -9 2>/dev/null || true
     STOPPED_ANY=true
 fi
 

@@ -202,7 +202,7 @@ clean_runtime() {
 
   if [ "$NO_KILL" = true ]; then
     log_warn "--no-kill 已启用：仅报告端口占用，不终止进程"
-    for port in 8000 5173; do
+    for port in 38080 5173; do
       if lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
         pid=$(lsof -Pi ":$port" -sTCP:LISTEN -t | head -n 1)
         log_warn "端口 $port 被占用（PID=$pid）"
@@ -213,7 +213,7 @@ clean_runtime() {
     return
   fi
 
-  for port in 8000 5173; do
+  for port in 38080 5173; do
     if lsof -Pi ":$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
       local pids
       pids=$(lsof -ti ":$port" | tr '\n' ' ')

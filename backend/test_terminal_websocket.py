@@ -9,7 +9,7 @@ import json
 
 async def test_terminal_auto_start():
     """测试终端自动启动功能"""
-    uri = "ws://localhost:8000/api/terminal/ws"
+    uri = "ws://localhost:38080/api/terminal/ws"
 
     print("=" * 60)
     print("测试终端自动启动 Claude")
@@ -42,7 +42,7 @@ async def test_terminal_auto_start():
     except Exception as e:
         print(f"\n✗ 连接失败: {e}")
         print("\n请确保：")
-        print("1. 后端服务正在运行 (http://localhost:8000)")
+        print("1. 后端服务正在运行 (http://localhost:38080)")
         print("2. 已配置至少一个启用的项目路径")
 
 

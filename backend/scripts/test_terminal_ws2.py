@@ -10,7 +10,7 @@ from websocket import create_connection
 
 def test_terminal_connection(agent_id: int):
     """测试 Terminal WebSocket 连接"""
-    uri = f"ws://localhost:8000/api/agents/{agent_id}/terminal"
+    uri = f"ws://localhost:38080/api/agents/{agent_id}/terminal"
 
     print(f"连接到: {uri}")
 

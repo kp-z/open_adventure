@@ -60,6 +60,13 @@ const typeStyleMap: Record<
     cardGlow: 'from-amber-400/20 via-amber-300/8 to-transparent',
     titleColor: 'text-amber-100',
   },
+  info: {
+    icon: <Info size={16} className="text-blue-300" />,
+    chip: 'bg-blue-400/15 text-blue-200 border border-blue-300/25',
+    ring: 'ring-blue-300/30',
+    cardGlow: 'from-blue-400/20 via-blue-300/8 to-transparent',
+    titleColor: 'text-blue-100',
+  },
   loading: {
     icon: <Loader2 size={16} className="text-violet-300 animate-spin" />,
     chip: 'bg-violet-400/15 text-violet-200 border border-violet-300/25',

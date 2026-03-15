@@ -677,12 +677,12 @@ Agent 描述: ${agent.description}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* 左侧 - 测试区域 */}
         <div className="lg:col-span-2 space-y-6">
-          {/* 统一的测试卡片 - 输入和输出在一起 */}
+          {/* Agent Runtime 控制台 */}
           <GlassCard className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold flex items-center gap-2">
                 <Terminal size={16} />
-                测试控制台
+                Agent Runtime
               </h3>
               <div className="flex items-center gap-2">
                 {/* 视图模式切换 */}
@@ -726,6 +726,7 @@ Agent 描述: ${agent.description}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.2 }}
+                className="max-h-[600px] overflow-y-auto"
               >
                 <ApiChatView
                   agentId={agent.id}

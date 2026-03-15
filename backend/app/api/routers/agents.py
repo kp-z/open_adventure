@@ -18,10 +18,12 @@ from app.repositories.agent_repository import AgentRepository
 from app.repositories.executions_repo import ExecutionRepository
 from app.services.agent_service import AgentService
 from app.services.agent_test_service import AgentTestService
+from app.services.agent_runtime_service import AgentRuntimeService
 from app.adapters.claude.file_scanner import ClaudeFileScanner
 from app.config.settings import settings
-from app.models.task import ExecutionStatus
+from app.models.task import ExecutionStatus, ExecutionType, Execution
 from datetime import datetime
+import time
 from app.schemas.agent import (
     AgentCreate,
     AgentUpdate,
@@ -1770,10 +1772,27 @@ async def api_agent_session(
             await websocket.close()
             return
 
-        # 发送就绪消息
+        # 创建 Execution 记录
+        execution_repo = ExecutionRepository(db)
+        execution = Execution(
+            agent_id=agent_id,
+            execution_type=ExecutionType.AGENT_TEST,
+            session_id=session_id,
+            status=ExecutionStatus.RUNNING,
+            started_at=datetime.utcnow(),
+            test_input='',  # 初始为空，收到第一条消息时更新
+            chat_history='[]'
+        )
+        await execution_repo.create(execution)
+
+        execution_id = execution.id
+        logger.info(f"[ApiSession] Created execution record: {execution_id}")
+
+        # 发送就绪消息（包含 execution_id）
         await websocket.send_json({
             'type': 'ready',
             'session_id': session_id,
+            'execution_id': execution_id,
             'provider': provider_type,
             'mode': mode,
             'message': f'Agent "{agent.name}" ready (using {provider_type})'
@@ -1790,10 +1809,27 @@ async def api_agent_session(
                     logger.info(f"[ApiSession] Received input: {user_input[:50]}...")
                     logger.info(f"[ApiSession] Full input length: {len(user_input)} bytes")
 
+                    # 如果是第一条消息，更新 test_input
+                    if not execution.test_input:
+                        execution.test_input = user_input
+                        await db.commit()
+                        logger.info(f"[ApiSession] Updated test_input for execution {execution_id}")
+
+                    # 更新聊天历史 - 添加用户消息
+                    chat_history = json.loads(execution.chat_history) if execution.chat_history else []
+                    user_message = {
+                        'id': f'user-{int(time.time() * 1000)}',
+                        'role': 'user',
+                        'content': user_input,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }
+                    chat_history.append(user_message)
+
                     # 发送到模型提供商，流式返回
                     try:
                         logger.info(f"[ApiSession] Calling provider.send_message...")
                         message_count = 0
+                        assistant_content = ''  # 累积助手响应内容
                         async for response_msg in provider.send_message(
                             session_id=session_id,
                             message=user_input,
@@ -1804,6 +1840,10 @@ async def api_agent_session(
                         ):
                             message_count += 1
                             logger.info(f"[ApiSession] Received message {message_count} from provider, is_chunk={response_msg.metadata.get('is_chunk', False)}")
+
+                            # 累积内容
+                            if response_msg.content:
+                                assistant_content += response_msg.content
 
                             # 发送流式响应
                             await websocket.send_json({
@@ -1820,6 +1860,21 @@ async def api_agent_session(
                             logger.info(f"[ApiSession] Sent message {message_count} to WebSocket")
 
                         logger.info(f"[ApiSession] Finished sending all messages, total: {message_count}")
+
+                        # 在最后一条消息后更新聊天历史 - 添加助手消息
+                        if assistant_content:
+                            assistant_message = {
+                                'id': f'assistant-{int(time.time() * 1000)}',
+                                'role': 'assistant',
+                                'content': assistant_content,
+                                'timestamp': datetime.utcnow().isoformat()
+                            }
+                            chat_history.append(assistant_message)
+                            execution.chat_history = json.dumps(chat_history, ensure_ascii=False)
+                            execution.last_activity_at = datetime.utcnow()
+                            await db.commit()
+                            logger.info(f"[ApiSession] Updated chat history for execution {execution_id}")
+
                     except Exception as e:
                         logger.error(f"Error sending message: {e}")
                         logger.exception(e)
@@ -1843,6 +1898,11 @@ async def api_agent_session(
 
             except WebSocketDisconnect:
                 logger.info(f"[ApiSession] Client disconnected for agent {agent_id}")
+                # 更新 Execution 状态为成功
+                execution.status = ExecutionStatus.SUCCEEDED
+                execution.finished_at = datetime.utcnow()
+                await db.commit()
+                logger.info(f"[ApiSession] Updated execution {execution_id} status to SUCCEEDED")
                 break
             except json.JSONDecodeError as e:
                 logger.error(f"Invalid JSON: {e}")
@@ -1855,6 +1915,15 @@ async def api_agent_session(
         logger.error(f"[ApiSession] Error: {e}")
         import traceback
         traceback.print_exc()
+        # 更新 Execution 状态为失败
+        try:
+            execution.status = ExecutionStatus.FAILED
+            execution.error_message = str(e)
+            execution.finished_at = datetime.utcnow()
+            await db.commit()
+            logger.info(f"[ApiSession] Updated execution {execution_id} status to FAILED")
+        except:
+            pass
         try:
             await websocket.send_json({
                 'type': 'error',
@@ -1868,3 +1937,169 @@ async def api_agent_session(
         except:
             pass
 
+
+
+# ==================== Agent Runtime API ====================
+
+@router.post("/{agent_id}/execute-background")
+async def execute_agent_background(
+    agent_id: int,
+    task_description: str,
+    project_path: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    启动 Agent 后台执行
+
+    Args:
+        agent_id: Agent ID
+        task_description: 任务描述
+        project_path: 项目路径（可选）
+
+    Returns:
+        Execution 信息
+    """
+    from app.services.agent_runtime_service import AgentRuntimeService
+
+    # 获取 Agent
+    service = get_agent_service(db)
+    agent = await service.get_agent(agent_id)
+
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # 启动后台执行
+    runtime_service = AgentRuntimeService(db)
+    execution = await runtime_service.start_agent(
+        agent=agent,
+        task_description=task_description,
+        project_path=project_path,
+        background=True
+    )
+
+    return {
+        "execution_id": execution.id,
+        "session_id": execution.session_id,
+        "status": execution.status,
+        "pid": execution.process_pid,
+        "work_dir": execution.work_dir,
+        "log_file": execution.log_file
+    }
+
+
+@router.get("/executions/{execution_id}/runtime-status")
+async def get_execution_runtime_status(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取 Execution 的运行时状态
+
+    Args:
+        execution_id: Execution ID
+
+    Returns:
+        运行时状态信息
+    """
+    from app.services.agent_runtime_service import AgentRuntimeService
+
+    runtime_service = AgentRuntimeService(db)
+    status = await runtime_service.get_agent_status(execution_id)
+
+    return status
+
+
+@router.get("/executions/{execution_id}/runtime-logs")
+async def get_execution_runtime_logs(
+    execution_id: int,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取 Execution 的运行时日志
+
+    Args:
+        execution_id: Execution ID
+        offset: 偏移量
+        limit: 限制数量
+
+    Returns:
+        日志信息
+    """
+    from app.services.agent_runtime_service import AgentRuntimeService
+
+    runtime_service = AgentRuntimeService(db)
+    logs = await runtime_service.get_agent_logs(execution_id, offset, limit)
+
+    return logs
+
+
+@router.post("/executions/{execution_id}/runtime-stop")
+async def stop_execution_runtime(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    停止 Execution 的运行时
+
+    Args:
+        execution_id: Execution ID
+
+    Returns:
+        是否成功停止
+    """
+    from app.services.agent_runtime_service import AgentRuntimeService
+
+    runtime_service = AgentRuntimeService(db)
+    success = await runtime_service.stop_agent(execution_id)
+
+    return {"success": success}
+
+
+@router.get("/executions/running")
+async def get_running_executions(
+    agent_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取正在运行的 Execution 列表
+
+    Args:
+        agent_id: 可选的 Agent ID 过滤
+
+    Returns:
+        运行中的 Execution 列表
+    """
+    from app.models.task import Execution, ExecutionStatus, ExecutionType
+    from sqlalchemy import and_, select
+
+    query = select(Execution).where(
+        and_(
+            Execution.status == ExecutionStatus.RUNNING,
+            Execution.execution_type == ExecutionType.AGENT_TEST,
+            Execution.is_background == True
+        )
+    )
+
+    if agent_id:
+        query = query.where(Execution.agent_id == agent_id)
+
+    result = await db.execute(query)
+    executions = result.scalars().all()
+
+    return {
+        "total": len(executions),
+        "items": [
+            {
+                "id": e.id,
+                "agent_id": e.agent_id,
+                "session_id": e.session_id,
+                "status": e.status,
+                "pid": e.process_pid,
+                "started_at": e.started_at.isoformat() if e.started_at else None,
+                "last_activity_at": e.last_activity_at.isoformat() if e.last_activity_at else None
+            }
+            for e in executions
+        ]
+    }

@@ -9,7 +9,7 @@ echo ""
 
 # 1. 测试后端健康状态
 echo "1. 测试后端健康状态..."
-HEALTH=$(curl -s http://localhost:8000/api/system/health)
+HEALTH=$(curl -s http://localhost:38080/api/system/health)
 if [ $? -eq 0 ]; then
     echo "✅ 后端健康检查通过"
     echo "   响应: $HEALTH"
@@ -21,7 +21,7 @@ echo ""
 
 # 2. 测试 Agents API
 echo "2. 测试 Agents API..."
-AGENTS=$(curl -s http://localhost:8000/api/agents?limit=1)
+AGENTS=$(curl -s http://localhost:38080/api/agents?limit=1)
 if [ $? -eq 0 ]; then
     echo "✅ Agents API 正常"
     echo "   响应: $(echo $AGENTS | head -c 100)..."
@@ -33,7 +33,7 @@ echo ""
 
 # 3. 测试 Terminal Status
 echo "3. 测试 Terminal Status..."
-TERMINAL=$(curl -s http://localhost:8000/api/terminal/status)
+TERMINAL=$(curl -s http://localhost:38080/api/terminal/status)
 if [ $? -eq 0 ]; then
     echo "✅ Terminal 服务正常"
     echo "   响应: $TERMINAL"
@@ -46,7 +46,7 @@ echo ""
 # 4. 测试 Test Stream API
 echo "4. 测试 Test Stream API..."
 echo "   发送测试请求到 Agent 18..."
-STREAM=$(curl -s -X POST "http://localhost:8000/api/agents/18/test-stream?prompt=hello" -H "Content-Type: application/json" | head -5)
+STREAM=$(curl -s -X POST "http://localhost:38080/api/agents/18/test-stream?prompt=hello" -H "Content-Type: application/json" | head -5)
 if [ $? -eq 0 ]; then
     echo "✅ Test Stream API 正常"
     echo "   响应前 5 行:"

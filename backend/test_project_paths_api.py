@@ -5,7 +5,7 @@ API 测试：验证项目路径管理功能
 import requests
 import json
 
-BASE_URL = "http://localhost:8000/api"
+BASE_URL = "http://localhost:38080/api"
 
 
 def test_project_paths_api():

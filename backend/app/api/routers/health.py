@@ -1,11 +1,16 @@
 """Health check and system status endpoints."""
+import os
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config.settings import settings
 from app.core.database import get_db, engine
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(tags=["system"])
 

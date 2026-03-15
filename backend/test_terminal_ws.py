@@ -7,7 +7,7 @@ import websockets
 import json
 
 async def test_terminal():
-    uri = "ws://localhost:8000/api/terminal/ws"
+    uri = "ws://localhost:38080/api/terminal/ws"
 
     print(f"连接到 {uri}...")
 

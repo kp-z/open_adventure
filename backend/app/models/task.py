@@ -184,8 +184,8 @@ class Execution(Base):
     __tablename__ = "executions"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"), nullable=False, index=True)
-    workflow_id: Mapped[int] = mapped_column(ForeignKey("workflows.id"), nullable=False)
+    task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
+    workflow_id: Mapped[Optional[int]] = mapped_column(ForeignKey("workflows.id"), nullable=True)
     status: Mapped[ExecutionStatus] = mapped_column(
         SQLEnum(ExecutionStatus, native_enum=False),
         default=ExecutionStatus.PENDING,
@@ -211,6 +211,11 @@ class Execution(Base):
     last_activity_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     is_background: Mapped[bool] = mapped_column(default=False, nullable=False)
     chat_history: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON 格式的聊天历史
+
+    # Agent Runtime 相关字段
+    process_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)  # claude 进程 PID
+    work_dir: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # 工作目录路径
+    log_file: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)  # 日志文件路径
 
     # Terminal 相关字段
     terminal_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)  # 进程 ID

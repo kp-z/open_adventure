@@ -34,17 +34,60 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [currentChunk, setCurrentChunk] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 自动滚动到底部
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, currentChunk]);
+  // 检查是否接近底部
+  const checkIfNearBottom = () => {
+    const container = messagesContainerRef.current;
+    if (!container) return true;
+
+    const threshold = 150; // 距离底部 150px 以内认为是"接近底部"
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom < threshold;
+  };
+
+  // 监听滚动事件，更新是否应该自动滚动
+  const handleScroll = () => {
+    // 标记用户正在滚动
+    isUserScrollingRef.current = true;
+
+    // 清除之前的超时
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+
+    // 500ms 后认为用户停止滚动
+    scrollTimeoutRef.current = setTimeout(() => {
+      isUserScrollingRef.current = false;
+    }, 500);
+
+    const isNearBottom = checkIfNearBottom();
+
+    // 只有当用户滚动到接近底部时才启用自动滚动
+    // 如果用户向上滚动（远离底部），则禁用自动滚动
+    if (isNearBottom !== shouldAutoScroll) {
+      setShouldAutoScroll(isNearBottom);
+    }
+  };
+
+  // 自动滚动到底部（已禁用，避免页面跳动）
+  // useEffect(() => {
+  //   if (shouldAutoScroll && !isUserScrollingRef.current && messagesEndRef.current) {
+  //     // 使用 requestAnimationFrame 确保 DOM 更新后再滚动
+  //     requestAnimationFrame(() => {
+  //       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  //     });
+  //   }
+  // }, [messages, currentChunk, shouldAutoScroll]);
 
   // 连接 WebSocket
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.hostname}:8000/api/agents/${agentId}/api-session-ws?mode=${mode}`;
+    const wsUrl = `${protocol}//${window.location.hostname}:38080/api/agents/${agentId}/api-session-ws?mode=${mode}`;
 
     console.log('[ApiChatView] Connecting to:', wsUrl);
 
@@ -136,6 +179,12 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
 
     return () => {
       console.log('[ApiChatView] Cleanup: hasReceivedReady=', hasReceivedReady);
+
+      // 清理滚动超时
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+
       // 只有在没有收到 ready 消息时才关闭 WebSocket
       // 这样可以避免在组件重新渲染时关闭正在使用的 WebSocket
       if (!hasReceivedReady && websocket.readyState === WebSocket.OPEN) {
@@ -169,6 +218,12 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
     );
 
     setInput('');
+
+    // 发送消息后强制滚动到底部
+    setShouldAutoScroll(true);
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   // 处理键盘事件
@@ -202,7 +257,11 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
       )}
 
       {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div
+        ref={messagesContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[500px]"
+      >
         <AnimatePresence>
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
@@ -239,6 +298,7 @@ export const ApiChatView: React.FC<ApiChatViewProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={isReady ? `Message ${agentName}...` : 'Waiting for connection...'}
             disabled={!isReady || isSending}
+            autoFocus={false}
             className="flex-1 bg-gray-800/30 border border-gray-700/50 rounded-lg px-4 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none min-h-[44px] max-h-[200px]"
             rows={1}
             style={{

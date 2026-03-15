@@ -5,10 +5,10 @@ echo ""
 
 # 1. 检查后端监听地址
 echo "1️⃣  检查后端监听地址..."
-if netstat -tlnp 2>/dev/null | grep 8000 | grep -q "0.0.0.0:8000"; then
-    echo "   ✅ 后端正确监听 0.0.0.0:8000"
-elif netstat -tlnp 2>/dev/null | grep 8000 | grep -q "127.0.0.1:8000"; then
-    echo "   ❌ 后端只监听 127.0.0.1:8000（仅本机可访问）"
+if netstat -tlnp 2>/dev/null | grep 8000 | grep -q "0.0.0.0:38080"; then
+    echo "   ✅ 后端正确监听 0.0.0.0:38080"
+elif netstat -tlnp 2>/dev/null | grep 8000 | grep -q "127.0.0.1:38080"; then
+    echo "   ❌ 后端只监听 127.0.0.1:38080（仅本机可访问）"
     echo "   💡 请检查 backend/run.py，确保 host='0.0.0.0'"
 else
     echo "   ⚠️  后端未在 8000 端口监听"
@@ -47,9 +47,9 @@ echo ""
 
 # 3. 测试本地访问
 echo "3️⃣  测试本地访问..."
-if curl -s -f http://localhost:8000/api/system/health > /dev/null 2>&1; then
+if curl -s -f http://localhost:38080/api/system/health > /dev/null 2>&1; then
     echo "   ✅ 本地访问成功"
-    curl -s http://localhost:8000/api/system/health | python3 -m json.tool 2>/dev/null || echo "   (无法格式化 JSON)"
+    curl -s http://localhost:38080/api/system/health | python3 -m json.tool 2>/dev/null || echo "   (无法格式化 JSON)"
 else
     echo "   ❌ 本地访问失败"
     echo "   💡 请检查后端是否正常启动"
@@ -61,8 +61,8 @@ echo "4️⃣  外部访问地址:"
 IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || echo "无法获取")
 if [ "$IP" != "无法获取" ]; then
     echo "   🌐 前端: http://$IP:5173"
-    echo "   🔌 后端: http://$IP:8000"
-    echo "   ❤️  健康检查: http://$IP:8000/api/system/health"
+    echo "   🔌 后端: http://$IP:38080"
+    echo "   ❤️  健康检查: http://$IP:38080/api/system/health"
 else
     echo "   ⚠️  无法获取公网 IP"
     echo "   💡 请手动查询服务器公网 IP"
@@ -80,7 +80,7 @@ echo ""
 # 6. 测试外部访问（如果可能）
 echo "6️⃣  测试外部访问..."
 if [ "$IP" != "无法获取" ]; then
-    if curl -s -f --connect-timeout 5 http://$IP:8000/api/system/health > /dev/null 2>&1; then
+    if curl -s -f --connect-timeout 5 http://$IP:38080/api/system/health > /dev/null 2>&1; then
         echo "   ✅ 外部访问成功！"
     else
         echo "   ❌ 外部访问失败"

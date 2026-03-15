@@ -58,12 +58,12 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
     },
   });
 
-  // 自动滚动到最新消息
-  useEffect(() => {
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+  // 自动滚动到最新消息（已禁用，避免页面跳动）
+  // useEffect(() => {
+  //   if (messages.length > 0) {
+  //     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  //   }
+  // }, [messages]);
 
   const handleSend = useCallback(() => {
     if (!input) return;
@@ -121,6 +121,7 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
             }}
             placeholder="输入消息..."
             disabled={isRunning || !state.isConnected}
+            autoFocus={false}
             className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-xl resize-none focus:outline-none focus:border-blue-500/50 disabled:opacity-50"
             rows={3}
           />

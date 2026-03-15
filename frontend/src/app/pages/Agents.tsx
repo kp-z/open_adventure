@@ -428,7 +428,7 @@ const Agents = () => {
       </header>
 
       {/* 分类过滤 */}
-      <div className="min-h-[88px] md:min-h-[120px]">
+      <div>
         {categories && (
           <CategoryFilter
             selectedCategory={selectedCategory}

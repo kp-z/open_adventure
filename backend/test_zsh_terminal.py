@@ -8,7 +8,7 @@ import websockets
 
 async def test_zsh_terminal():
     """Test terminal with zsh."""
-    uri = "ws://127.0.0.1:8000/api/terminal/ws"
+    uri = "ws://127.0.0.1:38080/api/terminal/ws"
 
     print("🔌 Connecting to terminal WebSocket...")
 

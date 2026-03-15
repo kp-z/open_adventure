@@ -302,4 +302,75 @@ export const agentsApi = {
       chat_history_count: number;
       raw_output_size: number;
     }>(`/agents/${id}/status`),
+
+  // ==================== Agent Runtime API ====================
+
+  /**
+   * 启动 Agent 后台执行
+   */
+  executeBackground: (agentId: number, taskDescription: string, projectPath?: string) =>
+    apiClient.post<{
+      execution_id: number;
+      session_id: string;
+      status: string;
+      pid: number;
+      work_dir: string;
+      log_file: string;
+    }>(`/agents/${agentId}/execute-background`, null, {
+      params: {
+        task_description: taskDescription,
+        project_path: projectPath
+      }
+    }),
+
+  /**
+   * 获取 Execution 的运行时状态
+   */
+  getExecutionStatus: (executionId: number) =>
+    apiClient.get<{
+      status: string;
+      pid: number;
+      started_at: string | null;
+      last_activity: string | null;
+      output_lines: number;
+      cpu_percent: number;
+      memory_mb: number;
+    }>(`/agents/executions/${executionId}/runtime-status`),
+
+  /**
+   * 获取 Execution 的运行时日志
+   */
+  getExecutionLogs: (executionId: number, offset: number = 0, limit: number = 100) =>
+    apiClient.get<{
+      logs: string[];
+      total: number;
+      has_more: boolean;
+    }>(`/agents/executions/${executionId}/runtime-logs`, {
+      params: { offset, limit }
+    }),
+
+  /**
+   * 停止 Execution 的运行时
+   */
+  stopExecution: (executionId: number) =>
+    apiClient.post<{ success: boolean }>(`/agents/executions/${executionId}/runtime-stop`),
+
+  /**
+   * 获取正在运行的 Execution 列表
+   */
+  getRunningExecutions: (agentId?: number) =>
+    apiClient.get<{
+      total: number;
+      items: Array<{
+        id: number;
+        agent_id: number;
+        session_id: string;
+        status: string;
+        pid: number;
+        started_at: string | null;
+        last_activity_at: string | null;
+      }>;
+    }>('/agents/executions/running', {
+      params: agentId ? { agent_id: agentId } : undefined
+    }),
 };

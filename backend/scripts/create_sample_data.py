@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-BASE_URL = "http://127.0.0.1:8000/api"
+BASE_URL = "http://127.0.0.1:38080/api"
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 PROJECT_PATH = Path(os.getenv("PROJECT_PATH", str(REPO_ROOT))).resolve()
@@ -510,7 +510,7 @@ def main():
             return
         print("✅ 后端服务运行正常")
     except requests.exceptions.ConnectionError:
-        print("❌ 无法连接到后端服务，请确保后端运行在 http://127.0.0.1:8000")
+        print("❌ 无法连接到后端服务，请确保后端运行在 http://127.0.0.1:38080")
         return
     
     # 按顺序创建数据

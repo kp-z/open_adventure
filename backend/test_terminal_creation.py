@@ -11,7 +11,7 @@ async def test_terminal_creation():
 
     # 测试1：创建第一个 terminal
     print("=== 测试1：创建第一个 terminal ===")
-    uri1 = "ws://localhost:8000/api/terminal/ws"
+    uri1 = "ws://localhost:38080/api/terminal/ws"
     async with websockets.connect(uri1) as ws1:
         print(f"✓ Terminal 1 连接成功")
 
@@ -20,7 +20,7 @@ async def test_terminal_creation():
 
         # 测试2：创建第二个 terminal（不同路径）
         print("\n=== 测试2：创建第二个 terminal（不同路径）===")
-        uri2 = "ws://localhost:8000/api/terminal/ws?project_path=/tmp"
+        uri2 = "ws://localhost:38080/api/terminal/ws?project_path=/tmp"
         async with websockets.connect(uri2) as ws2:
             print(f"✓ Terminal 2 连接成功")
 
@@ -29,7 +29,7 @@ async def test_terminal_creation():
 
             # 测试3：创建第三个 terminal（相同路径）
             print("\n=== 测试3：创建第三个 terminal（相同路径）===")
-            uri3 = "ws://localhost:8000/api/terminal/ws?project_path=/tmp"
+            uri3 = "ws://localhost:38080/api/terminal/ws?project_path=/tmp"
             async with websockets.connect(uri3) as ws3:
                 print(f"✓ Terminal 3 连接成功")
 

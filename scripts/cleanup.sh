@@ -15,11 +15,11 @@ echo "Stopping frontend processes..."
 pkill -f "vite.*open_adventure" 2>/dev/null && echo "  ✅ Stopped vite processes" || echo "  ℹ️  No vite processes found"
 
 # 清理占用端口 8000 的所有进程
-if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+if lsof -Pi :38080 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "Cleaning up port 8000..."
-    lsof -ti :8000 | xargs kill -9 2>/dev/null
+    lsof -ti :38080 | xargs kill -9 2>/dev/null
     sleep 1
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if lsof -Pi :38080 -sTCP:LISTEN -t >/dev/null 2>&1; then
         echo "  ⚠️  Warning: Port 8000 still occupied"
     else
         echo "  ✅ Port 8000 released"

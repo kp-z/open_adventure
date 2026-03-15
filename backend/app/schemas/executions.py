@@ -28,8 +28,8 @@ class NodeExecutionResponse(BaseModel):
 class ExecutionResponse(BaseModel):
     """执行响应"""
     id: int
-    task_id: int
-    workflow_id: int
+    task_id: Optional[int] = None
+    workflow_id: Optional[int] = None
     status: ExecutionStatus
     execution_type: ExecutionType
     agent_id: Optional[int] = None

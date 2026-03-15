@@ -695,7 +695,16 @@ const Dashboard = () => {
                   // 限制最多显示8个气泡
                   const displayBubbles = bubbleConfigs.slice(0, 8);
 
-                  return displayBubbles.map((bubble, index) => {
+                  return displayBubbles
+                    .filter((bubble, index) => {
+                      // 过滤掉没有对应位置的气泡
+                      if (!bubblePositions[index]) {
+                        console.warn(`[Dashboard] No position found for bubble at index ${index}`);
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map((bubble, index) => {
                     const position = bubblePositions[index];
                     const isCurrentModel = bubble.isCurrent;
                     const isAvailable = bubble.available;
@@ -925,7 +934,16 @@ const Dashboard = () => {
                 // 限制最多显示8个气泡
                 const displayBubbles = bubbleConfigs.slice(0, 8);
 
-                return displayBubbles.map((bubble, index) => {
+                return displayBubbles
+                  .filter((bubble, index) => {
+                    // 过滤掉没有对应位置的气泡
+                    if (!bubblePositions[index]) {
+                      console.warn(`[Dashboard] No position found for bubble at index ${index}`);
+                      return false;
+                    }
+                    return true;
+                  })
+                  .map((bubble, index) => {
                   const position = bubblePositions[index];
                   const isCurrentModel = bubble.isCurrent;
                   const isAvailable = bubble.available;

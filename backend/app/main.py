@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes, config
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes, config, microverse
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -31,6 +31,12 @@ async def lifespan(app: FastAPI):
     # 启动终端清理任务
     terminal.start_cleanup_task()
     await terminal.reconcile_orphan_terminal_executions()
+
+    # 启动 Agent Monitor Service
+    from app.services.agent_monitor_service import get_monitor_service
+    monitor_service = get_monitor_service()
+    await monitor_service.start()
+    logger.info("Agent Monitor Service started")
 
     # 启动 Agent Session 清理任务
     import asyncio
@@ -76,6 +82,12 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down Open Adventure Backend...")
+
+    # 停止 Agent Monitor Service
+    from app.services.agent_monitor_service import get_monitor_service
+    monitor_service = get_monitor_service()
+    await monitor_service.stop()
+    logger.info("Agent Monitor Service stopped")
 
     # 停止 Agent Session 清理任务
     if cleanup_task:
@@ -154,15 +166,87 @@ app.include_router(token_usage.router, prefix=f"{settings.api_prefix}")
 app.include_router(plugins.router, prefix=f"{settings.api_prefix}")
 app.include_router(config.router, prefix=f"{settings.api_prefix}")
 app.include_router(settings_router.router, prefix=f"{settings.api_prefix}")
+app.include_router(microverse.router, prefix=f"{settings.api_prefix}")
 app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", tags=["dashboard"])
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
 app.include_router(processes.router, prefix=f"{settings.api_prefix}")
 app.include_router(websocket.router, prefix=f"{settings.api_prefix}/ws")
 
 
-# 静态文件服务（用于打包版本）- 必须在所有路由之后
+# 静态文件服务配置 - 先定义目录路径
+# 优先使用环境变量指定的目录，否则使用默认的 ../frontend/dist
 FRONTEND_DIR = os.environ.get("FRONTEND_DIST_DIR")
-if FRONTEND_DIR and os.path.exists(FRONTEND_DIR):
+if not FRONTEND_DIR:
+    # 开发模式：使用相对路径（从 backend/app/main.py 到 frontend/dist）
+    current_file = os.path.abspath(__file__)  # backend/app/main.py
+    backend_dir = os.path.dirname(os.path.dirname(current_file))  # backend/
+    project_root = os.path.dirname(backend_dir)  # 项目根目录
+    FRONTEND_DIR = os.path.join(project_root, "frontend", "dist")
+
+
+# 清除缓存标记端点 - 必须在静态文件挂载之前
+@app.get("/.clear-cache")
+async def check_clear_cache_flag() -> dict:
+    """
+    检查清除缓存标记文件是否存在
+
+    前端通过此端点检查是否需要清除 localStorage。
+    如果文件存在，返回 200；否则返回 404。
+    """
+    from pathlib import Path
+    from fastapi import HTTPException
+
+    clear_cache_file = Path(FRONTEND_DIR) / ".clear-cache"
+
+    if clear_cache_file.exists():
+        return {
+            "status": "exists",
+            "message": "Clear cache flag exists",
+            "file": str(clear_cache_file)
+        }
+    else:
+        raise HTTPException(status_code=404, detail="Clear cache flag not found")
+
+
+@app.delete("/.clear-cache")
+async def delete_clear_cache_flag() -> dict:
+    """
+    删除清除缓存标记文件
+
+    前端在检测到 .clear-cache 文件后会清除 localStorage，
+    然后调用此端点删除标记文件，避免重复清除。
+    """
+    try:
+        from pathlib import Path
+
+        # 获取前端 dist 目录路径
+        clear_cache_file = Path(FRONTEND_DIR) / ".clear-cache"
+
+        if clear_cache_file.exists():
+            clear_cache_file.unlink()
+            logger.info(f"Deleted clear cache flag: {clear_cache_file}")
+            return {
+                "status": "success",
+                "message": "Clear cache flag deleted",
+                "file": str(clear_cache_file)
+            }
+        else:
+            return {
+                "status": "not_found",
+                "message": "Clear cache flag not found",
+                "file": str(clear_cache_file)
+            }
+    except Exception as e:
+        logger.error(f"Failed to delete clear cache flag: {e}")
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=f"Failed to delete clear cache flag: {str(e)}")
+
+
+# 静态文件服务 - 必须在所有路由之后
+if os.path.exists(FRONTEND_DIR):
     from fastapi.staticfiles import StaticFiles
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     logger.info(f"Static files mounted from: {FRONTEND_DIR}")
+else:
+    logger.warning(f"Frontend directory not found: {FRONTEND_DIR}")
+    logger.warning("Frontend will not be served. Please build frontend first: cd frontend && npm run build")

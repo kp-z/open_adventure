@@ -8,6 +8,7 @@ import Executions from './pages/Executions';
 import Settings from './pages/Settings';
 import Teams from './pages/Teams';
 import Terminal from './pages/Terminal';
+import Microverse from './pages/Microverse';
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +46,10 @@ export const router = createBrowserRouter([
       {
         path: 'terminal',
         Component: Terminal,
+      },
+      {
+        path: 'microverse',
+        Component: Microverse,
       },
     ],
   },

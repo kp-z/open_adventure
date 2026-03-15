@@ -774,42 +774,19 @@ else
     echo "✅ Network access configured"
 fi
 
-# 启动前端服务器
+# 前端静态文件由后端提供（38080 端口）
 echo ""
-echo "Starting frontend server..."
+echo "Frontend static files served by backend on port $BACKEND_PORT"
 
 if [ "$DAEMON_MODE" = true ]; then
-    # 后台模式：前端也在后台运行
-    if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
-        # macOS + 防休眠模式：使用 caffeinate 包裹前端进程
-        caffeinate -i npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
-    else
-        npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT" > ../docs/logs/frontend.log 2>&1 &
-    fi
-    FRONTEND_PID=$!
-    echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
-
-    # 等待前端启动（最多 10 秒）
-    echo "Waiting for frontend to start..."
-    for i in {1..20}; do
-        if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo "✅ Frontend is ready (PID: $FRONTEND_PID)"
-            break
-        fi
-        if [ $i -eq 20 ]; then
-            echo "⚠️  Frontend may not have started properly, check docs/logs/frontend.log"
-        fi
-        sleep 0.5
-    done
-
+    # 后台模式
     echo ""
     echo "============================================"
     echo "✅ Open Adventure is running in background!"
     echo "============================================"
     echo ""
-    echo "🌐 Local Access:"
-    echo "   Frontend: http://localhost:${FRONTEND_PORT}"
-    echo "   Backend API: http://localhost:${BACKEND_PORT}"
+    echo "🌐 Access URL:"
+    echo "   http://localhost:${BACKEND_PORT}"
     echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
     if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
         echo "   Microverse (HTTPS): https://localhost:${CADDY_PORT}/microverse"
@@ -817,7 +794,7 @@ if [ "$DAEMON_MODE" = true ]; then
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
-        echo "   Frontend: http://${DISPLAY_IP}:${FRONTEND_PORT}"
+        echo "   http://${DISPLAY_IP}:${BACKEND_PORT}"
         echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
         if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
             echo "   Microverse (HTTPS): https://${DISPLAY_IP}:${CADDY_PORT}/microverse"
@@ -877,15 +854,14 @@ if [ "$DAEMON_MODE" = true ]; then
         echo ""
     fi
 else
-    # 前台模式：前端在前台运行
+    # 前台模式：显示访问信息
     echo ""
     echo "============================================"
     echo "✅ Open Adventure is running!"
     echo "============================================"
     echo ""
-    echo "🌐 Local Access:"
-    echo "   Frontend: http://localhost:${FRONTEND_PORT}"
-    echo "   Backend API: http://localhost:${BACKEND_PORT}"
+    echo "🌐 Access URL:"
+    echo "   http://localhost:${BACKEND_PORT}"
     echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
     if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
         echo "   Microverse (HTTPS): https://localhost:${CADDY_PORT}/microverse"
@@ -893,7 +869,7 @@ else
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
-        echo "   Frontend: http://${DISPLAY_IP}:${FRONTEND_PORT}"
+        echo "   http://${DISPLAY_IP}:${BACKEND_PORT}"
         echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
         if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
             echo "   Microverse (HTTPS): https://${DISPLAY_IP}:${CADDY_PORT}/microverse"
@@ -979,14 +955,9 @@ else
     # 捕获 Ctrl+C (SIGINT) 和 SIGTERM
     trap cleanup SIGINT SIGTERM
 
-    # 启动前端（前台运行）
-    if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
-        # macOS + 防休眠模式：使用 caffeinate 包裹前端进程
-        caffeinate -i npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
-    else
-        npm run dev -- --host 0.0.0.0 --port "$FRONTEND_PORT"
-    fi
-
-    # 当前端正常退出时，也停止后端
-    cleanup
+    # 前台模式：保持脚本运行，等待 Ctrl+C
+    echo "Waiting for Ctrl+C to stop..."
+    while true; do
+        sleep 1
+    done
 fi
