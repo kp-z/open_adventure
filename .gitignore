@@ -69,12 +69,36 @@ docs/releases/
 docs/design/
 backend/build/
 backend/dist/
+backend/docs/logs/
 release/
 venv/
 node_modules/
 frontend/node_modules/
 
+# Frontend build artifacts
+frontend/dev-dist/
+frontend/dist/
+frontend/.vite/
+
+# Avatars and images (runtime generated)
+frontend/public/avatars/
+
+# Microverse runtime files
+frontend/public/microverse/*.html
+frontend/public/microverse/*.js
+frontend/public/microverse/*.pck
+frontend/public/microverse/*.wasm
+frontend/public/microverse/*.backup
+
 # Microverse
 /microverse/export/
 /microverse/.godot/
 /microverse/.import/
+
+# Test and verification scripts
+backend/test_imports.py
+backend/verify_package.py
+backend/hooks/
+
+# Caddy server files
+scripts/caddy/
