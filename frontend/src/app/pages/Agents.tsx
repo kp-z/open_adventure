@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router';
+import { useNavigate } from 'react-router';
 import {
   RefreshCw,
   Plus,
@@ -9,8 +9,6 @@ import {
   Cpu,
   Shield,
   Zap,
-  AlertCircle,
-  CheckCircle2,
   Eye,
   EyeOff,
   Layers,
@@ -36,10 +34,13 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { CategoryFilter, type CategoryType } from '../components/CategoryFilter';
 import { motion, AnimatePresence } from 'motion/react';
 import { agentsApi } from '@/lib/api';
-import type { Agent, AgentScope, AgentSyncResponse } from '@/lib/api';
-import { AgentEditor } from '../components/AgentEditor';
-import { AgentTestPanel } from '../components/AgentTestPanel';
+import type { Agent, AgentScope } from '@/lib/api';
 import { getAgentAvatarUrl, getAgentGradient, getAgentInitials } from '../../imports/avatars';
+import {
+  useAgentsQuery,
+  useDeleteAgentMutation,
+  useSyncAgentsMutation
+} from '../hooks/useAgentsQuery';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,14 +102,24 @@ const Agents = () => {
   const { mode } = useMode();
   const { t } = useTranslation();
   const { addNotification, updateNotification } = useNotifications();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
-  // 状态
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [syncResult, setSyncResult] = useState<AgentSyncResponse | null>(null);
+  // ========== React Query 数据加载 ==========
+  const {
+    data: agentsData,
+    isLoading,
+    error: agentsError,
+    refetch: refetchAgents
+  } = useAgentsQuery();
+
+  const deleteAgentMutation = useDeleteAgentMutation();
+  const syncAgentsMutation = useSyncAgentsMutation();
+
+  const agents = agentsData || [];
+  const loading = isLoading;
+  const syncing = syncAgentsMutation.isPending;
+
+  // 可用模型列表
   const [availableModels, setAvailableModels] = useState<Set<string>>(new Set());
 
   // 置顶状态
@@ -136,12 +147,6 @@ const Agents = () => {
     });
   };
 
-  // 分类数据
-  const [categories, setCategories] = useState<{
-    counts: { builtin: number; user: number; project: number };
-    projects: Array<{ id: string; name: string; count: number }>;
-  } | null>(null);
-
   // 过滤和搜索
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
@@ -149,10 +154,10 @@ const Agents = () => {
   const [showOverridden, setShowOverridden] = useState(false);
   // 注意：后端已完全跳过 cache 目录，无需前端过滤
 
-  // 编辑/测试/创建模式
-  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
-  const [testingAgent, setTestingAgent] = useState<Agent | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  // 编辑/测试/创建模式 - 现在通过 URL 参数管理
+  // const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  // const [testingAgent, setTestingAgent] = useState<Agent | null>(null);
+  // const [isCreating, setIsCreating] = useState(false);
 
   // 操作下拉菜单
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
@@ -160,33 +165,6 @@ const Agents = () => {
   // 删除确认对话框
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  // 获取 agents 列表
-  const fetchAgents = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const response = await agentsApi.list({
-        limit: 1000,
-        active_only: !showOverridden
-      });
-
-      setAgents(response.items);
-    } catch (err) {
-      console.error('Failed to fetch agents:', err);
-      const message = err instanceof Error ? err.message : 'Failed to load agents';
-      setError(message);
-      addNotification({
-        type: 'error',
-        title: 'Failed to load agents',
-        message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [showOverridden, addNotification]);
 
   // 获取可用模型列表
   const fetchAvailableModels = useCallback(async () => {
@@ -205,51 +183,63 @@ const Agents = () => {
     }
   }, []);
 
-  // 获取分类数据
-  const fetchCategories = useCallback(async () => {
-    try {
-      const data = await agentsApi.getCategories();
+  // 初始加载可用模型
+  useEffect(() => {
+    fetchAvailableModels();
+  }, [fetchAvailableModels]);
+  const categories = React.useMemo(() => {
+    if (!agentsData) return null;
 
-      // 将 plugin scope 的 agent 重新分类到 user 或 project
-      // 需要获取所有 agents 来重新统计
-      const allAgentsResponse = await agentsApi.list({ limit: 1000 });
-      const allAgents = allAgentsResponse.items;
+    const allAgents = agentsData;
+    let builtinCount = 0;
+    let userCount = 0;
+    let projectCount = 0;
+    const projectGroups: Record<string, number> = {};
 
-      let userCount = data.counts.user || 0;
-      let projectCount = data.counts.project || 0;
+    // 遍历所有 agents 进行分类统计
+    allAgents.forEach((agent: Agent) => {
+      if (agent.scope === 'builtin') {
+        builtinCount++;
+      } else if (agent.scope === 'user') {
+        userCount++;
+      } else if (agent.scope === 'project') {
+        projectCount++;
+        const projectName = agent.meta?.project_name || extractProjectName(agent.meta?.path || '');
+        projectGroups[projectName] = (projectGroups[projectName] || 0) + 1;
+      } else if (agent.scope === 'plugin') {
+        const path = agent.meta?.path || '';
+        const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+        const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                 path.includes('/package.json') || path.includes('\\package.json');
+        const isUserPlugin = hasClaudePlugins && !hasProjectMarkers;
 
-      // 遍历所有 plugin scope 的 agents,根据路径重新分类
-      allAgents.forEach(agent => {
-        if (agent.scope === 'plugin') {
-          const path = agent.meta?.path || '';
-          // 判断是否在用户主目录下的插件（跨平台兼容）
-          // 用户插件：路径包含 /.claude/plugins/ 且不包含项目特征（如 .git, package.json 等的父目录）
-          const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
-          const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
-                                   path.includes('/package.json') || path.includes('\\package.json');
-          const isUserPlugin = hasClaudePlugins && !hasProjectMarkers;
-
-          if (isUserPlugin) {
-            userCount++;
-          } else {
-            projectCount++;
-          }
+        if (isUserPlugin) {
+          userCount++;
+        } else {
+          projectCount++;
+          const projectName = agent.meta?.project_name || extractProjectName(path);
+          projectGroups[projectName] = (projectGroups[projectName] || 0) + 1;
         }
-      });
+      }
+    });
 
-      const transformedData = {
-        counts: {
-          builtin: data.counts.builtin,
-          user: userCount,
-          project: projectCount
-        },
-        projects: data.projects
-      };
-      setCategories(transformedData);
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
-    }
-  }, []);
+    const projects = Object.entries(projectGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, count]) => ({
+        id: name,
+        name,
+        count,
+      }));
+
+    return {
+      counts: {
+        builtin: builtinCount,
+        user: userCount,
+        project: projectCount
+      },
+      projects
+    };
+  }, [agentsData]);
 
   // 同步 agents
   const handleSync = async () => {
@@ -260,34 +250,21 @@ const Agents = () => {
     });
 
     try {
-      setSyncing(true);
-      setError(null);
-      setSyncResult(null);
-
-      const result = await agentsApi.sync({
-        include_builtin: true
-      });
-
-      setSyncResult(result);
-      await fetchAgents();
-      await fetchCategories();
+      const result = await syncAgentsMutation.mutateAsync();
 
       updateNotification(notificationId, {
         type: 'success',
         title: 'Sync completed',
-        message: `${result.created} created, ${result.updated} updated`,
+        message: `${result.created} created, ${result.updated} updated, ${result.deleted} deleted`,
       });
     } catch (err) {
       console.error('Failed to sync agents:', err);
       const message = err instanceof Error ? err.message : 'Sync failed';
-      setError(message);
       updateNotification(notificationId, {
         type: 'error',
         title: 'Sync failed',
         message,
       });
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -306,16 +283,17 @@ const Agents = () => {
     if (!agentToDelete) return;
 
     try {
-      setIsDeleting(true);
-      await agentsApi.delete(agentToDelete.id, true);
-      await fetchAgents();
+      await deleteAgentMutation.mutateAsync(agentToDelete.id.toString());
       setDeleteDialogOpen(false);
       setAgentToDelete(null);
     } catch (err) {
       console.error('Failed to delete agent:', err);
-      setError(err instanceof Error ? err.message : 'Delete failed');
-    } finally {
-      setIsDeleting(false);
+      const message = err instanceof Error ? err.message : 'Delete failed';
+      addNotification({
+        type: 'error',
+        title: 'Delete failed',
+        message,
+      });
     }
   };
 
@@ -327,11 +305,11 @@ const Agents = () => {
       case 'configure':
       case 'edit':
         if (!agent.is_builtin) {
-          setEditingAgent(agent);
+          navigate(`/agents/${agent.id}/edit`);
         }
         break;
       case 'test':
-        setTestingAgent(agent);
+        navigate(`/agents/${agent.id}/test`);
         break;
       case 'duplicate':
         // TODO: 实现复制功能
@@ -341,23 +319,6 @@ const Agents = () => {
         break;
     }
   };
-
-  // 初始加载
-  useEffect(() => {
-    fetchAgents();
-    fetchCategories();
-    fetchAvailableModels();
-  }, [fetchAgents, fetchCategories, fetchAvailableModels]);
-
-  // 检测 URL 参数，自动打开创建表单
-  useEffect(() => {
-    const action = searchParams.get('action');
-    if (action === 'create') {
-      setIsCreating(true);
-      // 清除 URL 参数
-      setSearchParams({});
-    }
-  }, [searchParams, setSearchParams]);
 
   // 过滤和排序 agents
   const filteredAgents = agents
@@ -429,55 +390,6 @@ const Agents = () => {
       return 0;
     });
 
-  // 测试模式
-  if (testingAgent) {
-    return (
-      <AgentTestPanel
-        agent={testingAgent}
-        onBack={() => {
-          setTestingAgent(null);
-        }}
-        onEdit={(agent) => {
-          setTestingAgent(null);
-          setEditingAgent(agent);
-        }}
-      />
-    );
-  }
-
-  // 编辑器模式
-  if (editingAgent) {
-    return (
-      <AgentEditor
-        agent={editingAgent}
-        onBack={() => {
-          setEditingAgent(null);
-          fetchAgents();
-        }}
-        onSave={() => {
-          setEditingAgent(null);
-          fetchAgents();
-        }}
-      />
-    );
-  }
-
-  // 创建模式 - 使用 AgentEditor 组件（传入 null agent 表示创建模式）
-  if (isCreating) {
-    return (
-      <AgentEditor
-        agent={null}
-        onBack={() => {
-          setIsCreating(false);
-        }}
-        onSave={() => {
-          setIsCreating(false);
-          fetchAgents();
-        }}
-      />
-    );
-  }
-
   if (loading && agents.length === 0) {
     return <LoadingSpinner text="加载子代理..." />;
   }
@@ -508,65 +420,26 @@ const Agents = () => {
             <span className="hidden md:inline ml-2">{syncing ? '同步中...' : '同步'}</span>
           </ActionButton>
 
-          <ActionButton onClick={() => setIsCreating(true)} className="md:px-4 px-2 py-2 text-sm min-w-0">
+          <ActionButton onClick={() => navigate('/agents/create')} className="md:px-4 px-2 py-2 text-sm min-w-0">
             <Plus size={16} />
             <span className="hidden md:inline ml-2">新建</span>
           </ActionButton>
         </div>
       </header>
 
-      {/* 同步结果提示 */}
-      <AnimatePresence>
-        {syncResult && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="bg-green-500/10 border border-green-500/30 rounded-xl p-4"
-          >
-            <div className="flex items-center gap-3">
-              <CheckCircle2 size={20} className="text-green-400" />
-              <span className="text-green-400">
-                同步完成：{syncResult.created} 新增，{syncResult.updated} 更新，{syncResult.deleted} 删除
-              </span>
-              <button
-                onClick={() => setSyncResult(null)}
-                className="ml-auto text-gray-400 hover:text-white"
-              >
-                ×
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 错误提示 */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-          <div className="flex items-center gap-3">
-            <AlertCircle size={20} className="text-red-400" />
-            <span className="text-red-400">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-gray-400 hover:text-white"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 分类过滤 */}
-      {categories && (
-        <CategoryFilter
-          selectedCategory={selectedCategory}
-          selectedSubCategories={selectedSubCategories}
-          counts={categories.counts}
-          projectSubCategories={categories.projects}
-          onCategoryChange={setSelectedCategory}
-          onSubCategoriesChange={setSelectedSubCategories}
-        />
-      )}
+      <div className="min-h-[88px] md:min-h-[120px]">
+        {categories && (
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            selectedSubCategories={selectedSubCategories}
+            counts={categories.counts}
+            projectSubCategories={categories.projects}
+            onCategoryChange={setSelectedCategory}
+            onSubCategoriesChange={setSelectedSubCategories}
+          />
+        )}
+      </div>
 
       {/* 搜索和过滤 - 响应式布局 */}
       <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
@@ -598,17 +471,9 @@ const Agents = () => {
 
       {/* 子代理列表 - 响应式网格 */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
-        <AnimatePresence mode="popLayout">
-          {filteredAgents.map((agent) => (
-            <motion.div
-              key={agent.id}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.2 }}
-            >
-              <GlassCard
+        {filteredAgents.map((agent) => (
+          <div key={agent.id}>
+            <GlassCard
                 className={`
                   flex flex-col h-full p-6
                   ${agent.is_overridden ? 'opacity-60' : ''}
@@ -832,7 +697,7 @@ const Agents = () => {
                       e.stopPropagation();
                       const isModelUnavailable = agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model);
                       if (!isModelUnavailable) {
-                        setTestingAgent(agent);
+                        navigate(`/agents/${agent.id}/test`);
                       }
                     }}
                     disabled={agent.model && agent.model !== 'inherit' && !availableModels.has(agent.model)}
@@ -851,7 +716,7 @@ const Agents = () => {
                       e.preventDefault();
                       e.stopPropagation();
                       if (!agent.is_builtin) {
-                        setEditingAgent(agent);
+                        navigate(`/agents/${agent.id}/edit`);
                       }
                     }}
                     disabled={agent.is_builtin}
@@ -866,9 +731,8 @@ const Agents = () => {
                   </button>
                 </div>
               </GlassCard>
-            </motion.div>
+            </div>
           ))}
-        </AnimatePresence>
       </div>
 
       {/* 空状态 */}
@@ -892,7 +756,7 @@ const Agents = () => {
               <RefreshCw size={16} />
               同步本地
             </ActionButton>
-            <ActionButton onClick={() => setIsCreating(true)}>
+            <ActionButton onClick={() => navigate('/agents/create')}>
               <Plus size={16} />
               新建
             </ActionButton>
@@ -910,13 +774,13 @@ const Agents = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleteAgentMutation.isPending}>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              disabled={isDeleting}
+              disabled={deleteAgentMutation.isPending}
               className="bg-red-600 hover:bg-red-500 focus:ring-red-600"
             >
-              {isDeleting ? '删除中...' : '删除'}
+              {deleteAgentMutation.isPending ? '删除中...' : '删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

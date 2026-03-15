@@ -9,6 +9,7 @@ PID_DIR="$SCRIPT_DIR/.run"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 MICROVERSE_PID_FILE="$PID_DIR/microverse.pid"
+CADDY_PID_FILE="$PID_DIR/caddy.pid"
 
 echo "🛑 Stopping Open Adventure..."
 echo ""
@@ -111,6 +112,43 @@ else
     echo "ℹ️  No Microverse PID file found"
 fi
 
+# 停止 Caddy
+if [ -f "$CADDY_PID_FILE" ]; then
+    CADDY_PID=$(cat "$CADDY_PID_FILE")
+    if [ -n "$CADDY_PID" ] && kill -0 "$CADDY_PID" 2>/dev/null; then
+        echo "Stopping Caddy (PID: $CADDY_PID)..."
+        kill "$CADDY_PID" 2>/dev/null || true
+
+        # 等待进程退出（最多 5 秒）
+        for i in {1..10}; do
+            if ! kill -0 "$CADDY_PID" 2>/dev/null; then
+                echo "✅ Caddy stopped"
+                STOPPED_ANY=true
+                break
+            fi
+            sleep 0.5
+        done
+
+        # 如果还没停止，强制 kill
+        if kill -0 "$CADDY_PID" 2>/dev/null; then
+            echo "⚠️  Caddy didn't stop gracefully, forcing..."
+            kill -9 "$CADDY_PID" 2>/dev/null || true
+            echo "✅ Caddy force stopped"
+            STOPPED_ANY=true
+        fi
+    else
+        echo "⚠️  Caddy PID file exists but process is not running"
+    fi
+    rm -f "$CADDY_PID_FILE"
+else
+    echo "ℹ️  No Caddy PID file found"
+fi
+
+# 使用 caddy stop 命令确保完全停止
+if command -v caddy &> /dev/null; then
+    caddy stop 2>/dev/null && echo "✅ Caddy stopped via command" || true
+fi
+
 # 额外保险：清理可能残留的进程
 echo ""
 echo "Checking for any remaining processes..."
@@ -161,6 +199,12 @@ fi
 if lsof -Pi :5174 -sTCP:LISTEN -t >/dev/null 2>&1; then
     echo "⚠️  Port 5174 still occupied, forcing cleanup..."
     lsof -ti :5174 | xargs kill -9 2>/dev/null || true
+    STOPPED_ANY=true
+fi
+
+if lsof -Pi :8443 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    echo "⚠️  Port 8443 (Caddy) still occupied, forcing cleanup..."
+    lsof -ti :8443 | xargs kill -9 2>/dev/null || true
     STOPPED_ANY=true
 fi
 

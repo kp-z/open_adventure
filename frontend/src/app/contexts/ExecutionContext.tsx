@@ -248,13 +248,21 @@ export const ExecutionProvider: React.FC<ExecutionProviderProps> = ({ children }
         });
       } catch (error) {
         console.error('[ExecutionContext] Failed to restore active executions:', error);
-        if (lastWsErrorRef.current !== 'restore_error') {
+
+        // 检查是否是网络连接错误（后端未启动）
+        const isNetworkError = error instanceof TypeError &&
+          (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'));
+
+        // 只在非网络错误时显示通知（网络错误说明后端未启动，这是正常情况）
+        if (!isNetworkError && lastWsErrorRef.current !== 'restore_error') {
           addNotification({
             type: 'error',
             title: '恢复执行记录失败',
             message: '无法恢复活跃的 Terminal 执行记录，请刷新后重试。',
           });
           lastWsErrorRef.current = 'restore_error';
+        } else if (isNetworkError) {
+          console.log('[ExecutionContext] Backend not available, skipping execution restore');
         }
       }
     };

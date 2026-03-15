@@ -1,13 +1,16 @@
 """
-Agent Schemas - 匹配 Claude Code 官方 Subagent 规范
+Agent Schemas - 统一的 Agent API 接口定义
 
-根据 https://code.claude.com/docs/en/sub-agents 文档定义
+支持 Claude Code 和 OpenClaw 两种框架的 Agent 配置
+根据 https://code.claude.com/docs/en/sub-agents 和 OpenClaw 文档定义
 """
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Literal, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Literal, Optional, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict, validator
+
+from app.models.agent import AgentFramework, AgentType
 
 
 class AgentHook(BaseModel):
@@ -38,59 +41,81 @@ class AgentOverrideInfo(BaseModel):
 
 class AgentBase(BaseModel):
     """
-    Claude Code 子代理基础 Schema
+    统一的 Agent 基础 Schema
 
-    包含所有官方支持的配置项
+    支持 Claude Code 和 OpenClaw 两种框架
     """
     # 必填字段
-    name: str = Field(..., min_length=1, max_length=100, description="唯一标识符，小写字母和连字符")
-    description: str = Field("", max_length=100000, description="Claude 何时委托给此子代理")
+    name: str = Field(..., min_length=1, max_length=100, description="Agent 名称")
+    description: str = Field("", max_length=100000, description="Agent 描述")
 
-    # 系统提示（Markdown body）
+    # 框架和类型
+    framework: AgentFramework = Field(
+        AgentFramework.CLAUDE_CODE,
+        description="AI 框架：claude_code, openclaw, hybrid"
+    )
+    agent_type: AgentType = Field(
+        AgentType.SUBAGENT,
+        description="Agent 类型：subagent, session, workflow, terminal"
+    )
+
+    # 系统提示（通用字段）
     system_prompt: Optional[str] = Field(None, max_length=100000, description="系统提示词")
 
-    # 模型选择
+    # 模型选择（通用字段）
     model: Optional[str] = Field(
         "inherit",
         max_length=50,
         description="模型：sonnet, opus, haiku, 或 inherit"
     )
 
-    # 工具控制
+    # === Claude Code 专用字段 ===
     tools: List[str] = Field(
         default_factory=list,
-        description="允许使用的工具列表，为空则继承所有"
+        description="允许使用的工具列表"
     )
     disallowed_tools: List[str] = Field(
         default_factory=list,
         description="禁止使用的工具列表"
     )
-
-    # 权限模式
     permission_mode: Optional[str] = Field(
         "default",
         description="权限模式：default, acceptEdits, dontAsk, bypassPermissions, plan"
     )
-
-    # 高级配置
     max_turns: Optional[int] = Field(None, description="最大轮次限制")
-    skills: List[str] = Field(default_factory=list, description="预加载的技能列表")
-    mcp_servers: list = Field(default_factory=list, description="MCP 服务器配置")
-    hooks: Optional[dict] = Field(None, description="生命周期钩子")
     memory: Optional[str] = Field(None, description="持久化内存作用域：user, project, local")
     background: bool = Field(False, description="是否后台运行")
     isolation: Optional[str] = Field(None, description="隔离模式：worktree")
 
-    # 作用域信息
+    # === OpenClaw 专用字段 ===
+    persist: Optional[str] = Field(None, description="持久化配置：true, project, custom")
+    context: Optional[Dict[str, Any]] = Field(None, description="上下文配置")
+    retry: Optional[int] = Field(3, description="重试次数")
+    backoff: Optional[str] = Field("exponential", description="退避策略：none, linear, exponential")
+    permissions: List[str] = Field(default_factory=list, description="OpenClaw 权限列表")
+
+    # === 通用字段 ===
+    skills: List[str] = Field(default_factory=list, description="预加载的技能列表")
+    mcp_servers: list = Field(default_factory=list, description="MCP 服务器配置")
+    hooks: Optional[dict] = Field(None, description="生命周期钩子")
+
+    # 作用域和优先级
     scope: Literal["builtin", "user", "project", "plugin"] = Field(
         "user",
         description="作用域：builtin, user, project, plugin"
     )
     priority: int = Field(3, description="优先级（数字越小越高）")
 
+    # 分类和标签
+    category: Optional[str] = Field(None, description="分类")
+    tags: List[str] = Field(default_factory=list, description="标签列表")
+
+    # 模板
+    template_id: Optional[int] = Field(None, description="基于的模板 ID")
+
     # 状态标记
     is_builtin: bool = Field(False, description="是否内置")
-    is_active: bool = Field(True, description="是否激活（未被覆盖）")
+    is_active: bool = Field(True, description="是否激活")
     is_overridden: bool = Field(False, description="是否被更高优先级覆盖")
     override_info: Optional[AgentOverrideInfo] = Field(None, description="覆盖信息")
 
@@ -100,44 +125,78 @@ class AgentBase(BaseModel):
 
 class AgentCreate(BaseModel):
     """
-    创建子代理 Schema
+    创建 Agent Schema
 
-    用于在用户级或项目级创建新的子代理
+    支持创建 Claude Code 或 OpenClaw Agent
     """
-    name: str = Field(..., min_length=1, max_length=100, pattern=r'^[a-z][a-z0-9-]*$')
+    name: str = Field(..., min_length=1, max_length=100)
     description: str = Field(..., min_length=1, max_length=100000)
+    framework: AgentFramework = Field(AgentFramework.CLAUDE_CODE)
+    agent_type: AgentType = Field(AgentType.SUBAGENT)
     system_prompt: Optional[str] = Field(None, max_length=100000)
     model: Optional[str] = Field("inherit", max_length=50)
+
+    # Claude Code 字段
     tools: List[str] = Field(default_factory=list)
     disallowed_tools: List[str] = Field(default_factory=list)
     permission_mode: Optional[str] = Field("default")
     max_turns: Optional[int] = Field(None)
-    skills: List[str] = Field(default_factory=list)
-    mcp_servers: list = Field(default_factory=list)
-    hooks: Optional[dict] = Field(None)
     memory: Optional[str] = Field(None)
     background: bool = Field(False)
     isolation: Optional[str] = Field(None)
-    scope: Literal["user", "project"] = Field("user", description="创建位置：user 或 project")
-    meta: Optional[dict] = Field(None, description="元数据，project scope 需包含 project_path")
+
+    # OpenClaw 字段
+    persist: Optional[str] = Field(None)
+    context: Optional[Dict[str, Any]] = Field(None)
+    retry: Optional[int] = Field(3)
+    backoff: Optional[str] = Field("exponential")
+    permissions: List[str] = Field(default_factory=list)
+
+    # 通用字段
+    skills: List[str] = Field(default_factory=list)
+    mcp_servers: list = Field(default_factory=list)
+    hooks: Optional[dict] = Field(None)
+    scope: Literal["user", "project"] = Field("user")
+    priority: int = Field(3)
+    category: Optional[str] = Field(None)
+    tags: List[str] = Field(default_factory=list)
+    template_id: Optional[int] = Field(None)
+    meta: Optional[dict] = Field(None)
 
 
 class AgentUpdate(BaseModel):
-    """更新子代理 Schema"""
+    """更新 Agent Schema"""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=100000)
+    framework: Optional[AgentFramework] = None
+    agent_type: Optional[AgentType] = None
     system_prompt: Optional[str] = Field(None, max_length=100000)
     model: Optional[str] = Field(None, max_length=50)
+
+    # Claude Code 字段
     tools: Optional[List[str]] = None
     disallowed_tools: Optional[List[str]] = None
     permission_mode: Optional[str] = None
     max_turns: Optional[int] = None
-    skills: Optional[List[str]] = None
-    mcp_servers: Optional[list] = None
-    hooks: Optional[dict] = None
     memory: Optional[str] = None
     background: Optional[bool] = None
     isolation: Optional[str] = None
+
+    # OpenClaw 字段
+    persist: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+    retry: Optional[int] = None
+    backoff: Optional[str] = None
+    permissions: Optional[List[str]] = None
+
+    # 通用字段
+    skills: Optional[List[str]] = None
+    mcp_servers: Optional[list] = None
+    hooks: Optional[dict] = None
+    priority: Optional[int] = None
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
+    is_active: Optional[bool] = None
     meta: Optional[dict] = None
 
 

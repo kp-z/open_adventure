@@ -77,7 +77,7 @@ fi
 echo ""
 
 # 检查 PyInstaller
-echo -e "${YELLOW}[3/6] 检查 PyInstaller...${NC}"
+echo -e "${YELLOW}[3/7] 检查 PyInstaller...${NC}"
 if ! command -v pyinstaller &> /dev/null; then
     echo -e "${RED}❌ PyInstaller 未安装${NC}"
     echo -e "${YELLOW}正在安装 PyInstaller...${NC}"
@@ -86,8 +86,22 @@ fi
 echo -e "${GREEN}✓ PyInstaller 已安装: $(pyinstaller --version)${NC}"
 echo ""
 
+# 检查依赖项
+echo -e "${YELLOW}[4/7] 检查 Python 依赖项...${NC}"
+if [ -f "$BACKEND_DIR/test_imports.py" ]; then
+    python "$BACKEND_DIR/test_imports.py"
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ 依赖项检查失败${NC}"
+        echo -e "${YELLOW}请确保所有依赖都已安装: pip install -r backend/requirements.txt${NC}"
+        exit 1
+    fi
+else
+    echo -e "${YELLOW}⚠️  未找到 test_imports.py，跳过依赖检查${NC}"
+fi
+echo ""
+
 # 清理旧的构建产物
-echo -e "${YELLOW}[4/6] 清理旧的构建产物...${NC}"
+echo -e "${YELLOW}[5/7] 清理旧的构建产物...${NC}"
 if [ -d "$BACKEND_DIR/dist" ]; then
     rm -rf "$BACKEND_DIR/dist"
     echo -e "${GREEN}✓ 已删除旧的 backend/dist 目录${NC}"
@@ -99,7 +113,7 @@ fi
 echo ""
 
 # 使用 PyInstaller 构建
-echo -e "${YELLOW}[5/6] 使用 PyInstaller 构建二进制...${NC}"
+echo -e "${YELLOW}[6/7] 使用 PyInstaller 构建二进制...${NC}"
 cd "$BACKEND_DIR"
 pyinstaller open_adventure.spec --clean
 
@@ -111,7 +125,7 @@ echo -e "${GREEN}✓ PyInstaller 构建成功${NC}"
 echo ""
 
 # 验证构建产物
-echo -e "${YELLOW}[6/6] 验证构建产物...${NC}"
+echo -e "${YELLOW}[7/7] 验证构建产物...${NC}"
 # PyInstaller onefile 模式输出到 backend/dist 目录，需要移动到项目根目录的 dist
 BACKEND_DIST_DIR="$BACKEND_DIR/dist"
 BINARY_PATH="$BACKEND_DIST_DIR/open-adventure"

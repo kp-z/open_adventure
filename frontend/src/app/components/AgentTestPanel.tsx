@@ -6,7 +6,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  ArrowLeft,
   Play,
   Loader,
   CheckCircle,
@@ -57,7 +56,6 @@ import '../../styles/markdown.css';
 
 interface AgentTestPanelProps {
   agent: Agent;
-  onBack: () => void;
   onEdit?: (agent: Agent) => void;
 }
 
@@ -147,7 +145,6 @@ const saveTestHistory = (history: TestResult[]) => {
 
 export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
   agent,
-  onBack,
   onEdit,
 }) => {
   // 是否可以编辑（非内置 agent 可以编辑）
@@ -652,72 +649,26 @@ Agent 描述: ${agent.description}
   const agentColor = getAgentColor();
 
   return (
-    <div className="max-w-7xl mx-auto pb-20">
-      {/* 头部 - 融入 Agent 信息 */}
-      <header className="flex items-start gap-4 mb-8">
-        {/* Agent 图标 */}
-        <div
-          className="w-16 h-16 rounded-2xl flex items-center justify-center border-2 flex-shrink-0"
-          style={{
-            backgroundColor: `${agentColor}20`,
-            borderColor: agentColor
-          }}
-        >
-          {agent.is_builtin ? (
-            <Shield size={32} style={{ color: agentColor }} />
-          ) : (
-            <Cpu size={32} style={{ color: agentColor }} />
-          )}
-        </div>
-
-        {/* Agent 信息 */}
+    <div className="space-y-4 md:space-y-6 pt-6">
+      {/* 页面标题和操作 - 响应式布局 */}
+      <header className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight truncate uppercase">{agent.name}</h1>
-            {/* 标签 */}
-            <span
-              className="px-2 py-0.5 rounded-full text-xs font-bold capitalize"
-              style={{
-                backgroundColor: `${agentColor}20`,
-                color: agentColor
-              }}
-            >
-              {agent.scope}
-            </span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${modelColors[agent.model || 'inherit']} bg-white/5`}>
-              {(agent.model || 'inherit').toUpperCase()}
-            </span>
-            {/* Plugin name 或 Project name */}
-            {agent.scope === 'plugin' && agent.meta?.plugin_name && (
-              <span className="px-2 py-0.5 text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-md">
-                {agent.meta.plugin_name}
-              </span>
-            )}
-            {agent.scope === 'project' && agent.meta?.path && (
-              <span className="px-2 py-0.5 text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-md">
-                {extractProjectName(agent.meta.path)}
-              </span>
-            )}
-          </div>
-          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-2">{agent.description}</p>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
+            {agent.name}
+          </h1>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
+            {agent.description}
+          </p>
         </div>
 
-        {/* 右侧操作区 */}
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {/* 测试次数 */}
-          <div className="flex items-center gap-2 text-sm text-gray-400 px-3 py-2 bg-white/5 rounded-xl">
-            <Clock size={16} />
-            <span>{testHistory.length} 次测试</span>
-          </div>
-
-          {/* 编辑按钮 */}
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
           {canEdit && onEdit && (
             <button
               onClick={() => onEdit(agent)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all text-sm"
+              className="md:px-4 px-2 py-2 text-sm min-w-0 flex items-center gap-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl font-bold text-blue-400 transition-all"
             >
               <Edit3 size={16} />
-              编辑
+              <span className="hidden md:inline">编辑</span>
             </button>
           )}
         </div>

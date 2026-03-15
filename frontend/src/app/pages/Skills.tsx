@@ -46,6 +46,13 @@ import { getSkillIcon } from '../lib/skill-icons';
 import { getCategoryConfig } from '../../lib/category-icons';
 import { skillsApi, claudeApi, transformSkillsToUI, type UISkill } from '@/lib/api';
 import {
+  useSkillsQuery,
+  useCategoriesQuery,
+  useSemanticCategoriesQuery,
+  useDeleteSkillMutation,
+  useSyncSkillsMutation
+} from '../hooks/useSkillsQuery';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -62,11 +69,92 @@ const Skills = () => {
   const { addNotification, updateNotification } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ========== API 数据状态 ==========
-  const [skills, setSkills] = useState<UISkill[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  // ========== React Query 数据加载 ==========
+  const {
+    data: skillsData,
+    isLoading: skillsLoading,
+    error: skillsError,
+    refetch: refetchSkills
+  } = useSkillsQuery();
+
+  const {
+    data: categoriesData,
+    isLoading: categoriesLoading
+  } = useCategoriesQuery();
+
+  const {
+    data: semanticCategoriesData,
+    isLoading: semanticCategoriesLoading
+  } = useSemanticCategoriesQuery();
+
+  const deleteSkillMutation = useDeleteSkillMutation();
+  const syncSkillsMutation = useSyncSkillsMutation();
+
+  // 转换数据格式
+  const skills = skillsData ? transformSkillsToUI(skillsData.items || skillsData) : [];
+  const loading = skillsLoading || categoriesLoading || semanticCategoriesLoading;
+  const error = skillsError ? (skillsError as Error).message : null;
+  const syncing = syncSkillsMutation.isPending;
+
+  // 处理分类数据
+  const categories = React.useMemo(() => {
+    if (!categoriesData || !skillsData) return null;
+
+    const allSkills = skillsData.items || skillsData;
+    let userCount = categoriesData.counts.user || 0;
+    let projectCount = categoriesData.counts.project || 0;
+    const userGroups: Record<string, number> = {};
+
+    // 遍历所有 plugin scope 的 skills,根据路径重新分类
+    allSkills.forEach((skill: any) => {
+      if (skill.source === 'user') {
+        userGroups.public = (userGroups.public || 0) + 1;
+      }
+
+      if (skill.source === 'plugin') {
+        const path = skill.meta?.path || '';
+        const pluginName = skill.meta?.plugin_name;
+        const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
+        const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
+                                 path.includes('/package.json') || path.includes('\\package.json');
+        const isUserPlugin = hasClaudePlugins && !hasProjectMarkers;
+
+        if (isUserPlugin) {
+          userCount++;
+          if (pluginName) {
+            const key = `plugin:${pluginName}`;
+            userGroups[key] = (userGroups[key] || 0) + 1;
+          }
+        } else {
+          projectCount++;
+        }
+      }
+    });
+
+    if (userCount > 0 && Object.keys(userGroups).length === 0) {
+      userGroups.public = userCount;
+    }
+
+    const userSubCategories = Object.entries(userGroups)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([id, count]) => ({
+        id,
+        name: id === 'public' ? 'public' : id.replace('plugin:', 'plugin/'),
+        count,
+      }));
+
+    return {
+      counts: {
+        builtin: categoriesData.counts.builtin,
+        user: userCount,
+        project: projectCount
+      },
+      projects: categoriesData.projects,
+      users: userSubCategories
+    };
+  }, [categoriesData, skillsData]);
+
+  const semanticCategories = semanticCategoriesData;
 
   // ========== 置顶状态 ==========
   const [pinnedSkills, setPinnedSkills] = useState<Set<number>>(() => {
@@ -94,18 +182,7 @@ const Skills = () => {
   };
 
   // ========== 分类数据 ==========
-  const [categories, setCategories] = useState<{
-    counts: { builtin: number; user: number; project: number };
-    projects: Array<{ id: string; name: string; count: number }>;
-    users: Array<{ id: string; name: string; count: number }>;
-  } | null>(null);
-
-  // ========== 语义化分类数据 ==========
-  const [semanticCategories, setSemanticCategories] = useState<{
-    categories: Record<string, number>;
-    total_skills: number;
-    classified_skills: number;
-  } | null>(null);
+  // 已通过 React Query 加载，见上方 categories 和 semanticCategories
 
   // ========== UI 交互状态 ==========
   const [search, setSearch] = useState('');
@@ -121,120 +198,11 @@ const Skills = () => {
   // ========== 删除确认对话框状态 ==========
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [skillToDelete, setSkillToDelete] = useState<{ id: number; name: string } | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);  // 当前打开的菜单ID
 
   // ========== 质量评估详情弹窗状态 ==========
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
   const [selectedSkillForQuality, setSelectedSkillForQuality] = useState<UISkill | null>(null);
-
-  // ========== 获取技能列表 ==========
-  const fetchSkills = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await skillsApi.list({ limit: 1000 });
-      const transformed = transformSkillsToUI(response.items);
-      setSkills(transformed);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '获取技能列表失败';
-      setError(message);
-      addNotification({
-        type: 'error',
-        title: 'Failed to load skills',
-        message,
-      });
-      console.error('Failed to fetch skills:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [addNotification]);
-
-  // ========== 获取分类数据 ==========
-  const fetchCategories = useCallback(async () => {
-    try {
-      const data = await skillsApi.getCategories();
-
-      // 将 plugin scope 的 skill 重新分类到 user 或 project
-      // 需要获取所有 skills 来重新统计
-      const allSkillsResponse = await skillsApi.list({ limit: 1000 });
-      const allSkills = allSkillsResponse.items;
-
-      let userCount = data.counts.user || 0;
-      let projectCount = data.counts.project || 0;
-      const userGroups: Record<string, number> = {};
-
-      // 遍历所有 plugin scope 的 skills,根据路径重新分类
-      allSkills.forEach(skill => {
-        if (skill.source === 'user') {
-          userGroups.public = (userGroups.public || 0) + 1;
-        }
-
-        if (skill.source === 'plugin') {
-          const path = (skill as any).meta?.path || '';
-          const pluginName = (skill as any).meta?.plugin_name;
-          // 判断是否在用户主目录下的插件（跨平台兼容）
-          // 用户插件：路径包含 /.claude/plugins/ 且不包含项目特征（如 .git, package.json 等的父目录）
-          const hasClaudePlugins = path.includes('/.claude/plugins/') || path.includes('\\.claude\\plugins\\');
-          const hasProjectMarkers = path.includes('/.git/') || path.includes('\\.git\\') ||
-                                   path.includes('/package.json') || path.includes('\\package.json');
-          const isUserPlugin = hasClaudePlugins && !hasProjectMarkers;
-
-          if (isUserPlugin) {
-            userCount++;
-            if (pluginName) {
-              const key = `plugin:${pluginName}`;
-              userGroups[key] = (userGroups[key] || 0) + 1;
-            }
-          } else {
-            projectCount++;
-          }
-        }
-      });
-
-      if (userCount > 0 && Object.keys(userGroups).length === 0) {
-        userGroups.public = userCount;
-      }
-
-      const userSubCategories = Object.entries(userGroups)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([id, count]) => ({
-          id,
-          name: id === 'public' ? 'public' : id.replace('plugin:', 'plugin/'),
-          count,
-        }));
-
-      const transformedData = {
-        counts: {
-          builtin: data.counts.builtin,
-          user: userCount,
-          project: projectCount
-        },
-        projects: data.projects,
-        users: userSubCategories
-      };
-      setCategories(transformedData);
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
-    }
-  }, []);
-
-  // ========== 获取语义化分类数据 ==========
-  const fetchSemanticCategories = useCallback(async () => {
-    try {
-      const data = await skillsApi.getSemanticCategories();
-      setSemanticCategories(data);
-    } catch (err) {
-      console.error('Failed to fetch semantic categories:', err);
-    }
-  }, []);
-
-  // ========== 初始加载 ==========
-  useEffect(() => {
-    fetchSkills();
-    fetchCategories();
-    fetchSemanticCategories();
-  }, [fetchSkills, fetchCategories, fetchSemanticCategories]);
 
   // ========== 检测 URL 参数，自动打开创建表单 ==========
   useEffect(() => {
@@ -255,13 +223,8 @@ const Skills = () => {
       message: 'Scanning local skills...',
     });
 
-    setSyncing(true);
-    setError(null);
     try {
-      await claudeApi.syncSkills();
-      await fetchSkills();
-      await fetchCategories();
-      await fetchSemanticCategories();
+      await syncSkillsMutation.mutateAsync();
 
       updateNotification(notificationId, {
         type: 'success',
@@ -270,15 +233,12 @@ const Skills = () => {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : '同步失败';
-      setError(message);
       updateNotification(notificationId, {
         type: 'error',
         title: 'Sync failed',
         message,
       });
       console.error('Failed to sync skills:', err);
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -301,22 +261,22 @@ const Skills = () => {
   // 执行删除操作
   const handleConfirmDelete = async () => {
     if (!skillToDelete) return;
-    
+
     console.log('[Skills] Proceeding to delete skill:', skillToDelete.id);
-    setIsDeleting(true);
-    
+
     try {
-      await skillsApi.delete(skillToDelete.id);
+      await deleteSkillMutation.mutateAsync(skillToDelete.id.toString());
       console.log('[Skills] Skill deleted successfully');
-      setSkills(prev => prev.filter(s => s.id !== skillToDelete.id));
       setDeleteDialogOpen(false);
       setSkillToDelete(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : '删除失败';
-      setError(message);
       console.error('[Skills] Failed to delete skill:', err);
-    } finally {
-      setIsDeleting(false);
+      addNotification({
+        type: 'error',
+        title: 'Delete failed',
+        message,
+      });
     }
   };
 
@@ -527,15 +487,9 @@ const Skills = () => {
 
         {/* Library Shelves */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          <AnimatePresence>
-            {filteredSkills.map((skill, idx) => (
-              <motion.div
-                key={skill.id}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-              >
-                <GameCard 
+          {filteredSkills.map((skill, idx) => (
+            <div key={skill.id}>
+              <GameCard 
                   rarity={skill.rarity as any} 
                   className="group h-full flex flex-col p-0 overflow-visible cursor-pointer relative"
                   onClick={() => handleEditSkill(skill.id)}
@@ -693,9 +647,8 @@ const Skills = () => {
                     </div>
                   </div>
                 </GameCard>
-              </motion.div>
+              </div>
             ))}
-          </AnimatePresence>
         </div>
         
         {/* 删除确认对话框 */}
@@ -712,16 +665,16 @@ const Skills = () => {
             <AlertDialogFooter>
               <AlertDialogCancel 
                 className="bg-gray-800 border-yellow-500/20 text-white hover:bg-gray-700"
-                disabled={isDeleting}
+                disabled={deleteSkillMutation.isPending}
               >
                 取消
               </AlertDialogCancel>
               <AlertDialogAction
                 className="bg-red-600 text-white hover:bg-red-700"
                 onClick={handleConfirmDelete}
-                disabled={isDeleting}
+                disabled={deleteSkillMutation.isPending}
               >
-                {isDeleting ? (
+                {deleteSkillMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     删除中...
@@ -781,20 +734,23 @@ const Skills = () => {
       </header>
 
       {/* Category Filter */}
-      {categories && (
-        <CategoryFilter
-          selectedCategory={selectedCategory}
-          selectedSubCategories={selectedSubCategories}
-          counts={categories.counts}
-          projectSubCategories={categories.projects}
-          pluginSubCategories={categories.users}
-          onCategoryChange={setSelectedCategory}
-          onSubCategoriesChange={setSelectedSubCategories}
-        />
-      )}
+      <div className="min-h-[88px] md:min-h-[120px]">
+        {categories && (
+          <CategoryFilter
+            selectedCategory={selectedCategory}
+            selectedSubCategories={selectedSubCategories}
+            counts={categories.counts}
+            projectSubCategories={categories.projects}
+            pluginSubCategories={categories.users}
+            onCategoryChange={setSelectedCategory}
+            onSubCategoriesChange={setSelectedSubCategories}
+          />
+        )}
+      </div>
 
       {/* Semantic Category Filter */}
-      {semanticCategories && Object.keys(semanticCategories.categories).length > 0 && (() => {
+      <div className="min-h-[32px]">
+        {semanticCategories && Object.keys(semanticCategories.categories).length > 0 && (() => {
         // 根据当前选中的 Scope 动态计算每个分类的数量
         const filteredCategoryCounts: Record<string, number> = {};
 
@@ -904,6 +860,7 @@ const Skills = () => {
           </div>
         );
       })()}
+      </div>
 
       {/* Search */}
       <div className="relative">
@@ -920,16 +877,9 @@ const Skills = () => {
       {/* Grid */}
       {/* Skills Grid - 响应式网格 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-        <AnimatePresence>
-          {filteredSkills.map((skill, idx) => (
-            <motion.div
-              key={skill.id}
-              layout
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-            >
-              <GlassCard
+        {filteredSkills.map((skill, idx) => (
+          <div key={skill.id}>
+            <GlassCard
                 className="h-full flex flex-col group cursor-pointer hover:border-blue-500/50 transition-colors"
                 onClick={() => handleEditSkill(skill.id)}
               >
@@ -1125,9 +1075,8 @@ const Skills = () => {
                   <span className="text-[10px] text-gray-500 font-mono">{skill.usage.toLocaleString()} {t('runs' as any)}</span>
                 </div>
               </GlassCard>
-            </motion.div>
+            </div>
           ))}
-        </AnimatePresence>
 
         {/* Create Card */}
         <button 
@@ -1153,18 +1102,18 @@ const Skills = () => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel 
+            <AlertDialogCancel
               className="bg-gray-800 border-white/10 text-white hover:bg-gray-700"
-              disabled={isDeleting}
+              disabled={deleteSkillMutation.isPending}
             >
               取消
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleConfirmDelete}
-              disabled={isDeleting}
+              disabled={deleteSkillMutation.isPending}
             >
-              {isDeleting ? (
+              {deleteSkillMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   删除中...

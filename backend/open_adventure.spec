@@ -48,8 +48,9 @@ if config_dir.exists():
 else:
     print("⚠️  警告: app/config 目录不存在")
 
-# 隐藏导入（只保留运行时确实需要的模块，避免引用不存在的旧路径）
+# 隐藏导入（确保所有运行时需要的模块都被包含）
 hiddenimports = [
+    # App 模块
     'app',
     'app.main',
     'app.api',
@@ -62,33 +63,98 @@ hiddenimports = [
     'app.core',
     'app.core.database',
     'app.core.logging',
+    'app.core.security',
+    'app.core.auth_optional',
+    'app.core.exceptions',
+    'app.core.utils',
+    'app.core.tag_definitions',
+    'app.config',
+    'app.config.settings',
     'app.models',
     'app.repositories',
     'app.services',
     'app.adapters',
     'app.adapters.claude',
+    'app.schemas',
+
+    # Uvicorn 和 FastAPI
     'uvicorn',
     'uvicorn.config',
     'uvicorn.server',
     'uvicorn.main',
     'uvicorn.logging',
+    'uvicorn.loops',
     'uvicorn.loops.auto',
+    'uvicorn.protocols',
+    'uvicorn.protocols.http',
     'uvicorn.protocols.http.auto',
+    'uvicorn.protocols.websockets',
     'uvicorn.protocols.websockets.auto',
+    'uvicorn.lifespan',
     'uvicorn.lifespan.on',
     'fastapi',
     'fastapi.staticfiles',
+    'fastapi.responses',
+    'fastapi.middleware',
+    'fastapi.middleware.cors',
+    'starlette',
+    'starlette.middleware',
     'starlette.middleware.base',
+    'starlette.middleware.cors',
+    'starlette.responses',
+    'starlette.staticfiles',
+    'starlette.websockets',
+
+    # SQLAlchemy 和数据库
     'sqlalchemy',
+    'sqlalchemy.ext',
     'sqlalchemy.ext.asyncio',
     'sqlalchemy.ext.asyncio.engine',
     'sqlalchemy.ext.asyncio.session',
+    'sqlalchemy.ext.declarative',
+    'sqlalchemy.orm',
+    'sqlalchemy.pool',
+    'sqlalchemy.dialects',
+    'sqlalchemy.dialects.sqlite',
     'aiosqlite',
     'greenlet',
-    'anthropic',
+    'sqlite3',
+
+    # Pydantic
     'pydantic',
+    'pydantic.fields',
+    'pydantic.main',
+    'pydantic.types',
     'pydantic_settings',
+    'pydantic_core',
+
+    # Anthropic SDK
+    'anthropic',
+    'anthropic.types',
+    'anthropic.resources',
+
+    # 其他依赖
     'dotenv',
+    'yaml',
+    'aiohttp',
+    'aiohttp.client',
+    'aiohttp.web',
+    'psutil',
+    'typing_extensions',
+    'multipart',
+    'python_multipart',
+
+    # 安全相关
+    'jose',
+    'jose.jwt',
+    'passlib',
+    'passlib.context',
+    'bcrypt',
+    'cryptography',
+    'cryptography.fernet',
+    'cryptography.hazmat',
+    'cryptography.hazmat.primitives',
+    'cryptography.hazmat.backends',
 ]
 
 a = Analysis(
@@ -97,10 +163,24 @@ a = Analysis(
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=['hooks'],  # 添加自定义 hooks 目录
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        # 排除不需要的测试和开发工具
+        'pytest',
+        'pytest_asyncio',
+        'unittest',
+        'test',
+        'tests',
+        # 排除不需要的 GUI 库
+        'tkinter',
+        'matplotlib',
+        'PIL',
+        # 排除不需要的文档工具
+        'sphinx',
+        'docutils',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

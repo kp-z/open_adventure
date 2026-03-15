@@ -54,11 +54,13 @@ mkdir -p "$PID_DIR"
 BACKEND_PID_FILE="$PID_DIR/backend.pid"
 FRONTEND_PID_FILE="$PID_DIR/frontend.pid"
 MICROVERSE_PID_FILE="$PID_DIR/microverse.pid"
+CADDY_PID_FILE="$PID_DIR/caddy.pid"
 
 # 固定默认端口（除非用户显式选择新端口）
 BACKEND_PORT=38080
 FRONTEND_PORT=5173
 MICROVERSE_PORT=5174
+CADDY_PORT=8443
 
 # 检查运行模式参数
 DAEMON_MODE=false
@@ -119,6 +121,177 @@ if [ -f "$SCRIPT_DIR/scripts/install_plugins.sh" ]; then
 else
     echo "⚠️  Plugin installation script not found, skipping..."
     echo ""
+fi
+
+# ============ Caddy HTTPS 代理设置 ============
+echo "🔐 Setting up Caddy HTTPS proxy..."
+
+# 创建 Caddy 配置目录
+CADDY_DIR="$SCRIPT_DIR/scripts/caddy"
+mkdir -p "$CADDY_DIR"
+
+# 检查 Caddy 是否已安装
+CADDY_AVAILABLE=false
+CADDY_USER_ENABLED=false
+
+if command -v caddy &> /dev/null; then
+    CADDY_AVAILABLE=true
+    echo "✅ Caddy is installed"
+
+    # 非交互模式：默认启用 Caddy
+    if [ "$NON_INTERACTIVE" = true ]; then
+        CADDY_USER_ENABLED=true
+        echo "Running in non-interactive mode, Caddy HTTPS proxy will be enabled."
+    else
+        # 交互模式：询问是否启用 Caddy
+        echo ""
+        echo "Caddy can provide HTTPS access for /microverse (required for Godot Web Secure Context)"
+        echo "This will start Caddy on port $CADDY_PORT with automatic TLS certificates."
+        echo ""
+        echo "Would you like to enable Caddy HTTPS proxy?"
+        echo "  [y] Yes, enable HTTPS proxy (Recommended for /microverse)"
+        echo "  [n] No, skip for now"
+        echo ""
+
+        while true; do
+            read -r -p "Your choice [y/n]: " choice
+            case "$choice" in
+                y|Y)
+                    CADDY_USER_ENABLED=true
+                    echo "✅ Caddy HTTPS proxy will be enabled"
+                    break
+                    ;;
+                n|N)
+                    echo "⏭️  Skipping Caddy HTTPS proxy"
+                    echo "   Note: /microverse may not work without HTTPS (Godot Web requires Secure Context)"
+                    break
+                    ;;
+                *)
+                    echo "Please enter y or n."
+                    ;;
+            esac
+        done
+    fi
+    echo ""
+else
+    echo "⚠️  Caddy not found."
+    echo "   Caddy is required for HTTPS access to /microverse (Godot Web requires Secure Context)"
+    echo ""
+
+    # 非交互模式：跳过安装
+    if [ "$NON_INTERACTIVE" = true ]; then
+        echo "Running in non-interactive mode, skipping Caddy installation."
+        echo "HTTPS proxy will be disabled."
+        echo ""
+    else
+        # 交互模式：询问是否安装
+        if [ "$OS_TYPE" = "macos" ]; then
+            # macOS: 检查是否有 Homebrew
+            if command -v brew &> /dev/null; then
+                echo "Would you like to install Caddy now? (Recommended for /microverse)"
+                echo "  [y] Yes, install via Homebrew (brew install caddy)"
+                echo "  [n] No, skip for now"
+                echo ""
+
+                while true; do
+                    read -r -p "Your choice [y/n]: " choice
+                    case "$choice" in
+                        y|Y)
+                            echo ""
+                            echo "Installing Caddy via Homebrew..."
+                            if brew install caddy; then
+                                echo "✅ Caddy installed successfully"
+                                CADDY_AVAILABLE=true
+                                CADDY_USER_ENABLED=true
+                            else
+                                echo "❌ Failed to install Caddy"
+                                echo "You can install it manually later: brew install caddy"
+                            fi
+                            break
+                            ;;
+                        n|N)
+                            echo "Skipping Caddy installation. HTTPS proxy will be disabled."
+                            echo "You can install it later: brew install caddy"
+                            break
+                            ;;
+                        *)
+                            echo "Please enter y or n."
+                            ;;
+                    esac
+                done
+            else
+                echo "Homebrew not found. Please install Caddy manually:"
+                echo "  1. Install Homebrew: https://brew.sh/"
+                echo "  2. Install Caddy: brew install caddy"
+            fi
+        elif [ "$OS_TYPE" = "linux" ]; then
+            echo "Please install Caddy manually:"
+            echo "  Ubuntu/Debian: https://caddyserver.com/docs/install#debian-ubuntu-raspbian"
+            echo "  Other Linux: https://caddyserver.com/docs/install"
+            echo ""
+            echo "After installation, restart this script to enable HTTPS proxy."
+        fi
+    fi
+    echo ""
+fi
+
+# 如果 Caddy 可用且用户启用，生成配置并启动
+if [ "$CADDY_AVAILABLE" = true ] && [ "$CADDY_USER_ENABLED" = true ]; then
+    # 生成 Caddyfile（不写死 IP，使用 internal TLS）
+    cat > "$CADDY_DIR/Caddyfile" <<'EOF'
+{
+  auto_https disable_redirects
+}
+
+https://:8443 {
+  tls internal
+
+  @microverse path /microverse*
+  handle @microverse {
+    header {
+      Cross-Origin-Opener-Policy "same-origin"
+      Cross-Origin-Embedder-Policy "require-corp"
+    }
+    reverse_proxy 127.0.0.1:5173
+  }
+
+  handle {
+    redir http://{host}:5173{uri} 308
+  }
+}
+EOF
+
+    echo "✅ Caddyfile generated at $CADDY_DIR/Caddyfile"
+
+    # 验证配置文件
+    if ! caddy validate --config "$CADDY_DIR/Caddyfile" --adapter caddyfile > /dev/null 2>&1; then
+        echo "❌ Caddyfile validation failed"
+        echo "   HTTPS proxy will be disabled"
+        echo "   You can check the config at: $CADDY_DIR/Caddyfile"
+        echo ""
+    else
+        # 停止旧的 Caddy 进程（如果存在）
+        caddy stop 2>/dev/null || true
+        sleep 1
+
+        # 启动 Caddy（后台运行，使用 caddyfile adapter）
+        if caddy start --config "$CADDY_DIR/Caddyfile" --adapter caddyfile > /dev/null 2>&1; then
+            # 获取 Caddy PID（通过进程名查找）
+            sleep 1
+            CADDY_PID=$(pgrep -f "caddy.*$CADDY_DIR/Caddyfile" | head -1)
+            if [ -n "$CADDY_PID" ]; then
+                echo "$CADDY_PID" > "$CADDY_PID_FILE"
+                echo "✅ Caddy started (PID: $CADDY_PID, Port: $CADDY_PORT)"
+                echo "   HTTPS access: https://<your-ip>:$CADDY_PORT/microverse"
+            else
+                echo "⚠️  Caddy started but PID not found"
+            fi
+        else
+            echo "❌ Failed to start Caddy"
+            echo "   You can check logs with: caddy run --config $CADDY_DIR/Caddyfile --adapter caddyfile"
+        fi
+        echo ""
+    fi
 fi
 
 # 检查后端目录
@@ -240,6 +413,17 @@ if [ -f "$MICROVERSE_PID_FILE" ]; then
         sleep 1
     fi
     rm -f "$MICROVERSE_PID_FILE"
+fi
+
+if [ -f "$CADDY_PID_FILE" ]; then
+    OLD_CADDY_PID=$(cat "$CADDY_PID_FILE")
+    if [ -n "$OLD_CADDY_PID" ] && kill -0 "$OLD_CADDY_PID" 2>/dev/null; then
+        echo "⚠️  Found running Caddy process from previous session (PID: $OLD_CADDY_PID)"
+        echo "Cleaning up old process..."
+        kill "$OLD_CADDY_PID" 2>/dev/null || true
+        sleep 1
+    fi
+    rm -f "$CADDY_PID_FILE"
 fi
 
 # 强制清理后端进程的函数
@@ -627,16 +811,25 @@ if [ "$DAEMON_MODE" = true ]; then
     echo "   Frontend: http://localhost:${FRONTEND_PORT}"
     echo "   Backend API: http://localhost:${BACKEND_PORT}"
     echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
+        echo "   Microverse (HTTPS): https://localhost:${CADDY_PORT}/microverse"
+    fi
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
         echo "   Frontend: http://${DISPLAY_IP}:${FRONTEND_PORT}"
         echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
+            echo "   Microverse (HTTPS): https://${DISPLAY_IP}:${CADDY_PORT}/microverse"
+        fi
     fi
     echo ""
     echo "📋 Process IDs:"
     echo "   Backend PID: $BACKEND_PID"
     echo "   Frontend PID: $FRONTEND_PID"
+    if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
+        echo "   Caddy PID: $CADDY_PID"
+    fi
     echo ""
     echo "📝 Logs:"
     echo "   Backend: docs/logs/backend.log"
@@ -694,11 +887,17 @@ else
     echo "   Frontend: http://localhost:${FRONTEND_PORT}"
     echo "   Backend API: http://localhost:${BACKEND_PORT}"
     echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
+        echo "   Microverse (HTTPS): https://localhost:${CADDY_PORT}/microverse"
+    fi
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
         echo "   Frontend: http://${DISPLAY_IP}:${FRONTEND_PORT}"
         echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
+            echo "   Microverse (HTTPS): https://${DISPLAY_IP}:${CADDY_PORT}/microverse"
+        fi
     fi
     echo ""
     echo "Press Ctrl+C to stop all servers"
@@ -751,12 +950,21 @@ else
             rm -f "$FRONTEND_PID_FILE"
         fi
 
-        # 4. 额外保险：清理残留进程
+        # 4. 停止 Caddy
+        if [ -f "$CADDY_PID_FILE" ]; then
+            SAVED_CADDY_PID=$(cat "$CADDY_PID_FILE")
+            fast_stop_pid "$SAVED_CADDY_PID" "Caddy"
+            rm -f "$CADDY_PID_FILE"
+        fi
+        # 使用 caddy stop 命令确保完全停止
+        caddy stop 2>/dev/null || true
+
+        # 5. 额外保险：清理残留进程
         pkill -f "uvicorn app.main:app" 2>/dev/null || true
         pkill -f "python.*run\.py" 2>/dev/null || true
         pkill -f "vite.*$FRONTEND_PORT" 2>/dev/null || true
 
-        # 5. 最后验证端口
+        # 6. 最后验证端口
         if lsof -Pi :$BACKEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
             lsof -ti :$BACKEND_PORT | xargs kill -9 2>/dev/null || true
         fi

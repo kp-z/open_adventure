@@ -8,7 +8,6 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ArrowLeft,
   Save,
   Code2,
   Eye,
@@ -159,13 +158,11 @@ const MEMORY_OPTIONS = [
 
 interface AgentEditorProps {
   agent: Agent | null;
-  onBack: () => void;
   onSave: () => void;
 }
 
 export const AgentEditor: React.FC<AgentEditorProps> = ({
   agent,
-  onBack,
   onSave
 }) => {
   const isCreateMode = agent === null;
@@ -694,66 +691,56 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
   const CurrentIcon = AVAILABLE_ICONS.find(i => i.value === icon)?.icon || Bot;
 
   return (
-    <div className="max-w-6xl mx-auto pb-20">
-      {/* 头部 */}
-      <header className="flex items-center gap-4 mb-8">
-        <div className="flex items-center gap-4 flex-1">
-          <div
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-${color}-500/20 border border-${color}-500/30`}
-            style={{
-              backgroundColor: `color-mix(in srgb, var(--${color}-500, #3b82f6) 20%, transparent)`,
-            }}
-          >
-            <CurrentIcon size={28} className={`text-${color}-400`} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
-              {isCreateMode ? '创建新子代理' : '编辑子代理'}
-            </h1>
-            <p className="text-sm md:text-base text-gray-400 mt-1 line-clamp-1 md:line-clamp-none">
-              {isCreateMode ? '配置你的 AI 子代理' : agent?.meta?.path || agent?.name}
-            </p>
-          </div>
+    <div className="space-y-4 md:space-y-6 pt-6">
+      {/* 页面标题和操作 - 响应式布局 */}
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase">
+            {isCreateMode ? '创建新子代理' : '编辑子代理'}
+          </h1>
+          <p className="text-sm md:text-base text-gray-400 line-clamp-1 md:line-clamp-none">
+            {isCreateMode ? '配置你的 AI 子代理' : agent?.meta?.path || agent?.name}
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* 模式切换 - 始终显示 */}
+        <div className="flex md:flex-row flex-col gap-2 shrink-0">
+          {/* 模式切换 */}
           <div className="flex bg-white/5 rounded-xl p-1">
             <button
               onClick={() => setEditMode('visual')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editMode === 'visual' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editMode === 'visual' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               <Eye size={16} />
-              可视化
+              <span className="hidden md:inline">可视化</span>
             </button>
             <button
               onClick={() => setEditMode('source')}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editMode === 'source' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${editMode === 'source' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               <Code2 size={16} />
-              源码
+              <span className="hidden md:inline">源码</span>
             </button>
           </div>
 
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all shadow-lg"
+            className="md:px-4 px-2 py-2 text-sm min-w-0 flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded-xl font-bold transition-all shadow-lg"
           >
             {saving ? (
               <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white" />
-                保存中...
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white" />
+                <span className="hidden md:inline">保存中...</span>
               </>
             ) : success ? (
               <>
-                <CheckCircle2 size={20} />
-                已保存
+                <CheckCircle2 size={16} />
+                <span className="hidden md:inline">已保存</span>
               </>
             ) : (
               <>
-                <Save size={20} />
-                {isCreateMode ? '创建' : '保存'}
+                <Save size={16} />
+                <span className="hidden md:inline">{isCreateMode ? '创建' : '保存'}</span>
               </>
             )}
           </button>

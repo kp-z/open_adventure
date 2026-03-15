@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppProvider } from './contexts/AppContext';
 import { AgentsProvider } from './contexts/AgentsContext';
 import { TeamsProvider } from './contexts/TeamsContext';
@@ -7,10 +9,38 @@ import { ModeProvider } from './contexts/ModeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ExecutionProvider } from './contexts/ExecutionContext';
 import { TerminalProvider } from './contexts/TerminalContext';
+import { NavigationProvider } from './contexts/NavigationContext';
 import { InitializationProvider, useInitialization } from './contexts/InitializationContext';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import '../styles/theme.css';
 import '../styles/fonts.css';
+
+// 创建 QueryClient 实例
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5分钟内数据视为新鲜
+      gcTime: 10 * 60 * 1000, // 10分钟后清除缓存（原 cacheTime）
+      refetchOnWindowFocus: true, // 窗口聚焦时自动刷新
+      retry: 1, // 失败重试1次
+    },
+  },
+});
+
+// React Query DevTools 显示状态（从 localStorage 读取）
+export const useReactQueryDevTools = () => {
+  const [showDevTools, setShowDevTools] = useState(() => {
+    const saved = localStorage.getItem('showReactQueryDevTools');
+    return saved === 'true';
+  });
+
+  const toggleDevTools = (value: boolean) => {
+    setShowDevTools(value);
+    localStorage.setItem('showReactQueryDevTools', String(value));
+  };
+
+  return { showDevTools, toggleDevTools };
+};
 
 // App Version: 4.2.0 - Enhanced Teams Management
 console.log('🚀 Open Adventure v4.2.0 - Enhanced Teams Management');
@@ -111,6 +141,27 @@ const router = createBrowserRouter(
           },
         },
         {
+          path: 'agents/create',
+          lazy: async () => {
+            const AgentCreatePage = await import('./pages/AgentCreatePage');
+            return { Component: AgentCreatePage.default };
+          },
+        },
+        {
+          path: 'agents/:id/edit',
+          lazy: async () => {
+            const AgentEditPage = await import('./pages/AgentEditPage');
+            return { Component: AgentEditPage.default };
+          },
+        },
+        {
+          path: 'agents/:id/test',
+          lazy: async () => {
+            const AgentTestPage = await import('./pages/AgentTestPage');
+            return { Component: AgentTestPage.default };
+          },
+        },
+        {
           path: 'teams',
           lazy: async () => {
             const Teams = await import('./pages/Teams');
@@ -184,25 +235,57 @@ function AppContent() {
 }
 
 export default function App() {
+  const [showDevTools, setShowDevTools] = useState(() => {
+    const saved = localStorage.getItem('showReactQueryDevTools');
+    return saved === 'true';
+  });
+
+  // 监听 localStorage 变化
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('showReactQueryDevTools');
+      setShowDevTools(saved === 'true');
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    // 自定义事件用于同一页面内的更新
+    window.addEventListener('reactQueryDevToolsChange', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('reactQueryDevToolsChange', handleStorageChange);
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
-      <NotificationProvider>
-        <ModeProvider>
-          <InitializationProvider>
-            <AppProvider>
-              <AgentsProvider>
-                <TeamsProvider>
-                  <ExecutionProvider>
-                    <TerminalProvider>
-                      <AppContent />
-                    </TerminalProvider>
-                  </ExecutionProvider>
-                </TeamsProvider>
-              </AgentsProvider>
-            </AppProvider>
-          </InitializationProvider>
-        </ModeProvider>
-      </NotificationProvider>
+      <QueryClientProvider client={queryClient}>
+        <NotificationProvider>
+          <ModeProvider>
+            <InitializationProvider>
+              <AppProvider>
+                <AgentsProvider>
+                  <TeamsProvider>
+                    <ExecutionProvider>
+                      <TerminalProvider>
+                        <AppContent />
+                      </TerminalProvider>
+                    </ExecutionProvider>
+                  </TeamsProvider>
+                </AgentsProvider>
+              </AppProvider>
+            </InitializationProvider>
+          </ModeProvider>
+        </NotificationProvider>
+        {/* React Query DevTools - 通过 Settings 控制显示 */}
+        {showDevTools && (
+          <ReactQueryDevtools
+            initialIsOpen={false}
+            position="bottom-left"
+            buttonPosition="bottom-left"
+          />
+        )}
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

@@ -29,6 +29,7 @@ import { useTranslation } from "../hooks/useTranslation";
 import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
 import { useNotifications } from "../contexts/NotificationContext";
+import { useNavigation, NavigationProvider } from "../contexts/NavigationContext";
 
 const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
   const { t } = useTranslation();
@@ -330,20 +331,19 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
   );
 };
 
-export const Layout = () => {
+const LayoutContent = () => {
   const { lang } = useMode();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { notifications, removeNotification } = useNotifications();
+  const { canGoBack, canGoForward, goBack, goForward } = useNavigation();
   // 检测是否为移动端，移动端默认隐藏侧边栏
   const [isMobile, setIsMobile] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
-  const [canGoBack, setCanGoBack] = React.useState(false);
-  const [canGoForward, setCanGoForward] = React.useState(false);
   const [activeBottomMenu, setActiveBottomMenu] = React.useState<string | null>(null);
 
   // 检查是否在 Microverse 游戏模式
@@ -428,29 +428,6 @@ export const Layout = () => {
 
   // 检查是否是 Terminal 页面
   const isTerminalPage = location.pathname === '/terminal';
-
-  // 监听浏览器历史变化
-  React.useEffect(() => {
-    const updateNavigationState = () => {
-      setCanGoBack(window.history.length > 1);
-      // 注意：浏览器不提供直接检测 forward 的 API，这里简化处理
-      setCanGoForward(false);
-    };
-
-    updateNavigationState();
-    window.addEventListener('popstate', updateNavigationState);
-    return () => window.removeEventListener('popstate', updateNavigationState);
-  }, []);
-
-  const handleGoBack = () => {
-    if (canGoBack) {
-      navigate(-1);
-    }
-  };
-
-  const handleGoForward = () => {
-    navigate(1);
-  };
 
   // 点击外部关闭搜索框
   React.useEffect(() => {
@@ -692,7 +669,7 @@ export const Layout = () => {
             {!isMicroverse && (
               <div className="hidden sm:flex items-center gap-1">
                 <button
-                  onClick={handleGoBack}
+                  onClick={goBack}
                   disabled={!canGoBack}
                   className={`
                     p-2 rounded-lg transition-all duration-200
@@ -706,8 +683,15 @@ export const Layout = () => {
                   <ChevronLeft size={20} />
                 </button>
                 <button
-                  onClick={handleGoForward}
-                  className="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all duration-200"
+                  onClick={goForward}
+                  disabled={!canGoForward}
+                  className={`
+                    p-2 rounded-lg transition-all duration-200
+                    ${canGoForward
+                      ? 'hover:bg-white/5 text-gray-400 hover:text-white'
+                      : 'text-gray-600 cursor-not-allowed opacity-40'
+                    }
+                  `}
                   title="前进"
                 >
                   <ChevronRight size={20} />
@@ -784,18 +768,9 @@ export const Layout = () => {
 
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
         <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse ? '' : isTerminalPage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-              className={isTerminalPage || isMicroverse ? 'h-full' : ''}
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          <div className={isTerminalPage || isMicroverse ? 'h-full' : ''}>
+            <Outlet />
+          </div>
         </div>
       </main>
 
@@ -1104,5 +1079,13 @@ export const Layout = () => {
         </div>
       </nav>
     </div>
+  );
+};
+
+export const Layout = () => {
+  return (
+    <NavigationProvider>
+      <LayoutContent />
+    </NavigationProvider>
   );
 };
