@@ -8,6 +8,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { useIsMobile } from '../components/ui/use-mobile';
 import { MobileScrollbar } from '../components/MobileScrollbar';
 import { MobileScrollButtons } from '../components/MobileScrollButtons';
+import { TmuxRestoreDialog } from '../components/TmuxRestoreDialog';
 import { API_CONFIG } from '../../config/api';
 import 'xterm/css/xterm.css';
 
@@ -254,6 +255,14 @@ const Terminal = () => {
     restoreClaudeConversation,
     reconnectTerminal,
     checkClaudeStatus,
+    checkTmuxAlive,
+    detachTerminal,
+    getTmuxSettings,
+    killTmuxSession,
+    showRestoreDialog,
+    detachedSessions,
+    handleRestoreSessions,
+    handleIgnoreSessions,
   } = useTerminalContext();
   const { addNotification } = useNotifications();
   const isMobile = useIsMobile();
@@ -377,6 +386,40 @@ const Terminal = () => {
     focusInputAtCursorEnd();
     return false;
   }, [activeTabId, isMobile, setActiveTabId, focusInputAtCursorEnd]);
+
+  const handleCloseTab = useCallback(async (terminalId: string) => {
+    const terminal = terminals.find(t => t.id === terminalId);
+    if (!terminal) {
+      return;
+    }
+
+    // 如果使用 tmux，检查会话是否存活
+    if (terminal.useTmux && terminal.tmuxSessionName) {
+      const alive = await checkTmuxAlive(terminal);
+      if (alive) {
+        // 读取用户设置
+        const settings = getTmuxSettings();
+
+        if (settings.defaultCloseAction === 'detach') {
+          // 默认 Detach：直接关闭前端连接，保持 tmux 运行
+          await detachTerminal(terminal);
+          return;
+        } else {
+          // 默认 Kill：显示确认对话框
+          const confirmed = window.confirm(
+            'tmux 会话仍在运行，关闭将终止会话。确定要关闭吗？'
+          );
+          if (!confirmed) {
+            return;
+          }
+          // 终止 tmux 会话
+          await killTmuxSession(terminal.tmuxSessionName);
+        }
+      }
+    }
+
+    closeTerminal(terminalId);
+  }, [terminals, checkTmuxAlive, getTmuxSettings, detachTerminal, killTmuxSession, closeTerminal]);
 
   const notifyRestoreInProgress = useCallback(() => {
     addNotification({
@@ -898,7 +941,16 @@ const Terminal = () => {
   }, [terminals, isMobile, reconnectTerminal]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 px-4 pt-4 md:gap-6 md:px-8 md:pt-6">
+    <>
+      {/* tmux 恢复对话框 */}
+      <TmuxRestoreDialog
+        isOpen={showRestoreDialog}
+        sessions={detachedSessions}
+        onRestore={handleRestoreSessions}
+        onIgnore={handleIgnoreSessions}
+      />
+
+      <div className="flex h-full min-h-0 flex-col gap-4 px-4 pt-4 md:gap-6 md:px-8 md:pt-6">
       {/* Header */}
       <header className="flex shrink-0 items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -1115,11 +1167,18 @@ const Terminal = () => {
                     }
                   `}
                 >
-                  <span className="truncate text-xs sm:text-sm">{terminal.title}</span>
+                  <span className="truncate text-xs sm:text-sm flex items-center gap-1">
+                    {terminal.title}
+                    {terminal.useTmux && terminal.tmuxAlive && (
+                      <span className="text-yellow-400" title="tmux 会话运行中">
+                        🔒
+                      </span>
+                    )}
+                  </span>
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
-                      closeTerminal(terminal.id);
+                      handleCloseTab(terminal.id);
                     }}
                     className="hover:text-red-400 transition-colors shrink-0 cursor-pointer"
                   >
@@ -1435,7 +1494,8 @@ const Terminal = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 };
 

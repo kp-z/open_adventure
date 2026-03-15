@@ -59,6 +59,15 @@ const Settings = () => {
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [isSavingModels, setIsSavingModels] = useState(false);
 
+  // tmux 设置状态
+  const [tmuxSettings, setTmuxSettings] = useState<{
+    defaultCloseAction: 'detach' | 'kill';
+    autoRestoreOnRefresh: boolean;
+  }>({
+    defaultCloseAction: 'detach',
+    autoRestoreOnRefresh: false
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
@@ -66,6 +75,21 @@ const Settings = () => {
       setActiveTab(tab);
     }
   }, [location.search]);
+
+  // 加载 tmux 设置
+  useEffect(() => {
+    const loadTmuxSettings = () => {
+      try {
+        const data = localStorage.getItem('tmux_settings');
+        if (data) {
+          setTmuxSettings(JSON.parse(data));
+        }
+      } catch (error) {
+        console.error('Failed to load tmux settings:', error);
+      }
+    };
+    loadTmuxSettings();
+  }, []);
 
   // 加载配置
   useEffect(() => {
@@ -136,6 +160,17 @@ const Settings = () => {
     } catch (error) {
       console.error('Failed to reset config:', error);
       alert('❌ 重置配置失败，请重试');
+    }
+  };
+
+  const handleTmuxSettingsChange = (key: 'defaultCloseAction' | 'autoRestoreOnRefresh', value: any) => {
+    const newSettings = { ...tmuxSettings, [key]: value };
+    setTmuxSettings(newSettings);
+    try {
+      localStorage.setItem('tmux_settings', JSON.stringify(newSettings));
+      console.log('[Settings] Saved tmux settings:', newSettings);
+    } catch (error) {
+      console.error('[Settings] Failed to save tmux settings:', error);
     }
   };
 
@@ -499,6 +534,117 @@ const Settings = () => {
                     <h3 className="font-bold text-lg">{t("zhLang")}</h3>
                     <p className="text-xs text-gray-400 mt-1">中文简体界面</p>
                   </button>
+                </div>
+              </section>
+
+              {/* Developer Tools */}
+              <section className="space-y-4 pt-8 border-t border-white/10">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <ShieldCheck size={20} className="text-blue-500" />
+                  开发者工具
+                </h2>
+                <div className="space-y-4">
+                  {/* React Query DevTools */}
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-white">React Query DevTools</h3>
+                      <p className="text-sm text-gray-400 mt-1">
+                        显示数据查询和缓存状态的调试工具（左下角）
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newValue = !localStorage.getItem('showReactQueryDevTools') || localStorage.getItem('showReactQueryDevTools') === 'false';
+                        localStorage.setItem('showReactQueryDevTools', String(newValue));
+                        // 触发自定义事件通知 App 组件更新
+                        window.dispatchEvent(new Event('reactQueryDevToolsChange'));
+                        // 刷新页面以应用更改
+                        window.location.reload();
+                      }}
+                      className={`relative w-14 h-7 rounded-full transition-colors ${
+                        localStorage.getItem('showReactQueryDevTools') === 'true'
+                          ? 'bg-blue-500'
+                          : 'bg-gray-600'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
+                          localStorage.getItem('showReactQueryDevTools') === 'true'
+                            ? 'translate-x-7'
+                            : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {/* Terminal (tmux) Settings */}
+              <section className="space-y-4 pt-8 border-t border-white/10">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Monitor size={20} className="text-blue-500" />
+                    终端设置
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-2">
+                    配置 tmux 终端的行为和会话管理
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* 关闭终端时的默认行为 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-300">关闭终端时的默认行为</label>
+                    <p className="text-xs text-gray-500">
+                      选择关闭 tmux 终端时的默认操作
+                    </p>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="defaultCloseAction"
+                          value="detach"
+                          checked={tmuxSettings.defaultCloseAction === 'detach'}
+                          onChange={(e) => handleTmuxSettingsChange('defaultCloseAction', e.target.value)}
+                          className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-300">
+                          暂离（Detach）
+                          <span className="text-xs text-gray-500 ml-2">保持会话运行，可稍后恢复</span>
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="defaultCloseAction"
+                          value="kill"
+                          checked={tmuxSettings.defaultCloseAction === 'kill'}
+                          onChange={(e) => handleTmuxSettingsChange('defaultCloseAction', e.target.value)}
+                          className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-300">
+                          退出（Kill）
+                          <span className="text-xs text-gray-500 ml-2">完全终止会话</span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 刷新页面时自动恢复会话 */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={tmuxSettings.autoRestoreOnRefresh}
+                        onChange={(e) => handleTmuxSettingsChange('autoRestoreOnRefresh', e.target.checked)}
+                        className="w-4 h-4 text-blue-500 focus:ring-blue-500 rounded"
+                      />
+                      <span className="text-sm font-medium text-gray-300">刷新页面时自动恢复会话</span>
+                    </label>
+                    <p className="text-xs text-gray-500 ml-6">
+                      开启后，刷新页面时会自动恢复所有暂离的 tmux 会话，无需手动选择
+                    </p>
+                  </div>
                 </div>
               </section>
 

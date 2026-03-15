@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class TerminalSession:
     """Manages a PTY terminal session"""
 
-    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False, claude_resume_session: Optional[str] = None):
+    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False, claude_resume_session: Optional[str] = None, use_tmux: bool = True):
         self.session_id = session_id
         self.master_fd = None
         self.pid = None
@@ -45,6 +45,8 @@ class TerminalSession:
         self.initial_dir = initial_dir
         self.auto_start_claude = auto_start_claude
         self.claude_resume_session = claude_resume_session  # Claude 会话恢复的 session ID
+        self.use_tmux = use_tmux  # 是否使用 tmux
+        self.tmux_session_name = None  # tmux 会话名称
         self.websocket = None  # 当前连接的 WebSocket
         self.execution_id = None  # 关联的 execution ID
         self.claude_running = False  # 标记是否运行了 claude code
@@ -157,38 +159,135 @@ class TerminalSession:
             print(f"[Terminal] Error in get_claude_session_id: {e}")
             return None
 
+    @staticmethod
+    def check_tmux_installed() -> bool:
+        """检查 tmux 是否已安装"""
+        try:
+            import subprocess
+            result = subprocess.run(['which', 'tmux'], capture_output=True)
+            return result.returncode == 0
+        except Exception as e:
+            print(f"[Terminal] Error checking tmux: {e}")
+            return False
+
+    @staticmethod
+    def tmux_session_exists(session_name: str) -> bool:
+        """检查 tmux 会话是否已存在"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['tmux', 'has-session', '-t', session_name],
+                capture_output=True
+            )
+            return result.returncode == 0
+        except Exception as e:
+            print(f"[Terminal] Error checking tmux session: {e}")
+            return False
+
+    def create_tmux_session(self) -> Optional[str]:
+        """创建 tmux 会话"""
+        try:
+            import subprocess
+
+            # 生成唯一的会话名称
+            base_name = f"oa_{self.session_id[:8]}"
+            session_name = base_name
+            counter = 1
+
+            # 如果会话已存在，生成新名称
+            while self.tmux_session_exists(session_name):
+                session_name = f"{base_name}_{counter}"
+                counter += 1
+
+            # 设置初始目录
+            target_dir = self.initial_dir if self.initial_dir and os.path.isdir(self.initial_dir) else os.path.expanduser('~')
+
+            # 创建 detached tmux 会话
+            result = subprocess.run(
+                ['tmux', 'new-session', '-d', '-s', session_name, '-c', target_dir],
+                capture_output=True,
+                text=True
+            )
+
+            if result.returncode != 0:
+                print(f"[Terminal] Failed to create tmux session: {result.stderr}")
+                return None
+
+            print(f"[Terminal] Created tmux session: {session_name}")
+            return session_name
+
+        except Exception as e:
+            print(f"[Terminal] Error creating tmux session: {e}")
+            return None
+
+    @staticmethod
+    def kill_tmux_session(session_name: str) -> bool:
+        """关闭 tmux 会话"""
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['tmux', 'kill-session', '-t', session_name],
+                capture_output=True
+            )
+            return result.returncode == 0
+        except Exception as e:
+            print(f"[Terminal] Error killing tmux session: {e}")
+            return False
+
     def start(self):
         """Start a new PTY session"""
-        print(f"[Terminal] Starting new PTY session...")
+        print(f"[Terminal] Starting new PTY session (use_tmux={self.use_tmux})...")
+
+        # 如果启用 tmux，先检查是否已安装
+        if self.use_tmux:
+            if not self.check_tmux_installed():
+                print("[Terminal] tmux not installed, falling back to pty")
+                self.use_tmux = False
+            else:
+                # 创建 tmux 会话
+                self.tmux_session_name = self.create_tmux_session()
+                if not self.tmux_session_name:
+                    print("[Terminal] Failed to create tmux session, falling back to pty")
+                    self.use_tmux = False
 
         self.pid, self.master_fd = pty.fork()
         print(f"[Terminal] PTY forked - PID: {self.pid}, FD: {self.master_fd}")
 
         if self.pid == 0:
-            # Child process - execute shell
+            # Child process
             # Set HOME environment variable to ensure correct user context
             home_dir = os.path.expanduser('~')
             os.environ['HOME'] = home_dir
-
-            # Change to initial directory if specified, otherwise home
-            target_dir = self.initial_dir if self.initial_dir and os.path.isdir(self.initial_dir) else home_dir
-            os.chdir(target_dir)
-            print(f"[Terminal] Child process - Changed to directory: {target_dir}")
 
             # 取消 CLAUDECODE 环境变量，允许在 terminal 中使用 claude 命令
             if 'CLAUDECODE' in os.environ:
                 del os.environ['CLAUDECODE']
 
-            # Use zsh with login shell to load ~/.zshrc
-            # Try zsh first, fall back to bash if not available
-            shell = '/bin/zsh'
-            if not os.path.exists(shell):
-                shell = '/bin/bash'
+            # 禁用 oh-my-zsh 自动更新提示，避免干扰自动启动 Claude
+            os.environ['DISABLE_AUTO_UPDATE'] = 'true'
+            os.environ['DISABLE_UPDATE_PROMPT'] = 'true'
 
-            print(f"[Terminal] Child process - Executing shell: {shell}")
-            # Always start normal interactive shell
-            # We'll send the cd and claude commands after shell starts
-            os.execvp(shell, [shell, '-l', '-i'])
+            if self.use_tmux and self.tmux_session_name:
+                # 连接到 tmux 会话
+                print(f"[Terminal] Child process - Attaching to tmux session: {self.tmux_session_name}")
+                os.execvp('tmux', ['tmux', 'attach', '-t', self.tmux_session_name])
+            else:
+                # 原有逻辑：直接启动 shell
+                # Change to initial directory if specified, otherwise home
+                target_dir = self.initial_dir if self.initial_dir and os.path.isdir(self.initial_dir) else home_dir
+                os.chdir(target_dir)
+                print(f"[Terminal] Child process - Changed to directory: {target_dir}")
+
+                # Use zsh with login shell to load ~/.zshrc
+                # Try zsh first, fall back to bash if not available
+                shell = '/bin/zsh'
+                if not os.path.exists(shell):
+                    shell = '/bin/bash'
+
+                print(f"[Terminal] Child process - Executing shell: {shell}")
+                # Always start normal interactive shell
+                # We'll send the cd and claude commands after shell starts
+                os.execvp(shell, [shell, '-l', '-i'])
 
         # Parent process
         print(f"[Terminal] Parent process - PTY session started with PID: {self.pid}")
@@ -265,6 +364,13 @@ class TerminalSession:
         """Close the terminal session"""
         self.running = False
         self.websocket = None
+
+        # 如果使用 tmux，先关闭 tmux 会话
+        if self.use_tmux and self.tmux_session_name:
+            print(f"[Terminal] Killing tmux session: {self.tmux_session_name}")
+            self.kill_tmux_session(self.tmux_session_name)
+            self.tmux_session_name = None
+
         if self.master_fd:
             try:
                 os.close(self.master_fd)
@@ -439,7 +545,8 @@ async def terminal_websocket(
     project_path: str = None,
     session_id: str = None,  # 支持重新连接到已存在的 session
     auto_start_claude: bool = False,  # 是否自动启动 Claude
-    claude_resume_session: str = None  # Claude 会话恢复的 session ID
+    claude_resume_session: str = None,  # Claude 会话恢复的 session ID
+    use_tmux: bool = True  # 是否使用 tmux
 ):
     """WebSocket endpoint for terminal interaction"""
     await websocket.accept()
@@ -528,10 +635,11 @@ async def terminal_websocket(
             session_id=session_id,
             initial_dir=initial_dir,
             auto_start_claude=auto_start_claude,
-            claude_resume_session=claude_resume_session
+            claude_resume_session=claude_resume_session,
+            use_tmux=use_tmux
         )
         print(f"[Terminal] Creating new TerminalSession with ID: {session_id}")
-        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}, Claude resume: {claude_resume_session}")
+        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}, Claude resume: {claude_resume_session}, Use tmux: {use_tmux}")
         sessions[session_id] = session
         session.websocket = websocket
         print(f"[Terminal] Active sessions after: {len(sessions)}")
@@ -651,6 +759,16 @@ async def terminal_websocket(
         # Send session ID to client
         logger.info("[Terminal] Sending SESSION_ID: session_id=%s", session_id)
         await websocket.send_text(f"\x1b]0;SESSION_ID:{session_id}\x07")  # 使用 OSC 序列发送 session ID
+
+        # Send tmux session info if using tmux
+        if session.use_tmux and session.tmux_session_name:
+            logger.info("[Terminal] Sending TMUX_SESSION: session_name=%s", session.tmux_session_name)
+            tmux_info = json.dumps({
+                "type": "tmux_created",
+                "session_name": session.tmux_session_name,
+                "message": "tmux session created"
+            })
+            await websocket.send_text(f"\x1b]0;TMUX_INFO:{tmux_info}\x07")
 
     try:
         # Start the PTY (only for new sessions)
@@ -1153,6 +1271,8 @@ async def terminal_status():
             "claude_code_id": session.claude_resume_session,  # Claude Code 的 session ID
             "created_at": session.created_at.isoformat(),
             "last_activity": session.last_activity.isoformat(),
+            "use_tmux": session.use_tmux,  # 是否使用 tmux
+            "tmux_session_name": session.tmux_session_name,  # tmux 会话名称
         })
 
     return JSONResponse({
@@ -1242,3 +1362,130 @@ async def close_session(
     )
 
     return JSONResponse({"success": True, "message": f"Session {session_id} closed"})
+
+
+@router.get("/tmux/check")
+async def check_tmux():
+    """检查 tmux 是否已安装"""
+    installed = TerminalSession.check_tmux_installed()
+    return JSONResponse({
+        "installed": installed,
+        "message": "tmux is installed" if installed else "tmux is not installed"
+    })
+
+
+@router.get("/tmux/sessions")
+async def list_tmux_sessions():
+    """列出所有 tmux 会话"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['tmux', 'list-sessions', '-F', '#{session_name}'],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            sessions_list = [s.strip() for s in result.stdout.strip().split('\n') if s.strip()]
+            return JSONResponse({
+                "success": True,
+                "sessions": sessions_list
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "sessions": [],
+                "message": "No tmux sessions found"
+            })
+    except Exception as e:
+        logger.error(f"[Terminal] Error listing tmux sessions: {e}")
+        return JSONResponse({
+            "success": False,
+            "sessions": [],
+            "message": str(e)
+        }, status_code=500)
+
+
+@router.post("/tmux/kill/{session_name}")
+async def kill_tmux_session(session_name: str):
+    """强制关闭指定的 tmux 会话"""
+    try:
+        success = TerminalSession.kill_tmux_session(session_name)
+        if success:
+            return JSONResponse({
+                "success": True,
+                "message": f"tmux session {session_name} killed"
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "message": f"Failed to kill tmux session {session_name}"
+            }, status_code=500)
+    except Exception as e:
+        logger.error(f"[Terminal] Error killing tmux session: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": str(e)
+        }, status_code=500)
+
+
+@router.get("/tmux/check/{session_name}")
+async def check_tmux_session(session_name: str):
+    """检查 tmux 会话是否存在"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['tmux', 'has-session', '-t', session_name],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode == 0:
+            return JSONResponse({
+                "success": True,
+                "exists": True,
+                "message": f"tmux session {session_name} exists"
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "exists": False,
+                "message": f"tmux session {session_name} not found"
+            }, status_code=404)
+    except Exception as e:
+        logger.error(f"[Terminal] Error checking tmux session: {e}")
+        return JSONResponse({
+            "success": False,
+            "exists": False,
+            "message": str(e)
+        }, status_code=500)
+
+
+@router.post("/tmux/attach/{session_name}")
+async def attach_tmux_session(session_name: str):
+    """准备连接到现有 tmux 会话"""
+    try:
+        import subprocess
+        # 检查 tmux 会话是否存在
+        result = subprocess.run(
+            ['tmux', 'has-session', '-t', session_name],
+            capture_output=True
+        )
+
+        if result.returncode != 0:
+            return JSONResponse({
+                "success": False,
+                "message": f"tmux session not found: {session_name}"
+            }, status_code=404)
+
+        # 会话存在，准备连接
+        return JSONResponse({
+            "success": True,
+            "message": f"Ready to attach to tmux session: {session_name}"
+        })
+    except Exception as e:
+        logger.error(f"[Terminal] Error attaching tmux session: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": str(e)
+        }, status_code=500)
+
