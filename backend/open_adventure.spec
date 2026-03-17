@@ -22,10 +22,20 @@ WORKPATH = str(backend_dir / 'build')
 frontend_datas = []
 if frontend_dist.exists():
     for root, dirs, files in os.walk(frontend_dist):
+        # 收集所有文件
         for file in files:
             src = Path(root) / file
             dst = Path('frontend_dist') / src.relative_to(frontend_dist).parent
             frontend_datas.append((str(src), str(dst)))
+        # 确保空目录也被创建（通过添加 .gitkeep 占位符）
+        for dir_name in dirs:
+            dir_path = Path(root) / dir_name
+            # 检查目录是否为空
+            if not any(dir_path.iterdir()):
+                # 为空目录添加占位符
+                dst = Path('frontend_dist') / dir_path.relative_to(frontend_dist)
+                # PyInstaller 需要至少一个文件才能创建目录，所以我们不处理空目录
+                pass
     print(f"✓ 收集前端文件: {len(frontend_datas)} 个")
 else:
     print("⚠️  警告: frontend/dist 不存在")

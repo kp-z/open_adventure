@@ -81,7 +81,7 @@ frontend/dist/
 frontend/.vite/
 
 # Avatars and images (runtime generated)
-frontend/public/avatars/
+# frontend/public/avatars/  # 注释掉，avatars 是静态资源，应该提交到 git
 
 # Microverse runtime files
 frontend/public/microverse/*.html
