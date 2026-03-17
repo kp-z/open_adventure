@@ -347,7 +347,13 @@ check_python_deps() {
     python -c "from jose import jwt" 2>/dev/null && \
     python -c "from passlib.context import CryptContext" 2>/dev/null && \
     python -c "import anthropic" 2>/dev/null && \
-    python -c "import pydantic_settings" 2>/dev/null
+    python -c "import pydantic_settings" 2>/dev/null && \
+    python -c "import aiosqlite" 2>/dev/null && \
+    python -c "import greenlet" 2>/dev/null && \
+    python -c "import dotenv" 2>/dev/null && \
+    python -c "import aiohttp" 2>/dev/null && \
+    python -c "import yaml" 2>/dev/null && \
+    python -c "import cryptography" 2>/dev/null
 }
 
 install_python_deps() {

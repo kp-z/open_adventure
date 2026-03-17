@@ -92,7 +92,7 @@ def init_database():
         default_config = """# Open Adventure Configuration
 # 应用配置
 APP_NAME=Open Adventure
-APP_VERSION=0.2.0
+APP_VERSION=1.3.8
 DEBUG=false
 ENV=production
 
@@ -125,9 +125,13 @@ LOG_LEVEL=INFO
 
     # 加载用户配置文件
     if user_env.exists():
-        from dotenv import load_dotenv
-        load_dotenv(user_env)
-        print(f"✓ 已加载配置: {user_env}")
+        try:
+            from dotenv import load_dotenv
+            load_dotenv(user_env)
+            print(f"✓ 已加载配置: {user_env}")
+        except ImportError:
+            print(f"⚠️  警告: python-dotenv 未安装，无法自动加载配置文件: {user_env}")
+            print(f"   请手动设置环境变量，或安装: pip install python-dotenv")
 
 
 def check_port_available(port: int) -> bool:
