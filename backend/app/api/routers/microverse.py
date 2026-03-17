@@ -19,7 +19,19 @@ from app.schemas.microverse import (
     MicroverseCharacterBindAgent,
     StartWorkRequest,
     WorkStatusResponse,
-    WorkLogsResponse
+    WorkLogsResponse,
+    ConversationCreateRequest,
+    ConversationResponse,
+    MessageSendRequest,
+    MessageResponse,
+    ConversationHistoryResponse,
+    TaskControlResponse,
+    QuestionAnswerRequest,
+    QuestionAnswerResponse,
+    SessionSaveRequest,
+    SessionSaveResponse,
+    SessionRestoreRequest,
+    SessionRestoreResponse
 )
 
 router = APIRouter(prefix="/microverse", tags=["microverse"])
@@ -299,5 +311,361 @@ async def delete_character_task(
     """删除角色的任务配置"""
     service = MicroverseAgentService(db)
     return await service.delete_character_task(character_name, task_id)
+
+
+# ===== 对话 API =====
+
+@router.post("/conversations", response_model=ConversationResponse)
+async def create_conversation(
+    request: ConversationCreateRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    创建对话会话
+
+    为指定角色创建一个新的对话会话，用于多轮对话。
+    """
+    service = MicroverseAgentService(db)
+    return await service.create_conversation(
+        character_name=request.character_name,
+        context=request.context
+    )
+
+
+@router.post("/conversations/{session_id}/messages", response_model=MessageResponse)
+async def send_message(
+    session_id: str,
+    request: MessageSendRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    发送消息到对话会话
+
+    向指定的对话会话发送消息，并获取 Agent 的回复。
+    """
+    service = MicroverseAgentService(db)
+    return await service.send_message(
+        session_id=session_id,
+        message=request.message,
+        context=request.context
+    )
+
+
+@router.get("/conversations/{session_id}/history", response_model=ConversationHistoryResponse)
+async def get_conversation_history(
+    session_id: str,
+    offset: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取对话历史
+
+    获取指定会话的对话历史记录。
+    """
+    service = MicroverseAgentService(db)
+    return await service.get_conversation_history(
+        session_id=session_id,
+        offset=offset,
+        limit=limit
+    )
+
+
+# ===== 任务控制 API =====
+
+@router.post("/executions/{execution_id}/pause", response_model=TaskControlResponse)
+async def pause_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    暂停执行
+
+    暂停正在运行的任务执行。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+    from app.models.task import ExecutionStatus
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status != ExecutionStatus.RUNNING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot pause execution with status: {execution.status}"
+        )
+
+    # TODO: 实现实际的暂停逻辑（需要与 Agent Runtime 集成）
+    # 目前只更新状态
+    execution.status = ExecutionStatus.PENDING
+    await db.commit()
+
+    return TaskControlResponse(
+        success=True,
+        execution_id=execution_id,
+        status=execution.status.value,
+        message="Execution paused successfully"
+    )
+
+
+@router.post("/executions/{execution_id}/resume", response_model=TaskControlResponse)
+async def resume_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    恢复执行
+
+    恢复已暂停的任务执行。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+    from app.models.task import ExecutionStatus
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status != ExecutionStatus.PENDING:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot resume execution with status: {execution.status}"
+        )
+
+    # TODO: 实现实际的恢复逻辑（需要与 Agent Runtime 集成）
+    execution.status = ExecutionStatus.RUNNING
+    await db.commit()
+
+    return TaskControlResponse(
+        success=True,
+        execution_id=execution_id,
+        status=execution.status.value,
+        message="Execution resumed successfully"
+    )
+
+
+@router.post("/executions/{execution_id}/stop", response_model=TaskControlResponse)
+async def stop_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    停止执行
+
+    停止正在运行的任务执行。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+    from app.models.task import ExecutionStatus
+    from datetime import datetime
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status not in [ExecutionStatus.RUNNING, ExecutionStatus.PENDING]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot stop execution with status: {execution.status}"
+        )
+
+    # TODO: 实现实际的停止逻辑（需要与 Agent Runtime 集成）
+    # 如果有进程 PID，需要终止进程
+    if execution.process_pid:
+        try:
+            import psutil
+            process = psutil.Process(execution.process_pid)
+            process.terminate()
+            process.wait(timeout=5)
+        except (psutil.NoSuchProcess, psutil.TimeoutExpired):
+            pass
+
+    execution.status = ExecutionStatus.CANCELLED
+    execution.finished_at = datetime.utcnow()
+    await db.commit()
+
+    return TaskControlResponse(
+        success=True,
+        execution_id=execution_id,
+        status=execution.status.value,
+        message="Execution stopped successfully"
+    )
+
+
+@router.post("/executions/{execution_id}/retry", response_model=TaskControlResponse)
+async def retry_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    重试执行
+
+    重新执行失败的任务。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+    from app.models.task import ExecutionStatus
+    from datetime import datetime
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if execution.status not in [ExecutionStatus.FAILED, ExecutionStatus.CANCELLED]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot retry execution with status: {execution.status}"
+        )
+
+    # 创建新的执行记录
+    new_execution = Execution(
+        task_id=execution.task_id,
+        workflow_id=execution.workflow_id,
+        execution_type=execution.execution_type,
+        agent_id=execution.agent_id,
+        status=ExecutionStatus.PENDING,
+        test_input=execution.test_input,
+        session_id=execution.session_id,
+        work_dir=execution.work_dir,
+        started_at=datetime.utcnow()
+    )
+
+    db.add(new_execution)
+    await db.commit()
+    await db.refresh(new_execution)
+
+    # TODO: 实际启动执行（需要与 Agent Runtime 集成）
+
+    return TaskControlResponse(
+        success=True,
+        execution_id=new_execution.id,
+        status=new_execution.status.value,
+        message="Execution retry initiated"
+    )
+
+
+# ===== 询问响应 API =====
+
+@router.post("/executions/{execution_id}/questions/{question_id}/answer", response_model=QuestionAnswerResponse)
+async def answer_question(
+    execution_id: int,
+    question_id: str,
+    request: QuestionAnswerRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    提交询问响应
+
+    当 Agent 执行任务时需要用户输入，通过此接口提交答案。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get(execution_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    # TODO: 实现实际的询问响应逻辑
+    # 需要将答案传递给正在运行的 Agent 进程
+    # 可以通过 WebSocket 或其他 IPC 机制实现
+
+    # 暂时存储在 meta 中
+    if not execution.meta:
+        execution.meta = {}
+
+    if "questions" not in execution.meta:
+        execution.meta["questions"] = {}
+
+    execution.meta["questions"][question_id] = {
+        "answer": request.answer,
+        "answered_at": datetime.utcnow().isoformat()
+    }
+
+    await db.commit()
+
+    return QuestionAnswerResponse(
+        success=True,
+        question_id=question_id,
+        execution_id=execution_id
+    )
+
+
+# ===== 会话持久化 API =====
+
+@router.post("/sessions/save", response_model=SessionSaveResponse)
+async def save_session(
+    request: SessionSaveRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    保存会话状态
+
+    保存 Agent 会话的状态，用于跨设备同步或恢复中断的对话。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+    from datetime import datetime
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get_by_session_id(request.session_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # 保存会话数据到 meta
+    if not execution.meta:
+        execution.meta = {}
+
+    execution.meta["saved_session"] = {
+        "data": request.session_data,
+        "saved_at": datetime.utcnow().isoformat()
+    }
+
+    await db.commit()
+
+    return SessionSaveResponse(
+        success=True,
+        session_id=request.session_id,
+        saved_at=datetime.utcnow()
+    )
+
+
+@router.post("/sessions/restore", response_model=SessionRestoreResponse)
+async def restore_session(
+    request: SessionRestoreRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    恢复会话状态
+
+    恢复之前保存的 Agent 会话状态。
+    """
+    from app.repositories.executions_repo import ExecutionRepository
+    from datetime import datetime
+
+    repo = ExecutionRepository(db)
+    execution = await repo.get_by_session_id(request.session_id)
+
+    if not execution:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # 从 meta 中恢复会话数据
+    if not execution.meta or "saved_session" not in execution.meta:
+        raise HTTPException(status_code=404, detail="No saved session data found")
+
+    saved_session = execution.meta["saved_session"]
+
+    return SessionRestoreResponse(
+        success=True,
+        session_id=request.session_id,
+        session_data=saved_session["data"],
+        saved_at=datetime.fromisoformat(saved_session["saved_at"])
+    )
 
 

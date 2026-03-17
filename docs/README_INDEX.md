@@ -32,9 +32,11 @@
 - `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（26 个文件）
-- `20260316-microverse-dialog-fix.md` - Microverse 对话框和移动功能修复 ⭐ NEW
-- `20260316-godot-asset-fetcher-test-report.md` - Godot Asset Fetcher Skill 测试报告 ⭐ NEW
+技术文档和修复记录（28 个文件）
+- `godot-e2e-test-report.md` - Godot 端到端集成测试详细报告 ⭐ NEW
+- `godot-e2e-test-summary.md` - Godot 端到端集成测试执行总结 ⭐ NEW
+- `20260316-microverse-dialog-fix.md` - Microverse 对话框和移动功能修复
+- `20260316-godot-asset-fetcher-test-report.md` - Godot Asset Fetcher Skill 测试报告
 - `20260316-godot-asset-fetcher-implementation.md` - Godot Asset Fetcher Skill 实施报告
 - `20260316-godot-auto-sync-implementation.md` - Godot 自动同步机制实现总结
 - `20260316-microverse-sync-mechanism.md` - Microverse 同步机制技术文档

@@ -642,3 +642,155 @@ class MicroverseAgentService:
 
         logger.info(f"Deleted task {task_id} from character {character_name}")
         return {"success": True}
+
+    # ===== 对话管理方法 =====
+
+    async def create_conversation(
+        self,
+        character_name: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """创建对话会话"""
+        import uuid
+
+        # 获取或创建角色
+        character = await self.create_or_get_character(character_name)
+
+        # 检查是否已绑定 Agent
+        if not character.agent_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Character {character_name} is not bound to any agent"
+            )
+
+        # 生成会话 ID
+        session_id = str(uuid.uuid4())
+
+        # 创建 Execution 作为会话容器
+        execution = Execution(
+            execution_type=ExecutionType.AGENT_TEST,
+            agent_id=character.agent_id,
+            status=ExecutionStatus.RUNNING,
+            session_id=session_id,
+            is_background=True,
+            chat_history="[]",  # 初始化为空的 JSON 数组
+            last_activity_at=datetime.utcnow(),
+            started_at=datetime.utcnow()
+        )
+        self.db.add(execution)
+        await self.db.commit()
+        await self.db.refresh(execution)
+
+        logger.info(f"Created conversation session {session_id} for character {character_name}")
+
+        return {
+            "session_id": session_id,
+            "character_name": character_name,
+            "agent_id": character.agent_id,
+            "created_at": execution.created_at,
+            "last_activity_at": execution.last_activity_at
+        }
+
+    async def send_message(
+        self,
+        session_id: str,
+        message: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """发送消息到对话会话"""
+        import json
+        import uuid
+
+        # 查找会话
+        result = await self.db.execute(
+            select(Execution).where(Execution.session_id == session_id)
+        )
+        execution = result.scalar_one_or_none()
+
+        if not execution:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        # 获取 Agent
+        agent_result = await self.db.execute(
+            select(Agent).where(Agent.id == execution.agent_id)
+        )
+        agent = agent_result.scalar_one_or_none()
+
+        if not agent:
+            raise HTTPException(status_code=404, detail=f"Agent {execution.agent_id} not found")
+
+        # 解析聊天历史
+        try:
+            chat_history = json.loads(execution.chat_history or "[]")
+        except json.JSONDecodeError:
+            chat_history = []
+
+        # 添加用户消息
+        user_message = {
+            "message_id": str(uuid.uuid4()),
+            "role": "user",
+            "content": message,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        chat_history.append(user_message)
+
+        # 调用 AI API 获取响应
+        try:
+            response_text = await self._call_ai_api(agent, message, context)
+
+            # 添加助手消息
+            assistant_message = {
+                "message_id": str(uuid.uuid4()),
+                "role": "assistant",
+                "content": response_text,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            chat_history.append(assistant_message)
+
+            # 更新会话
+            execution.chat_history = json.dumps(chat_history)
+            execution.last_activity_at = datetime.utcnow()
+            await self.db.commit()
+
+            logger.info(f"Sent message to session {session_id}, got response")
+
+            return assistant_message
+
+        except Exception as e:
+            logger.error(f"Failed to send message to session {session_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def get_conversation_history(
+        self,
+        session_id: str,
+        offset: int = 0,
+        limit: int = 50
+    ) -> Dict[str, Any]:
+        """获取对话历史"""
+        import json
+
+        # 查找会话
+        result = await self.db.execute(
+            select(Execution).where(Execution.session_id == session_id)
+        )
+        execution = result.scalar_one_or_none()
+
+        if not execution:
+            raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+        # 解析聊天历史
+        try:
+            chat_history = json.loads(execution.chat_history or "[]")
+        except json.JSONDecodeError:
+            chat_history = []
+
+        # 分页
+        total = len(chat_history)
+        messages = chat_history[offset:offset + limit]
+
+        return {
+            "session_id": session_id,
+            "messages": messages,
+            "total": total
+        }
+
