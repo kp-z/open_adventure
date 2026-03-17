@@ -1,0 +1,206 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux-compat:
+    name: Build Linux (Ubuntu 20.04 - Compat)
+    runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:20.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup environment
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y python3 python3-venv python3-pip python3-dev build-essential
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          # 安装 Node.js 20
+          apt-get install -y curl
+          curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+          apt-get install -y nodejs
+          npm install
+          npm run build
+
+      - name: Build backend binary
+        run: |
+          cd backend
+          python3 -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller open_adventure.spec --clean
+
+      - name: Package release
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/open-adventure
+          cp backend/dist/open-adventure dist/open-adventure/
+          cp -r frontend/dist dist/open-adventure/frontend
+          cat > dist/open-adventure/start.sh << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          ./open-adventure
+          EOF
+          chmod +x dist/open-adventure/start.sh
+          cd dist
+          tar -czf "open_adventure-${TAG_NAME}-linux-x86_64-compat.tar.gz" open-adventure/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-compat
+          path: dist/open_adventure-*.tar.gz
+
+  build-linux-latest:
+    name: Build Linux (Ubuntu 24.04 - Latest)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Build backend binary
+        run: |
+          cd backend
+          python -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller open_adventure.spec --clean
+
+      - name: Package release
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/open-adventure
+          cp backend/dist/open-adventure dist/open-adventure/
+          cp -r frontend/dist dist/open-adventure/frontend
+          cat > dist/open-adventure/start.sh << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          ./open-adventure
+          EOF
+          chmod +x dist/open-adventure/start.sh
+          cd dist
+          tar -czf "open_adventure-${TAG_NAME}-linux-x86_64-latest.tar.gz" open-adventure/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-latest
+          path: dist/open_adventure-*.tar.gz
+
+  build-macos:
+    name: Build macOS (ARM64)
+    runs-on: macos-14  # macOS 14 with Apple Silicon
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
+      - name: Build backend binary
+        run: |
+          cd backend
+          python -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller open_adventure.spec --clean
+
+      - name: Package release
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist/open-adventure
+          cp backend/dist/open-adventure dist/open-adventure/
+          cp -r frontend/dist dist/open-adventure/frontend
+          cat > dist/open-adventure/start.sh << 'EOF'
+          #!/bin/bash
+          cd "$(dirname "$0")"
+          ./open-adventure
+          EOF
+          chmod +x dist/open-adventure/start.sh
+          cd dist
+          tar -czf "open_adventure-${TAG_NAME}-macos-arm64.tar.gz" open-adventure/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist/open_adventure-*.tar.gz
+
+  release:
+    name: Create GitHub Release
+    needs: [build-linux-compat, build-linux-latest, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/linux-compat/*.tar.gz
+            artifacts/linux-latest/*.tar.gz
+            artifacts/macos-arm64/*.tar.gz
+          body_path: docs/release-notes/RELEASE_NOTES_${{ github.ref_name }}.md
+          draft: false
+          prerelease: false

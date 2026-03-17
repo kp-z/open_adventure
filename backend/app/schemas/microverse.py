@@ -2,7 +2,7 @@
 Microverse Schemas - Pydantic 模型
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -69,7 +69,7 @@ class WorkStatusResponse(BaseModel):
 
 class WorkLogsResponse(BaseModel):
     """工作日志响应"""
-    logs: list[str] = Field(..., description="日志列表")
+    logs: List[str] = Field(..., description="日志列表")
     total: int = Field(..., description="总日志数")
     has_more: bool = Field(..., description="是否还有更多日志")
 
@@ -108,7 +108,7 @@ class MessageResponse(BaseModel):
 class ConversationHistoryResponse(BaseModel):
     """对话历史响应"""
     session_id: str = Field(..., description="会话 ID")
-    messages: list[MessageResponse] = Field(..., description="消息列表")
+    messages: List[MessageResponse] = Field(..., description="消息列表")
     total: int = Field(..., description="总消息数")
 
 
