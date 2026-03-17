@@ -69,7 +69,22 @@ def init_database():
     print(f"调试: user_frontend.exists() = {user_frontend.exists()}")
 
     if FRONTEND_DIR.exists():
-        if not user_frontend.exists() or not (user_frontend / "index.html").exists():
+        # 检查是否需要更新前端资源
+        need_update = False
+        if not user_frontend.exists():
+            need_update = True
+        elif not (user_frontend / "index.html").exists():
+            need_update = True
+        else:
+            # 检查关键目录是否存在（用于检测不完整的安装）
+            required_dirs = ["assets", "avatars", "images", "microverse"]
+            for dir_name in required_dirs:
+                if not (user_frontend / dir_name).exists():
+                    print(f"⚠️  检测到缺失目录: {dir_name}，将重新复制前端资源")
+                    need_update = True
+                    break
+
+        if need_update:
             if user_frontend.exists():
                 shutil.rmtree(user_frontend)
             shutil.copytree(FRONTEND_DIR, user_frontend)

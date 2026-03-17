@@ -248,6 +248,14 @@ if os.path.exists(FRONTEND_DIR):
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse
 
+    # 确保必要的子目录存在
+    required_dirs = ["assets", "avatars", "images", "microverse"]
+    for dir_name in required_dirs:
+        dir_path = os.path.join(FRONTEND_DIR, dir_name)
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path, exist_ok=True)
+            logger.warning(f"Created missing directory: {dir_path}")
+
     # 挂载静态文件目录
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
     app.mount("/avatars", StaticFiles(directory=os.path.join(FRONTEND_DIR, "avatars")), name="avatars")
