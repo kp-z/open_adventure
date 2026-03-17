@@ -48,6 +48,8 @@ import { GlassCard } from './ui-shared';
 import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ChatView } from './agent-test/ChatView';
+import { TasksCard } from './agent-test/TasksCard';
+import { useAgentTasks } from '../hooks/useAgentTasks';
 import { TerminalView } from './agent-test/TerminalView';
 import { ApiChatView } from './agent-test/ApiChatView';
 import type { ViewMode } from './agent-test/types';
@@ -170,6 +172,9 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
   const [isSavingSkills, setIsSavingSkills] = useState(false);
   const [showSkillSelector, setShowSkillSelector] = useState(false);
   const skillSelectorRef = useRef<HTMLDivElement>(null);
+
+  // 获取 Agent 任务
+  const { tasks, loading: tasksLoading } = useAgentTasks(agent.id);
 
   // 点击外部关闭 Skill 选择器
   useEffect(() => {
@@ -873,6 +878,9 @@ Agent 描述: ${agent.description}
 
         {/* 右侧 - Agent 信息和使用说明 */}
         <div className="space-y-6">
+          {/* Tasks Card - 新增 */}
+          <TasksCard tasks={tasks} loading={tasksLoading} />
+
           {/* Skill 配置卡片 */}
           <GlassCard className="p-6 border-cyan-500/20">
             <div className="flex items-center justify-between mb-4">

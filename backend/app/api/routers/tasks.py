@@ -47,10 +47,11 @@ async def list_tasks(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Number of items to return"),
     status: Optional[TaskStatus] = Query(None, description="Filter by status"),
+    agent_id: Optional[int] = Query(None, description="Filter by agent ID"),
     service: TaskService = Depends(get_task_service)
 ):
     """List all tasks with pagination"""
-    return await service.list_tasks(skip=skip, limit=limit, status=status)
+    return await service.list_tasks(skip=skip, limit=limit, status=status, agent_id=agent_id)
 
 
 @router.get(
@@ -148,3 +149,15 @@ async def get_execution(
 ):
     """Get an execution by ID"""
     return await service.get_execution(execution_id)
+
+
+@router.get(
+    "/{task_id}/dependencies",
+    summary="Get task dependencies"
+)
+async def get_task_dependencies(
+    task_id: int,
+    service: TaskService = Depends(get_task_service)
+):
+    """Get task dependencies (depends_on and blocks)"""
+    return await service.get_task_dependencies(task_id)

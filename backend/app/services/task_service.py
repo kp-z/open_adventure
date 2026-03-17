@@ -35,13 +35,15 @@ class TaskService:
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[TaskStatus] = None
+        status: Optional[TaskStatus] = None,
+        agent_id: Optional[int] = None
     ) -> TaskListResponse:
         """List all tasks with pagination"""
         tasks, total = await self.task_repository.get_all(
             skip=skip,
             limit=limit,
-            status=status
+            status=status,
+            agent_id=agent_id
         )
         return TaskListResponse(
             total=total,
@@ -116,3 +118,39 @@ class TaskService:
             total=total,
             items=[ExecutionResponse.model_validate(execution) for execution in executions]
         )
+
+    async def get_task_dependencies(self, task_id: int) -> dict:
+        """Get task dependencies (depends_on and blocks)"""
+        task = await self.task_repository.get_by_id(task_id)
+        if not task:
+            raise NotFoundException(f"Task with id {task_id} not found")
+
+        # 获取前置任务
+        depends_on_tasks = []
+        if task.depends_on:
+            for dep_id in task.depends_on:
+                dep_task = await self.task_repository.get_by_id(dep_id)
+                if dep_task:
+                    depends_on_tasks.append({
+                        "id": dep_task.id,
+                        "title": dep_task.title,
+                        "status": dep_task.status
+                    })
+
+        # 获取后续任务
+        blocks_tasks = []
+        if task.blocks:
+            for block_id in task.blocks:
+                block_task = await self.task_repository.get_by_id(block_id)
+                if block_task:
+                    blocks_tasks.append({
+                        "id": block_task.id,
+                        "title": block_task.title,
+                        "status": block_task.status
+                    })
+
+        return {
+            "task_id": task_id,
+            "depends_on": depends_on_tasks,
+            "blocks": blocks_tasks
+        }

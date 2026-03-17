@@ -1,6 +1,7 @@
 """
 Project Path API Router
 """
+from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -153,6 +154,54 @@ async def delete_project_path(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to delete project path {path_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/scan-git-repos")
+async def scan_git_repos(
+    service: ProjectPathService = Depends(get_project_path_service)
+):
+    """
+    手动扫描 Git 仓库并添加到项目路径
+
+    扫描 /mnt 和用户主目录下的所有 Git 仓库，自动添加到项目路径配置
+    """
+    try:
+        from app.services.git_repo_scanner import GitRepoScanner
+
+        scanner = GitRepoScanner()
+        base_dirs = ["/mnt", str(Path.home())]
+        git_repos = scanner.scan_directories(base_dirs, max_depth=3)
+
+        added_count = 0
+        skipped_count = 0
+
+        for repo_path in git_repos:
+            try:
+                await service.create_project_path(
+                    path=repo_path,
+                    alias=Path(repo_path).name,
+                    enabled=True,
+                    recursive_scan=True
+                )
+                added_count += 1
+            except ConflictException:
+                # 已存在，跳过
+                skipped_count += 1
+            except Exception as e:
+                logger.warning(f"Failed to add project path {repo_path}: {e}")
+
+        return {
+            "success": True,
+            "total_found": len(git_repos),
+            "added": added_count,
+            "skipped": skipped_count
+        }
+    except Exception as e:
+        logger.error(f"Failed to scan git repositories: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)

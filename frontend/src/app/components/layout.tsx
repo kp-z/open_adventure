@@ -22,6 +22,7 @@ import {
   Network,
   Loader,
   Bell,
+  Gamepad2,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -29,6 +30,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
 import { useNotifications } from "../contexts/NotificationContext";
 import { useNavigation, NavigationProvider } from "../contexts/NavigationContext";
+import Microverse from "../pages/Microverse";
 
 const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
   const { t } = useTranslation();
@@ -455,29 +457,61 @@ const LayoutContent = () => {
     <div
       className={`app-shell min-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} bg-[#0f111a]`}
     >
-      {/* 桌面端侧边栏 */}
+      {/* 桌面端侧边栏 / 游戏模式悬浮 Logo */}
       <aside
         className={`
-          ${isSidebarOpen ? "w-72" : "w-20"}
-          hidden md:flex flex-col border-r border-white/5 transition-all duration-300 relative z-50
-          bg-[#0a0b14]/80 backdrop-blur-2xl
+          ${isMicroverse
+            ? "fixed top-0 left-0 z-50 w-auto"
+            : `${isSidebarOpen ? "w-72" : "w-20"} hidden md:flex flex-col border-r border-white/5 transition-all duration-300 relative z-50 bg-[#0a0b14]/80 backdrop-blur-2xl`
+          }
         `}
       >
         {/* Logo */}
-        <button
-          onClick={() => navigate('/')}
-          className="h-20 flex items-center px-6 gap-4 transition-all duration-500 hover:bg-white/5 group border-b border-blue-500/20"
+        <motion.button
+          initial={isMicroverse ? { opacity: 0 } : false}
+          animate={isMicroverse ? { opacity: 1 } : {}}
+          transition={isMicroverse ? { duration: 0.3, ease: "easeOut" } : {}}
+          onClick={() => {
+            // 如果当前在 Microverse 页面，返回首页；否则跳转到 Microverse
+            if (location.pathname === '/microverse') {
+              navigate('/');
+            } else {
+              navigate('/microverse');
+            }
+          }}
+          className={`
+            h-20 flex items-center transition-all duration-500 hover:bg-white/5 group
+            ${isMicroverse
+              ? "px-6 gap-4"
+              : `${isSidebarOpen ? "px-6 gap-4" : "px-3 justify-center"} border-b border-blue-500/20`
+            }
+          `}
+          title={isMicroverse ? "退出游戏模式" : undefined}
         >
           <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden bg-blue-500/10 backdrop-blur-xl border border-blue-400/30 shadow-blue-500/10"
+            className={`w-12 aspect-square flex-shrink-0 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:scale-110 shadow-lg relative overflow-hidden backdrop-blur-xl ${
+              isMicroverse
+                ? "bg-purple-500/15 border border-purple-400/40 shadow-purple-500/20"
+                : "bg-blue-500/10 border border-blue-400/30 shadow-blue-500/10"
+            }`}
           >
-            <Zap
-              size={24}
-              className="text-blue-400"
-            />
+            {isMicroverse ? (
+              <Gamepad2
+                size={24}
+                fill="currentColor"
+                className="text-purple-400 drop-shadow-[0_0_15px_rgba(192,132,252,0.7)] relative z-10"
+              />
+            ) : (
+              <Zap
+                size={24}
+                fill="currentColor"
+                className="text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.6)] animate-pulse relative z-10"
+              />
+            )}
+            <div className={`absolute inset-0 blur-xl scale-150 rounded-full ${isMicroverse ? "bg-purple-400/25" : "bg-blue-400/20"}`} />
           </div>
 
-          {isSidebarOpen && (
+          {(isSidebarOpen || isMicroverse) && (
             <div className="flex flex-col items-start overflow-hidden">
               <motion.div
                 key={lang}
@@ -485,22 +519,23 @@ const LayoutContent = () => {
                 animate={{ opacity: 1, x: 0 }}
                 className="flex flex-col"
               >
-                <span className="text-lg font-black tracking-tighter uppercase italic leading-[0.85] text-white">
+                <span className={`text-lg font-black tracking-tighter uppercase italic leading-[0.85] ${isMicroverse ? "text-purple-100" : "text-white"}`}>
                   Open
                 </span>
-                <span className="text-sm font-black tracking-[0.2em] uppercase leading-tight text-blue-400/80">
+                <span className={`text-sm font-black tracking-[0.2em] uppercase leading-tight ${isMicroverse ? "text-purple-400/90" : "text-blue-400/80"}`}>
                   Adventure
                 </span>
               </motion.div>
             </div>
           )}
-        </button>
+        </motion.button>
 
-        <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />
+        {!isMicroverse && <Navigation collapsed={!isSidebarOpen} onExpandSidebar={() => setIsSidebarOpen(true)} />}
       </aside>
 
       {/* 移动端抽屉侧边栏 - 仅在 <md 显示 */}
-      <AnimatePresence>
+      {!isMicroverse && (
+        <AnimatePresence>
         {isSidebarOpen && (
           <>
             {/* 遮罩层 */}
@@ -525,7 +560,12 @@ const LayoutContent = () => {
               {/* Logo */}
               <button
                 onClick={() => {
-                  navigate('/');
+                  // 如果当前在 Microverse 页面，返回首页；否则跳转到 Microverse
+                  if (location.pathname === '/microverse') {
+                    navigate('/');
+                  } else {
+                    navigate('/microverse');
+                  }
                   setIsSidebarOpen(false);
                 }}
                 className="h-14 flex items-center px-4 gap-3 transition-all duration-500 hover:bg-white/5 group w-full border-b border-blue-500/20"
@@ -564,16 +604,22 @@ const LayoutContent = () => {
           </>
         )}
       </AnimatePresence>
+      )}
 
       {/* Main Content Area */}
-      <main className={`flex-1 flex flex-col min-w-0 min-h-0 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'}`}>
+      <main className={`
+        flex-1 flex flex-col min-w-0 min-h-0
+        ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'}
+        ${isMicroverse ? 'absolute inset-0 w-full h-full' : ''}
+      `}>
         {/* TopBar - 仅桌面端显示 */}
-        <header
-          className={`
-          hidden md:flex h-20 items-center justify-between px-8 border-b border-white/5
-          bg-white/[0.02] backdrop-blur-xl
-        `}
-        >
+        {!isMicroverse && (
+          <header
+            className={`
+            hidden md:flex h-20 items-center justify-between px-8 border-b border-white/5
+            bg-white/[0.02] backdrop-blur-xl
+          `}
+          >
           <div className="flex items-center gap-4 flex-1">
             {/* 侧边栏收起/展开按钮 - 仅桌面端显示 */}
             <button
@@ -694,21 +740,30 @@ const LayoutContent = () => {
             </div>
           </div>
         </header>
+        )}
 
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
         <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse ? '' : isTerminalPage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
           <div className={isTerminalPage || isMicroverse ? 'h-full' : ''}>
-            <Outlet />
+            {/* 游戏模式：始终挂载，通过 CSS 控制显示 */}
+            <div className={`${isMicroverse ? '' : 'hidden'} h-full`}>
+              <Microverse key="microverse-cached" />
+            </div>
+
+            {/* 其他路由：正常渲染 */}
+            {!isMicroverse && <Outlet />}
           </div>
         </div>
+
       </main>
 
       {/* 移动端底部导航栏 - iOS 液态玻璃风格浮动导航栏 */}
-      <nav
-        className="md:hidden fixed left-4 right-4 z-50 safe-area-left safe-area-right transition-all duration-200 ease-out"
-        style={{ bottom: 'calc(var(--safe-bottom) + 1rem)' }}
-        id="mobile-dock"
-      >
+      {!isMicroverse && (
+        <nav
+          className="md:hidden fixed left-4 right-4 z-50 safe-area-left safe-area-right transition-all duration-200 ease-out"
+          style={{ bottom: 'calc(var(--safe-bottom) + 1rem)' }}
+          id="mobile-dock"
+        >
         {/* 二级菜单和通知弹出层 */}
         <AnimatePresence>
           {(activeBottomMenu || showNotifications) && (
@@ -1007,6 +1062,7 @@ const LayoutContent = () => {
           </div>
         </div>
       </nav>
+      )}
     </div>
   );
 };

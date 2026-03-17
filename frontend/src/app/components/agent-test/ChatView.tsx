@@ -87,9 +87,9 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
   }, [input, isRunning, state.isConnected, sendInput]);
 
   return (
-    <div className="flex flex-col h-[500px]">
+    <div className="flex flex-col h-[500px] relative">
       {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 pb-32 space-y-4">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500 text-sm">
             <div className="text-center">
@@ -107,8 +107,8 @@ export function ChatView({ agentId, agentName, onTestComplete, sessionId }: Chat
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 输入区域 */}
-      <div className="p-4 border-t border-white/10">
+      {/* 输入区域 - 固定在底部 */}
+      <div className="sticky bottom-0 p-4 border-t border-white/10 bg-black/80 backdrop-blur-sm shadow-lg">
         <div className="flex gap-2">
           <textarea
             value={input}

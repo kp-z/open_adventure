@@ -21,6 +21,7 @@ from app.models.agent import Agent
 from app.models.agent_team import AgentTeam
 from app.models.workflow import Workflow, WorkflowNode, WorkflowEdge
 from app.models.task import Task, Execution, NodeExecution
+from app.models.microverse import MicroverseCharacter
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

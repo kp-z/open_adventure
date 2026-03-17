@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes, config, microverse
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes, config, microverse, tasks_ws
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -171,6 +171,7 @@ app.include_router(dashboard.router, prefix=f"{settings.api_prefix}/dashboard", 
 app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", tags=["terminal"])
 app.include_router(processes.router, prefix=f"{settings.api_prefix}")
 app.include_router(websocket.router, prefix=f"{settings.api_prefix}/ws")
+app.include_router(tasks_ws.router, prefix=f"{settings.api_prefix}/ws")
 
 
 # 静态文件服务配置 - 先定义目录路径
@@ -245,7 +246,30 @@ async def delete_clear_cache_flag() -> dict:
 # 静态文件服务 - 必须在所有路由之后
 if os.path.exists(FRONTEND_DIR):
     from fastapi.staticfiles import StaticFiles
-    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+    from fastapi.responses import FileResponse
+
+    # 挂载静态文件目录
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+    app.mount("/avatars", StaticFiles(directory=os.path.join(FRONTEND_DIR, "avatars")), name="avatars")
+    app.mount("/images", StaticFiles(directory=os.path.join(FRONTEND_DIR, "images")), name="images")
+    app.mount("/microverse", StaticFiles(directory=os.path.join(FRONTEND_DIR, "microverse"), html=True), name="microverse")
+
+    # SPA catch-all 路由 - 将所有非 API 请求重定向到 index.html
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """
+        SPA catch-all 路由
+
+        将所有非 API、非静态文件的请求重定向到 index.html
+        """
+        # 如果请求的是静态文件，直接返回
+        file_path = os.path.join(FRONTEND_DIR, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+        # 否则返回 index.html（SPA 路由）
+        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
     logger.info(f"Static files mounted from: {FRONTEND_DIR}")
 else:
     logger.warning(f"Frontend directory not found: {FRONTEND_DIR}")

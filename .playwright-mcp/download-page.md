@@ -1,0 +1,605 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#game_download_2702477"
+    - generic [ref=e4]:
+      - heading "itch.io itch.io logo & title" [level=1] [ref=e5]:
+        - link "itch.io itch.io logo & title" [ref=e6] [cursor=pointer]:
+          - /url: https://itch.io/
+          - generic [ref=e7]: itch.io
+          - img "itch.io logo & title" [ref=e8]
+      - generic [ref=e9]:
+        - link "Browse Games" [ref=e10] [cursor=pointer]:
+          - /url: https://itch.io/games
+        - link "Game Jams" [ref=e11] [cursor=pointer]:
+          - /url: https://itch.io/jams
+        - link "Upload Game" [ref=e12] [cursor=pointer]:
+          - /url: https://itch.io/developers
+          - generic [ref=e13]: 
+          - text: Upload Game
+        - link "Developer Logs" [ref=e14] [cursor=pointer]:
+          - /url: https://itch.io/devlogs
+        - link "Community" [ref=e15] [cursor=pointer]:
+          - /url: https://itch.io/community
+      - generic [ref=e16]:
+        - textbox "Search for games, jams, tags or creators" [ref=e18]
+        - button "Search" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+      - generic [ref=e23]:
+        - link "Log in" [ref=e24] [cursor=pointer]:
+          - /url: https://itch.io/login
+        - link "Register" [ref=e25] [cursor=pointer]:
+          - /url: https://itch.io/register
+  - generic [ref=e27]:
+    - generic [ref=e28]:
+      - generic [ref=e29]:
+        - heading "Download “Pixel Planet Generator”" [level=2] [ref=e32]
+        - link "← Asset Pack page" [ref=e35] [cursor=pointer]:
+          - /url: https://deep-fold.itch.io/pixel-planet-generator
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - link "Download" [ref=e39] [cursor=pointer]:
+              - /url: javascript:void(0);
+            - generic [ref=e40]:
+              - generic [ref=e41]:
+                - strong [ref=e42]: PixelPlanetsWindows.exe
+                - generic [ref=e43]: 36 MB
+                - generic [ref=e45]: 
+              - generic "18 March 2023 @ 13:49 UTC" [ref=e47]:
+                - generic [ref=e48]: 
+                - text: Mar 18, 2023
+          - generic [ref=e49]:
+            - link "Download" [ref=e50] [cursor=pointer]:
+              - /url: javascript:void(0);
+            - generic [ref=e51]:
+              - generic [ref=e52]:
+                - strong [ref=e53]: PixelPlanetsLinux.x86_64
+                - generic [ref=e54]: 38 MB
+                - generic [ref=e56]: 
+              - generic "18 March 2023 @ 13:49 UTC" [ref=e58]:
+                - generic [ref=e59]: 
+                - text: Mar 18, 2023
+          - generic [ref=e60]:
+            - link "Download" [ref=e61] [cursor=pointer]:
+              - /url: javascript:void(0);
+            - generic [ref=e62]:
+              - generic [ref=e63]:
+                - strong [ref=e64]: PixelPlanetsSource.zip
+                - generic [ref=e65]: 849 kB
+              - generic "29 March 2024 @ 17:16 UTC" [ref=e67]:
+                - generic [ref=e68]: 
+                - text: Mar 29, 2024
+        - link "Downloads not starting?" [ref=e70] [cursor=pointer]:
+          - /url: ""
+      - generic [ref=e71]:
+        - heading "Share & follow" [level=3] [ref=e72]
+        - generic [ref=e73]:
+          - link "Follow Deep-Fold" [ref=e74] [cursor=pointer]:
+            - /url: https://itch.io/login?intent=follow_user&return_to=https%3A%2F%2Fdeep-fold.itch.io%2Fpixel-planet-generator%2Fdownload%2FeyJpZCI6ODIxMDAzLCJleHBpcmVzIjoxNzczNjgzMjQ3fQ%253d%253d.hQivdZs9JRJUDHSvltVX5Nln490%253d
+            - generic [ref=e75]:
+              - generic [ref=e76]: 
+              - text: Follow Deep-Fold
+            - text: 
+          - link "Add asset pack to collection" [ref=e77] [cursor=pointer]:
+            - /url: https://deep-fold.itch.io/pixel-planet-generator/add-to-collection?source=download
+            - generic [ref=e78]: 
+            - text: Add asset pack to collection
+          - generic [ref=e79]:
+            - text: or share on
+            - generic [ref=e80]:
+              - link "Bluesky Share on Bluesky" [ref=e81] [cursor=pointer]:
+                - /url: https://bsky.app/intent/compose?text=I%20just%20downloaded%20Pixel%20Planet%20Generator%20by%20Deep-Fold%0Ahttps%3A%2F%2Fdeep-fold.itch.io%2Fpixel-planet-generator
+                - img "Bluesky" [ref=e82]
+                - generic [ref=e84]: Share on Bluesky
+              - link "Share on Twitter" [ref=e85] [cursor=pointer]:
+                - /url: https://twitter.com/intent/tweet?url=https%3A%2F%2Fdeep-fold.itch.io%2Fpixel-planet-generator&hashtags=indiegames&text=I%20just%20downloaded%20Pixel%20Planet%20Generator%20by%20Deep-Fold&via=itchio
+                - generic [ref=e86]: 
+                - generic [ref=e87]: Share on Twitter
+              - link "Share on Facebook" [ref=e88] [cursor=pointer]:
+                - /url: https://www.facebook.com/dialog/share?app_id=537395183072744&display=popup&quote=I%20just%20downloaded%20Pixel%20Planet%20Generator%20by%20Deep-Fold&href=https%3A%2F%2Fdeep-fold.itch.io%2Fpixel-planet-generator
+                - generic [ref=e89]: 
+                - generic [ref=e90]: Share on Facebook
+    - link "New itch.io is on YouTube! Subscribe for game recommendations, clips, and more View Channel →" [ref=e91] [cursor=pointer]:
+      - /url: https://www.youtube.com/itchiogames?sub_confirmation=1
+      - img [ref=e93]
+      - generic [ref=e96]:
+        - heading "New itch.io is on YouTube!" [level=4] [ref=e97]:
+          - generic [ref=e98]: New
+          - text: itch.io is on YouTube!
+        - paragraph [ref=e99]: Subscribe for game recommendations, clips, and more
+      - generic [ref=e100]: View Channel →
+    - generic [ref=e102]:
+      - heading "More you might be interested in" [level=2] [ref=e103]
+      - generic [ref=e107]:
+        - generic [ref=e108]:
+          - generic [ref=e109]:
+            - link [ref=e110] [cursor=pointer]:
+              - /url: https://thorbjorn.itch.io/tiled
+              - img [ref=e111]
+            - generic [ref=e112]:
+              - generic [ref=e113]: 
+              - generic [ref=e114]: 
+              - generic [ref=e115]: 
+            - button "Add to collection" [ref=e117] [cursor=pointer]:
+              - generic [ref=e118]: 
+              - generic [ref=e119]: Add to collection
+          - generic [ref=e120]:
+            - generic [ref=e121]: Free
+            - link "Tiled Map Editor" [ref=e122] [cursor=pointer]:
+              - /url: https://thorbjorn.itch.io/tiled
+          - link "Thorbjørn Lindeijer" [ref=e124] [cursor=pointer]:
+            - /url: https://thorbjorn.itch.io
+          - 'generic "Average: 4.89" [ref=e125]':
+            - generic [ref=e126]: Average rating 4.89 out of 5
+            - generic [ref=e127]:
+              - generic [ref=e128]:
+                - generic [ref=e129]: 
+                - generic [ref=e130]: 
+                - generic [ref=e131]: 
+                - generic [ref=e132]: 
+                - generic [ref=e133]: 
+              - generic [ref=e134]:
+                - generic [ref=e135]: 
+                - generic [ref=e136]: 
+                - generic [ref=e137]: 
+                - generic [ref=e138]: 
+                - generic [ref=e139]: 
+            - generic [ref=e140]:
+              - text: (1k
+              - generic [ref=e141]: total ratings
+              - text: )
+          - link "#Tools" [ref=e143] [cursor=pointer]:
+            - /url: https://itch.io/tools
+          - generic [ref=e144]: Free, easy to use and flexible level editor.
+        - generic [ref=e145]:
+          - generic [ref=e146]:
+            - link [ref=e147] [cursor=pointer]:
+              - /url: https://ncase.itch.io/wbwwb
+              - img [ref=e148]
+            - button "Add to collection" [ref=e150] [cursor=pointer]:
+              - generic [ref=e151]: 
+              - generic [ref=e152]: Add to collection
+          - generic [ref=e153]:
+            - generic [ref=e154]: Web
+            - link "We Become What We Behold" [ref=e155] [cursor=pointer]:
+              - /url: https://ncase.itch.io/wbwwb
+          - link "Nicky Case!" [ref=e157] [cursor=pointer]:
+            - /url: https://ncase.itch.io
+          - 'generic "Average: 4.77" [ref=e158]':
+            - generic [ref=e159]: Average rating 4.77 out of 5
+            - generic [ref=e160]:
+              - generic [ref=e161]:
+                - generic [ref=e162]: 
+                - generic [ref=e163]: 
+                - generic [ref=e164]: 
+                - generic [ref=e165]: 
+                - generic [ref=e166]: 
+              - generic [ref=e167]:
+                - generic [ref=e168]: 
+                - generic [ref=e169]: 
+                - generic [ref=e170]: 
+                - generic [ref=e171]: 
+                - generic [ref=e172]: 
+            - generic [ref=e173]:
+              - text: (8.1k
+              - generic [ref=e174]: total ratings
+              - text: )
+          - generic [ref=e175]: a game about news cycles, vicious cycles, infinite cycles
+        - generic [ref=e176]:
+          - generic [ref=e177]:
+            - link [ref=e178] [cursor=pointer]:
+              - /url: https://ansimuz.itch.io/sunny-land-pixel-game-art
+              - img [ref=e179]
+            - button "Add to collection" [ref=e181] [cursor=pointer]:
+              - generic [ref=e182]: 
+              - generic [ref=e183]: Add to collection
+          - generic [ref=e184]:
+            - generic [ref=e185]: Web
+            - link "Sunny Land - Pixel Game Art Collection" [ref=e186] [cursor=pointer]:
+              - /url: https://ansimuz.itch.io/sunny-land-pixel-game-art
+          - link "ansimuz" [ref=e188] [cursor=pointer]:
+            - /url: https://ansimuz.itch.io
+          - 'generic "Average: 4.92" [ref=e189]':
+            - generic [ref=e190]: Average rating 4.92 out of 5
+            - generic [ref=e191]:
+              - generic [ref=e192]:
+                - generic [ref=e193]: 
+                - generic [ref=e194]: 
+                - generic [ref=e195]: 
+                - generic [ref=e196]: 
+                - generic [ref=e197]: 
+              - generic [ref=e198]:
+                - generic [ref=e199]: 
+                - generic [ref=e200]: 
+                - generic [ref=e201]: 
+                - generic [ref=e202]: 
+                - generic [ref=e203]: 
+            - generic [ref=e204]:
+              - text: (272
+              - generic [ref=e205]: total ratings
+              - text: )
+          - link "#Game assets" [ref=e207] [cursor=pointer]:
+            - /url: https://itch.io/game-assets
+          - generic [ref=e208]: Free 2D Platform Pixel-Art Assets
+        - generic [ref=e209]:
+          - generic [ref=e210]:
+            - link [ref=e211] [cursor=pointer]:
+              - /url: https://watabou.itch.io/medieval-fantasy-city-generator
+              - img [ref=e212]
+            - button "Add to collection" [ref=e214] [cursor=pointer]:
+              - generic [ref=e215]: 
+              - generic [ref=e216]: Add to collection
+          - generic [ref=e217]:
+            - generic [ref=e218]: Web
+            - link "Medieval Fantasy City Generator" [ref=e219] [cursor=pointer]:
+              - /url: https://watabou.itch.io/medieval-fantasy-city-generator
+          - link "watabou" [ref=e221] [cursor=pointer]:
+            - /url: https://watabou.itch.io
+          - 'generic "Average: 4.84" [ref=e222]':
+            - generic [ref=e223]: Average rating 4.84 out of 5
+            - generic [ref=e224]:
+              - generic [ref=e225]:
+                - generic [ref=e226]: 
+                - generic [ref=e227]: 
+                - generic [ref=e228]: 
+                - generic [ref=e229]: 
+                - generic [ref=e230]: 
+              - generic [ref=e231]:
+                - generic [ref=e232]: 
+                - generic [ref=e233]: 
+                - generic [ref=e234]: 
+                - generic [ref=e235]: 
+                - generic [ref=e236]: 
+            - generic [ref=e237]:
+              - text: (3.4k
+              - generic [ref=e238]: total ratings
+              - text: )
+          - link "#Tools" [ref=e240] [cursor=pointer]:
+            - /url: https://itch.io/tools
+          - generic [ref=e241]: Not a game
+        - generic [ref=e242]:
+          - generic [ref=e243]:
+            - link [ref=e244] [cursor=pointer]:
+              - /url: https://alarts.itch.io/die-in-the-dungeon
+              - img [ref=e245]
+              - generic [ref=e246]: GIF
+            - generic [ref=e247]:
+              - generic [ref=e248]: 
+              - generic [ref=e249]: 
+              - generic [ref=e250]: 
+            - button "Add to collection" [ref=e252] [cursor=pointer]:
+              - generic [ref=e253]: 
+              - generic [ref=e254]: Add to collection
+          - generic [ref=e255]:
+            - generic [ref=e256]: Web
+            - link "Die in the Dungeon CLASSIC" [ref=e257] [cursor=pointer]:
+              - /url: https://alarts.itch.io/die-in-the-dungeon
+          - link "Alarts" [ref=e259] [cursor=pointer]:
+            - /url: https://alarts.itch.io
+          - 'generic "Average: 4.74" [ref=e260]':
+            - generic [ref=e261]: Average rating 4.74 out of 5
+            - generic [ref=e262]:
+              - generic [ref=e263]:
+                - generic [ref=e264]: 
+                - generic [ref=e265]: 
+                - generic [ref=e266]: 
+                - generic [ref=e267]: 
+                - generic [ref=e268]: 
+              - generic [ref=e269]:
+                - generic [ref=e270]: 
+                - generic [ref=e271]: 
+                - generic [ref=e272]: 
+                - generic [ref=e273]: 
+                - generic [ref=e274]: 
+            - generic [ref=e275]:
+              - text: (2.5k
+              - generic [ref=e276]: total ratings
+              - text: )
+          - generic [ref=e277]: A turn-based, deck-building roguelite focused on dice combinations!
+        - generic [ref=e278]:
+          - generic [ref=e279]:
+            - link [ref=e280] [cursor=pointer]:
+              - /url: https://pixelfrog-assets.itch.io/tiny-swords
+              - img [ref=e281]
+            - button "Add to collection" [ref=e283] [cursor=pointer]:
+              - generic [ref=e284]: 
+              - generic [ref=e285]: Add to collection
+          - generic [ref=e286]:
+            - generic [ref=e287]: Free
+            - link "Tiny Swords" [ref=e288] [cursor=pointer]:
+              - /url: https://pixelfrog-assets.itch.io/tiny-swords
+          - link "Pixel Frog" [ref=e290] [cursor=pointer]:
+            - /url: https://pixelfrog-assets.itch.io
+          - 'generic "Average: 4.94" [ref=e291]':
+            - generic [ref=e292]: Average rating 4.94 out of 5
+            - generic [ref=e293]:
+              - generic [ref=e294]:
+                - generic [ref=e295]: 
+                - generic [ref=e296]: 
+                - generic [ref=e297]: 
+                - generic [ref=e298]: 
+                - generic [ref=e299]: 
+              - generic [ref=e300]:
+                - generic [ref=e301]: 
+                - generic [ref=e302]: 
+                - generic [ref=e303]: 
+                - generic [ref=e304]: 
+                - generic [ref=e305]: 
+            - generic [ref=e306]:
+              - text: (651
+              - generic [ref=e307]: total ratings
+              - text: )
+          - link "#Game assets" [ref=e309] [cursor=pointer]:
+            - /url: https://itch.io/game-assets
+          - generic [ref=e310]: The most brutal and colorful battle!
+        - generic [ref=e311]:
+          - generic [ref=e312]:
+            - link [ref=e313] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io/pixel-sprite-generator
+              - img [ref=e314]
+            - generic [ref=e315]:
+              - generic [ref=e316]: 
+              - generic [ref=e317]: 
+            - button "Add to collection" [ref=e319] [cursor=pointer]:
+              - generic [ref=e320]: 
+              - generic [ref=e321]: Add to collection
+          - generic [ref=e322]:
+            - generic [ref=e323]: Web
+            - link "Pixel Sprite Generator" [ref=e324] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io/pixel-sprite-generator
+          - link "Deep-Fold" [ref=e326] [cursor=pointer]:
+            - /url: https://deep-fold.itch.io
+          - 'generic "Average: 4.88" [ref=e327]':
+            - generic [ref=e328]: Average rating 4.88 out of 5
+            - generic [ref=e329]:
+              - generic [ref=e330]:
+                - generic [ref=e331]: 
+                - generic [ref=e332]: 
+                - generic [ref=e333]: 
+                - generic [ref=e334]: 
+                - generic [ref=e335]: 
+              - generic [ref=e336]:
+                - generic [ref=e337]: 
+                - generic [ref=e338]: 
+                - generic [ref=e339]: 
+                - generic [ref=e340]: 
+                - generic [ref=e341]: 
+            - generic [ref=e342]:
+              - text: (58
+              - generic [ref=e343]: total ratings
+              - text: )
+          - link "#Tools" [ref=e345] [cursor=pointer]:
+            - /url: https://itch.io/tools
+          - generic [ref=e346]: A tool to generate all kinds of funny sprites.
+        - generic [ref=e347]:
+          - generic [ref=e348]:
+            - link [ref=e349] [cursor=pointer]:
+              - /url: https://limezu.itch.io/modernuserinterface
+              - img [ref=e350]
+            - generic [ref=e351]:
+              - generic [ref=e352]: 35%
+              - generic [ref=e353]: "off"
+            - generic [ref=e354]:
+              - generic [ref=e355]: 
+              - generic [ref=e356]: 
+            - button "Add to collection" [ref=e358] [cursor=pointer]:
+              - generic [ref=e359]: 
+              - generic [ref=e360]: Add to collection
+          - generic [ref=e361]:
+            - generic [ref=e362]: $3.90
+            - link "Modern User Interface - RPG asset pack [16x16]" [ref=e363] [cursor=pointer]:
+              - /url: https://limezu.itch.io/modernuserinterface
+          - link "LimeZu" [ref=e365] [cursor=pointer]:
+            - /url: https://limezu.itch.io
+          - 'generic "Average: 4.94" [ref=e366]':
+            - generic [ref=e367]: Average rating 4.94 out of 5
+            - generic [ref=e368]:
+              - generic [ref=e369]:
+                - generic [ref=e370]: 
+                - generic [ref=e371]: 
+                - generic [ref=e372]: 
+                - generic [ref=e373]: 
+                - generic [ref=e374]: 
+              - generic [ref=e375]:
+                - generic [ref=e376]: 
+                - generic [ref=e377]: 
+                - generic [ref=e378]: 
+                - generic [ref=e379]: 
+                - generic [ref=e380]: 
+            - generic [ref=e381]:
+              - text: (65
+              - generic [ref=e382]: total ratings
+              - text: )
+          - link "#Game assets" [ref=e384] [cursor=pointer]:
+            - /url: https://itch.io/game-assets
+          - generic [ref=e385]: 16x16 assets for your top-down game
+        - generic [ref=e386]:
+          - generic [ref=e387]:
+            - link [ref=e388] [cursor=pointer]:
+              - /url: https://orama-interactive.itch.io/pixelorama
+              - img [ref=e389]
+            - generic [ref=e390]:
+              - generic [ref=e391]: 
+              - generic [ref=e392]: 
+              - generic [ref=e393]: 
+              - generic [ref=e394]: 
+            - button "Add to collection" [ref=e396] [cursor=pointer]:
+              - generic [ref=e397]: 
+              - generic [ref=e398]: Add to collection
+          - generic [ref=e399]:
+            - generic [ref=e400]: Web
+            - link "Pixelorama" [ref=e401] [cursor=pointer]:
+              - /url: https://orama-interactive.itch.io/pixelorama
+          - link "Orama Interactive" [ref=e403] [cursor=pointer]:
+            - /url: https://orama-interactive.itch.io
+          - 'generic "Average: 4.90" [ref=e404]':
+            - generic [ref=e405]: Average rating 4.90 out of 5
+            - generic [ref=e406]:
+              - generic [ref=e407]:
+                - generic [ref=e408]: 
+                - generic [ref=e409]: 
+                - generic [ref=e410]: 
+                - generic [ref=e411]: 
+                - generic [ref=e412]: 
+              - generic [ref=e413]:
+                - generic [ref=e414]: 
+                - generic [ref=e415]: 
+                - generic [ref=e416]: 
+                - generic [ref=e417]: 
+                - generic [ref=e418]: 
+            - generic [ref=e419]:
+              - text: (721
+              - generic [ref=e420]: total ratings
+              - text: )
+          - link "#Tools" [ref=e422] [cursor=pointer]:
+            - /url: https://itch.io/tools
+          - generic [ref=e423]: Unleash your creativity with Pixelorama, a powerful and accessible open-source pixel art multitool.
+        - generic [ref=e424]:
+          - generic [ref=e425]:
+            - link [ref=e426] [cursor=pointer]:
+              - /url: https://dacap.itch.io/aseprite
+              - img [ref=e427]
+            - generic [ref=e428]:
+              - generic [ref=e429]: 
+              - generic [ref=e430]: 
+              - generic [ref=e431]: 
+            - button "Add to collection" [ref=e433] [cursor=pointer]:
+              - generic [ref=e434]: 
+              - generic [ref=e435]: Add to collection
+          - generic [ref=e436]:
+            - generic [ref=e437]: $19.99
+            - link "Aseprite" [ref=e438] [cursor=pointer]:
+              - /url: https://dacap.itch.io/aseprite
+          - link "David Capello" [ref=e440] [cursor=pointer]:
+            - /url: https://dacap.itch.io
+          - 'generic "Average: 4.95" [ref=e441]':
+            - generic [ref=e442]: Average rating 4.95 out of 5
+            - generic [ref=e443]:
+              - generic [ref=e444]:
+                - generic [ref=e445]: 
+                - generic [ref=e446]: 
+                - generic [ref=e447]: 
+                - generic [ref=e448]: 
+                - generic [ref=e449]: 
+              - generic [ref=e450]:
+                - generic [ref=e451]: 
+                - generic [ref=e452]: 
+                - generic [ref=e453]: 
+                - generic [ref=e454]: 
+                - generic [ref=e455]: 
+            - generic [ref=e456]:
+              - text: (845
+              - generic [ref=e457]: total ratings
+              - text: )
+          - link "#Tools" [ref=e459] [cursor=pointer]:
+            - /url: https://itch.io/tools
+          - generic [ref=e460]: Animated sprite editor & pixel art tool
+        - generic [ref=e461]:
+          - generic [ref=e462]:
+            - link [ref=e463] [cursor=pointer]:
+              - /url: https://graebor.itch.io/sort-the-court
+              - img [ref=e464]
+            - generic [ref=e465]:
+              - generic [ref=e466]: 
+              - generic [ref=e467]: 
+            - button "Add to collection" [ref=e469] [cursor=pointer]:
+              - generic [ref=e470]: 
+              - generic [ref=e471]: Add to collection
+          - generic [ref=e472]:
+            - generic [ref=e473]: Web
+            - link "Sort the Court!" [ref=e474] [cursor=pointer]:
+              - /url: https://graebor.itch.io/sort-the-court
+          - link "Graeme Borland" [ref=e476] [cursor=pointer]:
+            - /url: https://graebor.itch.io
+          - 'generic "Average: 4.70" [ref=e477]':
+            - generic [ref=e478]: Average rating 4.70 out of 5
+            - generic [ref=e479]:
+              - generic [ref=e480]:
+                - generic [ref=e481]: 
+                - generic [ref=e482]: 
+                - generic [ref=e483]: 
+                - generic [ref=e484]: 
+                - generic [ref=e485]: 
+              - generic [ref=e486]:
+                - generic [ref=e487]: 
+                - generic [ref=e488]: 
+                - generic [ref=e489]: 
+                - generic [ref=e490]: 
+                - generic [ref=e491]: 
+            - generic [ref=e492]:
+              - text: (10k
+              - generic [ref=e493]: total ratings
+              - text: )
+          - generic [ref=e494]: Give your decree in simple yes or no answers, and help the kingdom grow!
+        - generic [ref=e495]:
+          - generic [ref=e496]:
+            - link [ref=e497] [cursor=pointer]:
+              - /url: https://sfbgames.itch.io/chiptone
+              - img [ref=e498]
+            - generic [ref=e499]:
+              - generic [ref=e500]: 
+              - generic [ref=e501]: 
+            - button "Add to collection" [ref=e503] [cursor=pointer]:
+              - generic [ref=e504]: 
+              - generic [ref=e505]: Add to collection
+          - generic [ref=e506]:
+            - generic [ref=e507]: Web
+            - link "ChipTone" [ref=e508] [cursor=pointer]:
+              - /url: https://sfbgames.itch.io/chiptone
+          - link "SFBGames" [ref=e510] [cursor=pointer]:
+            - /url: https://sfbgames.itch.io
+          - 'generic "Average: 4.91" [ref=e511]':
+            - generic [ref=e512]: Average rating 4.91 out of 5
+            - generic [ref=e513]:
+              - generic [ref=e514]:
+                - generic [ref=e515]: 
+                - generic [ref=e516]: 
+                - generic [ref=e517]: 
+                - generic [ref=e518]: 
+                - generic [ref=e519]: 
+              - generic [ref=e520]:
+                - generic [ref=e521]: 
+                - generic [ref=e522]: 
+                - generic [ref=e523]: 
+                - generic [ref=e524]: 
+                - generic [ref=e525]: 
+            - generic [ref=e526]:
+              - text: (973
+              - generic [ref=e527]: total ratings
+              - text: )
+          - link "#Tools" [ref=e529] [cursor=pointer]:
+            - /url: https://itch.io/tools
+          - generic [ref=e530]: Free game sound effects tool
+  - generic [ref=e531]:
+    - generic [ref=e532]:
+      - generic [ref=e533]:
+        - link "itch.io on Twitter" [ref=e534] [cursor=pointer]:
+          - /url: https://twitter.com/itchio
+          - generic [ref=e535]: 
+          - generic [ref=e536]: itch.io on Twitter
+        - link "itch.io on Facebook" [ref=e537] [cursor=pointer]:
+          - /url: https://www.facebook.com/itchiogames
+          - generic [ref=e538]: 
+          - generic [ref=e539]: itch.io on Facebook
+      - link "About" [ref=e540] [cursor=pointer]:
+        - /url: https://itch.io/docs/general/about
+      - link "FAQ" [ref=e541] [cursor=pointer]:
+        - /url: https://itch.io/docs/general/faq
+      - link "Blog" [ref=e542] [cursor=pointer]:
+        - /url: https://itch.io/blog
+      - link "Contact us" [ref=e543] [cursor=pointer]:
+        - /url: https://itch.io/support?game_id=821003
+    - generic [ref=e544]:
+      - text: Copyright © 2026 itch corp ·
+      - link "Directory" [ref=e545] [cursor=pointer]:
+        - /url: https://itch.io/directory
+      - text: ·
+      - link "Terms" [ref=e546] [cursor=pointer]:
+        - /url: https://itch.io/docs/legal/terms
+      - text: ·
+      - link "Privacy" [ref=e547] [cursor=pointer]:
+        - /url: https://itch.io/docs/legal/privacy-policy
+      - text: ·
+      - link "Cookies" [ref=e548] [cursor=pointer]:
+        - /url: https://itch.io/docs/legal/cookie-policy

@@ -1,0 +1,9 @@
+{
+  "version": "1.0.3",
+  "build_time": "2026-03-17T11:25:00+08:00",
+  "changes": [
+    "修复角色动画透明度问题",
+    "统一使用 ExtResource 纹理引用",
+    "移除 CompressedTexture2D 定义"
+  ]
+}

@@ -3,7 +3,7 @@
  * 用于在设置页面管理项目路径配置
  */
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, FolderOpen, Check, X, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, FolderOpen, Check, X, RefreshCw, Search } from 'lucide-react';
 import { projectPathsApi, type ProjectPath, type ProjectPathCreate } from '../../lib/api';
 
 interface ProjectPathManagerProps {
@@ -18,6 +18,7 @@ export const ProjectPathManager: React.FC<ProjectPathManagerProps> = ({ onPathsC
   const [newPath, setNewPath] = useState('');
   const [newAlias, setNewAlias] = useState('');
   const [newRecursive, setNewRecursive] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
 
   console.log('[ProjectPathManager] Component mounted, paths:', paths, 'loading:', loading);
 
@@ -99,6 +100,23 @@ export const ProjectPathManager: React.FC<ProjectPathManagerProps> = ({ onPathsC
     }
   };
 
+  // 扫描 Git 仓库
+  const handleScanGitRepos = async () => {
+    try {
+      setIsScanning(true);
+      setError(null);
+      const response = await projectPathsApi.scanGitRepos();
+      await loadPaths();
+      onPathsChange?.();
+      // 显示成功消息
+      alert(`扫描完成！发现 ${response.total_found} 个仓库，添加 ${response.added} 个，跳过 ${response.skipped} 个`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '扫描失败');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -109,16 +127,35 @@ export const ProjectPathManager: React.FC<ProjectPathManagerProps> = ({ onPathsC
 
   return (
     <div className="space-y-6">
-      {/* 添加按钮 */}
-      <div className="flex items-center justify-end">
+      {/* 操作按钮 */}
+      <div className="flex items-center justify-end gap-2">
         {!isAdding && (
-          <button
-            onClick={() => setIsAdding(true)}
-            className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-400 font-bold transition-colors flex items-center gap-2"
-          >
-            <Plus size={16} />
-            添加路径
-          </button>
+          <>
+            <button
+              onClick={handleScanGitRepos}
+              disabled={isScanning}
+              className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded-lg text-purple-400 font-bold transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isScanning ? (
+                <>
+                  <RefreshCw size={16} className="animate-spin" />
+                  扫描中...
+                </>
+              ) : (
+                <>
+                  <Search size={16} />
+                  扫描 Git 仓库
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-400 font-bold transition-colors flex items-center gap-2"
+            >
+              <Plus size={16} />
+              添加路径
+            </button>
+          </>
         )}
       </div>
 

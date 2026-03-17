@@ -1,0 +1,1253 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - link "Skip to main content" [ref=e3] [cursor=pointer]:
+      - /url: "#maincontent"
+    - generic [ref=e4]:
+      - heading "itch.io itch.io logo & title" [level=1] [ref=e5]:
+        - link "itch.io itch.io logo & title" [ref=e6] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e7]: itch.io
+          - img "itch.io logo & title" [ref=e8]
+      - generic [ref=e9]:
+        - link "Browse Games" [ref=e10] [cursor=pointer]:
+          - /url: /games
+        - link "Game Jams" [ref=e11] [cursor=pointer]:
+          - /url: /jams
+        - link "Upload Game" [ref=e12] [cursor=pointer]:
+          - /url: /developers
+          - generic [ref=e13]: 
+          - text: Upload Game
+        - link "Developer Logs" [ref=e14] [cursor=pointer]:
+          - /url: /devlogs
+        - link "Community" [ref=e15] [cursor=pointer]:
+          - /url: /community
+      - generic [ref=e16]:
+        - textbox "Search for games, jams, tags or creators" [ref=e18]
+        - button "Search" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+      - generic [ref=e23]:
+        - link "Log in" [ref=e24] [cursor=pointer]:
+          - /url: /login
+        - link "Register" [ref=e25] [cursor=pointer]:
+          - /url: /register
+  - generic [ref=e27]:
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - heading "Filter Results" [level=2] [ref=e31]
+        - generic [ref=e32]:
+          - text: (
+          - link "Clear" [ref=e33] [cursor=pointer]:
+            - /url: /game-assets
+          - text: )
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - generic [ref=e36]: Tags
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - heading "Godot" [level=3] [ref=e39]:
+                - img [ref=e40]
+                - generic [ref=e42]: Godot
+                - link [ref=e43] [cursor=pointer]:
+                  - /url: /game-assets/free/tag-pixel-art
+                  - img [ref=e44]
+              - paragraph [ref=e48]:
+                - link "Godot Engine" [ref=e49] [cursor=pointer]:
+                  - /url: https://godotengine.org/
+                - text: "- The free and open source 2D and 3D game engine"
+              - paragraph [ref=e50]:
+                - link "Suggest updated description" [ref=e51] [cursor=pointer]:
+                  - /url: javascript:void(0);
+            - generic [ref=e52]:
+              - heading "Pixel Art" [level=3] [ref=e53]:
+                - img [ref=e54]
+                - generic [ref=e56]: Pixel Art
+                - link [ref=e57] [cursor=pointer]:
+                  - /url: /game-assets/free/tag-godot
+                  - img [ref=e58]
+              - paragraph [ref=e62]: Pixel Art refers to the charming, simplistic, retro/renaissance style of very-low-resolution graphics, such as from the 1977-1995 Atari, GameBoy, & Super Nintendo (SNES) eras.
+              - paragraph [ref=e63]:
+                - link "Suggest updated description" [ref=e64] [cursor=pointer]:
+                  - /url: javascript:void(0);
+              - group [ref=e65]:
+                - generic "Aliases..." [ref=e66] [cursor=pointer]
+        - generic [ref=e67]:
+          - generic [ref=e68]:
+            - button "Price" [ref=e69] [cursor=pointer]:
+              - generic [ref=e70]:
+                - text: 
+                - generic [ref=e71]: 
+              - text: Price
+            - link "Clear filter" [ref=e72] [cursor=pointer]:
+              - /url: /game-assets/tag-godot/tag-pixel-art
+              - img [ref=e73]
+          - list [ref=e76]:
+            - listitem [ref=e77]:
+              - link "Free" [ref=e78] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art
+                - generic [ref=e79]: 
+                - text: Free
+            - listitem:
+              - link "On Sale" [ref=e80] [cursor=pointer]:
+                - /url: /game-assets/on-sale/tag-godot/tag-pixel-art
+                - generic [ref=e81]: 
+                - text: On Sale
+            - listitem:
+              - link "Paid" [ref=e82] [cursor=pointer]:
+                - /url: /game-assets/store/tag-godot/tag-pixel-art
+                - generic [ref=e83]: 
+                - text: Paid
+            - listitem:
+              - link "$5 or less" [ref=e84] [cursor=pointer]:
+                - /url: /game-assets/5-dollars-or-less/tag-godot/tag-pixel-art
+                - generic [ref=e85]: 
+                - text: $5 or less
+            - listitem:
+              - link "$15 or less" [ref=e86] [cursor=pointer]:
+                - /url: /game-assets/15-dollars-or-less/tag-godot/tag-pixel-art
+                - generic [ref=e87]: 
+                - text: $15 or less
+          - button "More OptionsToggle More Options" [ref=e88] [cursor=pointer]
+        - generic [ref=e89]:
+          - button "Types" [ref=e91] [cursor=pointer]:
+            - generic [ref=e92]:
+              - generic [ref=e93]: 
+              - text: 
+            - text: Types
+          - list [ref=e94]:
+            - listitem [ref=e95]:
+              - link "Sprites" [ref=e96] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-sprites
+                - generic [ref=e97]: 
+                - text: Sprites
+            - listitem [ref=e98]:
+              - link "Sound effects" [ref=e99] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-sound-effects
+                - generic [ref=e100]: 
+                - text: Sound effects
+            - listitem [ref=e101]:
+              - link "Music" [ref=e102] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-music/tag-pixel-art
+                - generic [ref=e103]: 
+                - text: Music
+            - listitem [ref=e104]:
+              - link "Textures" [ref=e105] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-textures
+                - generic [ref=e106]: 
+                - text: Textures
+            - listitem [ref=e107]:
+              - link "Characters" [ref=e108] [cursor=pointer]:
+                - /url: /game-assets/free/tag-characters/tag-godot/tag-pixel-art
+                - generic [ref=e109]: 
+                - text: Characters
+            - listitem [ref=e110]:
+              - link "Tileset" [ref=e111] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-tileset
+                - generic [ref=e112]: 
+                - text: Tileset
+            - listitem [ref=e113]:
+              - link "Backgrounds" [ref=e114] [cursor=pointer]:
+                - /url: /game-assets/free/tag-backgrounds/tag-godot/tag-pixel-art
+                - generic [ref=e115]: 
+                - text: Backgrounds
+            - listitem [ref=e116]:
+              - link "Fonts" [ref=e117] [cursor=pointer]:
+                - /url: /game-assets/free/tag-fonts/tag-godot/tag-pixel-art
+                - generic [ref=e118]: 
+                - text: Fonts
+            - listitem [ref=e119]:
+              - link "Icons" [ref=e120] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-icons/tag-pixel-art
+                - generic [ref=e121]: 
+                - text: Icons
+            - listitem [ref=e122]:
+              - link "User Interface (UI)" [ref=e123] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-user-interface
+                - generic [ref=e124]: 
+                - text: User Interface (UI)
+        - generic [ref=e125]:
+          - button "Styles" [ref=e127] [cursor=pointer]:
+            - generic [ref=e128]:
+              - text: 
+              - generic [ref=e129]: 
+            - text: Styles
+          - list [ref=e130]:
+            - listitem:
+              - link "2D" [ref=e131] [cursor=pointer]:
+                - /url: /game-assets/free/tag-2d/tag-godot
+                - generic [ref=e132]: 
+                - text: 2D
+              - link "" [ref=e134] [cursor=pointer]:
+                - /url: /game-assets/free/tag-2d/tag-godot/tag-pixel-art
+                - generic [ref=e135]: 
+            - listitem:
+              - link "3D" [ref=e136] [cursor=pointer]:
+                - /url: /game-assets/free/tag-3d/tag-godot
+                - generic [ref=e137]: 
+                - text: 3D
+              - link "" [ref=e139] [cursor=pointer]:
+                - /url: /game-assets/free/tag-3d/tag-godot/tag-pixel-art
+                - generic [ref=e140]: 
+            - listitem [ref=e141]:
+              - link "Pixel Art" [ref=e142] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art
+                - generic [ref=e143]: 
+                - text: Pixel Art
+              - link "Clear filter" [ref=e145] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot
+                - img [ref=e146]
+            - listitem:
+              - link "8-Bit" [ref=e149] [cursor=pointer]:
+                - /url: /game-assets/free/tag-8-bit/tag-godot
+                - generic [ref=e150]: 
+                - text: 8-Bit
+              - link "" [ref=e152] [cursor=pointer]:
+                - /url: /game-assets/free/tag-8-bit/tag-godot/tag-pixel-art
+                - generic [ref=e153]: 
+            - listitem:
+              - link "16-bit" [ref=e154] [cursor=pointer]:
+                - /url: /game-assets/free/tag-16-bit/tag-godot
+                - generic [ref=e155]: 
+                - text: 16-bit
+              - link "" [ref=e157] [cursor=pointer]:
+                - /url: /game-assets/free/tag-16-bit/tag-godot/tag-pixel-art
+                - generic [ref=e158]: 
+            - listitem:
+              - link "1-bit" [ref=e159] [cursor=pointer]:
+                - /url: /game-assets/free/tag-1-bit/tag-godot
+                - generic [ref=e160]: 
+                - text: 1-bit
+              - link "" [ref=e162] [cursor=pointer]:
+                - /url: /game-assets/free/tag-1-bit/tag-godot/tag-pixel-art
+                - generic [ref=e163]: 
+            - listitem:
+              - link "Low-poly" [ref=e164] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-low-poly
+                - generic [ref=e165]: 
+                - text: Low-poly
+              - link "" [ref=e167] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-low-poly/tag-pixel-art
+                - generic [ref=e168]: 
+            - listitem:
+              - link "Voxel" [ref=e169] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-voxel
+                - generic [ref=e170]: 
+                - text: Voxel
+              - link "" [ref=e172] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-voxel
+                - generic [ref=e173]: 
+          - button "More OptionsToggle More Options" [ref=e174] [cursor=pointer]
+        - generic [ref=e175]:
+          - button "Formats" [ref=e177] [cursor=pointer]:
+            - generic [ref=e178]:
+              - text: 
+              - generic [ref=e179]: 
+            - text: Formats
+          - list:
+            - listitem:
+              - link "16x16" [ref=e180] [cursor=pointer]:
+                - /url: /game-assets/free/tag-16x16/tag-godot/tag-pixel-art
+                - generic [ref=e181]: 
+                - text: 16x16
+            - listitem:
+              - link "32x32" [ref=e182] [cursor=pointer]:
+                - /url: /game-assets/free/tag-32x32/tag-godot/tag-pixel-art
+                - generic [ref=e183]: 
+                - text: 32x32
+            - listitem:
+              - link "FBX" [ref=e184] [cursor=pointer]:
+                - /url: /game-assets/free/tag-fbx/tag-godot/tag-pixel-art
+                - generic [ref=e185]: 
+                - text: FBX
+            - listitem:
+              - link "PNG" [ref=e186] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-png
+                - generic [ref=e187]: 
+                - text: PNG
+            - listitem:
+              - link "MIDI" [ref=e188] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-midi/tag-pixel-art
+                - generic [ref=e189]: 
+                - text: MIDI
+        - generic [ref=e190]:
+          - button "Themes" [ref=e192] [cursor=pointer]:
+            - generic [ref=e193]:
+              - text: 
+              - generic [ref=e194]: 
+            - text: Themes
+          - list:
+            - listitem:
+              - link "Fantasy" [ref=e195] [cursor=pointer]:
+                - /url: /game-assets/free/tag-fantasy/tag-godot/tag-pixel-art
+                - generic [ref=e196]: 
+                - text: Fantasy
+            - listitem:
+              - link "Medieval" [ref=e197] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-medieval/tag-pixel-art
+                - generic [ref=e198]: 
+                - text: Medieval
+            - listitem:
+              - link "Modern" [ref=e199] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-modern/tag-pixel-art
+                - generic [ref=e200]: 
+                - text: Modern
+            - listitem:
+              - link "Sci-fi" [ref=e201] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-science-fiction
+                - generic [ref=e202]: 
+                - text: Sci-fi
+            - listitem:
+              - link "Futuristic" [ref=e203] [cursor=pointer]:
+                - /url: /game-assets/free/tag-futuristic/tag-godot/tag-pixel-art
+                - generic [ref=e204]: 
+                - text: Futuristic
+            - listitem:
+              - link "Gothic" [ref=e205] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-gothic/tag-pixel-art
+                - generic [ref=e206]: 
+                - text: Gothic
+            - listitem:
+              - link "Cute" [ref=e207] [cursor=pointer]:
+                - /url: /game-assets/free/tag-cute/tag-godot/tag-pixel-art
+                - generic [ref=e208]: 
+                - text: Cute
+            - listitem:
+              - link "Retro" [ref=e209] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-retro
+                - generic [ref=e210]: 
+                - text: Retro
+            - listitem:
+              - link "Platformer" [ref=e211] [cursor=pointer]:
+                - /url: /game-assets/free/genre-platformer/tag-godot/tag-pixel-art
+                - generic [ref=e212]: 
+                - text: Platformer
+            - listitem:
+              - link "Top-Down" [ref=e213] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-top-down
+                - generic [ref=e214]: 
+                - text: Top-Down
+        - generic [ref=e215]:
+          - button "Tools & Engines" [ref=e217] [cursor=pointer]:
+            - generic [ref=e218]:
+              - text: 
+              - generic [ref=e219]: 
+            - text: Tools & Engines
+          - list:
+            - listitem:
+              - link "Unity" [ref=e220] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-unity
+                - generic [ref=e221]: 
+                - text: Unity
+            - listitem:
+              - link "Unreal Engine" [ref=e222] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-unreal-engine
+                - generic [ref=e223]: 
+                - text: Unreal Engine
+            - listitem:
+              - link "Blender" [ref=e224] [cursor=pointer]:
+                - /url: /game-assets/free/tag-blender/tag-godot/tag-pixel-art
+                - generic [ref=e225]: 
+                - text: Blender
+        - generic [ref=e226]:
+          - button "Misc" [ref=e228] [cursor=pointer]:
+            - generic [ref=e229]:
+              - text: 
+              - generic [ref=e230]: 
+            - text: Misc
+          - list:
+            - listitem:
+              - link "No AI" [ref=e231] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-no-ai/tag-pixel-art
+                - generic [ref=e232]: 
+                - text: No AI
+            - listitem:
+              - link "Royalty Free" [ref=e233] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-royalty-free
+                - generic [ref=e234]: 
+                - text: Royalty Free
+            - listitem:
+              - link "Asset Pack" [ref=e235] [cursor=pointer]:
+                - /url: /game-assets/free/tag-asset-pack/tag-godot/tag-pixel-art
+                - generic [ref=e236]: 
+                - text: Asset Pack
+            - listitem:
+              - link "Modular" [ref=e237] [cursor=pointer]:
+                - /url: /game-assets/free/tag-godot/tag-modular/tag-pixel-art
+                - generic [ref=e238]: 
+                - text: Modular
+        - generic [ref=e239]:
+          - button "When" [ref=e241] [cursor=pointer]:
+            - generic [ref=e242]:
+              - generic [ref=e243]: 
+              - text: 
+            - text: When
+          - list [ref=e244]:
+            - listitem [ref=e245]:
+              - link "Last Day" [ref=e246] [cursor=pointer]:
+                - /url: /game-assets/free/last-day/tag-godot/tag-pixel-art
+                - generic [ref=e247]: 
+                - text: Last Day
+            - listitem [ref=e248]:
+              - link "Last 7 days" [ref=e249] [cursor=pointer]:
+                - /url: /game-assets/free/last-7-days/tag-godot/tag-pixel-art
+                - generic [ref=e250]: 
+                - text: Last 7 days
+            - listitem [ref=e251]:
+              - link "Last 30 days" [ref=e252] [cursor=pointer]:
+                - /url: /game-assets/free/last-30-days/tag-godot/tag-pixel-art
+                - generic [ref=e253]: 
+                - text: Last 30 days
+        - generic [ref=e254]:
+          - heading "Related collections" [level=3] [ref=e255]
+          - generic [ref=e256]:
+            - link [ref=e257] [cursor=pointer]:
+              - /url: /c/3588369/java3000s-collection
+              - generic [ref=e258]:
+                - img [ref=e259]
+                - img [ref=e260]
+                - img [ref=e261]
+                - img [ref=e262]
+            - generic [ref=e263]:
+              - link "java3000's Collection" [ref=e265] [cursor=pointer]:
+                - /url: /c/3588369/java3000s-collection
+              - link "java3000" [ref=e267] [cursor=pointer]:
+                - /url: https://java3000.itch.io
+          - generic [ref=e268]:
+            - link [ref=e269] [cursor=pointer]:
+              - /url: /c/4999735/alexdsouzafs-collection
+              - generic [ref=e270]:
+                - img [ref=e271]
+                - img [ref=e272]
+                - img [ref=e273]
+                - img [ref=e274]
+            - generic [ref=e275]:
+              - link "Alexdsouzaf's Collection" [ref=e277] [cursor=pointer]:
+                - /url: /c/4999735/alexdsouzafs-collection
+              - link "Alexdsouzaf" [ref=e279] [cursor=pointer]:
+                - /url: https://alexdsouzaf.itch.io
+          - generic [ref=e280]:
+            - link [ref=e281] [cursor=pointer]:
+              - /url: /c/2414229/dev-stuff
+              - generic [ref=e282]:
+                - img [ref=e283]
+                - img [ref=e284]
+                - img [ref=e285]
+                - img [ref=e286]
+            - generic [ref=e287]:
+              - link "dev stuff" [ref=e289] [cursor=pointer]:
+                - /url: /c/2414229/dev-stuff
+              - link "bulkbolgan" [ref=e291] [cursor=pointer]:
+                - /url: https://bulkbolgan.itch.io
+          - generic [ref=e292]:
+            - link [ref=e293] [cursor=pointer]:
+              - /url: /c/3936731/game-dev
+              - generic [ref=e294]:
+                - img [ref=e295]
+                - img [ref=e296]
+                - img [ref=e297]
+                - img [ref=e298]
+            - generic [ref=e299]:
+              - link "game dev" [ref=e301] [cursor=pointer]:
+                - /url: /c/3936731/game-dev
+              - link "TigrJyff" [ref=e303] [cursor=pointer]:
+                - /url: https://tigrjyff.itch.io
+          - generic [ref=e304]:
+            - link [ref=e305] [cursor=pointer]:
+              - /url: /c/3379880/game-dev
+              - generic [ref=e306]:
+                - img [ref=e307]
+                - img [ref=e308]
+                - img [ref=e309]
+                - img [ref=e310]
+            - generic [ref=e311]:
+              - link "Game Dev" [ref=e313] [cursor=pointer]:
+                - /url: /c/3379880/game-dev
+              - link "Jill_is_my_Valentine" [ref=e315] [cursor=pointer]:
+                - /url: https://jill-is-my-valentine.itch.io
+          - generic [ref=e316]:
+            - link [ref=e317] [cursor=pointer]:
+              - /url: /c/6934603/free-packs
+              - generic [ref=e318]:
+                - img [ref=e319]
+                - img [ref=e320]
+                - img [ref=e321]
+                - img [ref=e322]
+            - generic [ref=e323]:
+              - link "Free Packs" [ref=e325] [cursor=pointer]:
+                - /url: /c/6934603/free-packs
+              - link "TortoiseShellGames" [ref=e327] [cursor=pointer]:
+                - /url: https://tortoiseshellgames.itch.io
+    - generic [ref=e329]:
+      - generic [ref=e330]:
+        - heading "Top free Game assets tagged Godot and Pixel Art (359 results)" [level=2] [ref=e331]:
+          - text: Top free
+          - button "Game assets" [ref=e334] [cursor=pointer]:
+            - generic [ref=e335]: Game assets
+            - img [ref=e336]
+          - text: tagged Godot and Pixel Art (359 results)
+        - generic [ref=e338]:
+          - generic [ref=e339]:
+            - img [ref=e340]
+            - generic [ref=e342]: Sort by
+          - list [ref=e343]:
+            - listitem [ref=e344]:
+              - button "Popular" [ref=e345] [cursor=pointer]
+            - listitem [ref=e346]:
+              - link "New & Popular" [ref=e347] [cursor=pointer]:
+                - /url: /game-assets/new-and-popular/free/tag-godot/tag-pixel-art
+            - listitem [ref=e348]:
+              - link "Top sellers" [ref=e349] [cursor=pointer]:
+                - /url: /game-assets/top-sellers/free/tag-godot/tag-pixel-art
+            - listitem [ref=e350]:
+              - link "Top rated" [ref=e351] [cursor=pointer]:
+                - /url: /game-assets/top-rated/free/tag-godot/tag-pixel-art
+            - listitem [ref=e352]:
+              - link "Most Recent" [ref=e353] [cursor=pointer]:
+                - /url: /game-assets/newest/free/tag-godot/tag-pixel-art
+        - generic [ref=e354]:
+          - generic "Filter by tag" [ref=e355]:
+            - img [ref=e356]
+          - textbox "Select a tag..." [ref=e360] [cursor=pointer]
+          - generic [ref=e361]:
+            - link "Voxel" [ref=e362] [cursor=pointer]:
+              - /url: /game-assets/free/tag-voxel
+            - link "+" [ref=e363] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-voxel
+          - generic [ref=e364]:
+            - link "Unreal Engine" [ref=e365] [cursor=pointer]:
+              - /url: /game-assets/free/tag-unreal-engine
+            - link "+" [ref=e366] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-unreal-engine
+          - generic [ref=e367]:
+            - link "Top-Down" [ref=e368] [cursor=pointer]:
+              - /url: /game-assets/free/tag-top-down
+            - link "+" [ref=e369] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-top-down
+          - generic [ref=e370]:
+            - link "3D" [ref=e371] [cursor=pointer]:
+              - /url: /game-assets/free/tag-3d
+            - link "+" [ref=e372] [cursor=pointer]:
+              - /url: /game-assets/free/tag-3d/tag-godot/tag-pixel-art
+          - generic [ref=e373]:
+            - link "Low-poly" [ref=e374] [cursor=pointer]:
+              - /url: /game-assets/free/tag-low-poly
+            - link "+" [ref=e375] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-low-poly/tag-pixel-art
+          - generic [ref=e376]:
+            - link "Isometric" [ref=e377] [cursor=pointer]:
+              - /url: /game-assets/free/tag-isometric
+            - link "+" [ref=e378] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-isometric/tag-pixel-art
+          - generic [ref=e379]:
+            - link "2D" [ref=e380] [cursor=pointer]:
+              - /url: /game-assets/free/tag-2d
+            - link "+" [ref=e381] [cursor=pointer]:
+              - /url: /game-assets/free/tag-2d/tag-godot/tag-pixel-art
+          - generic [ref=e382]:
+            - link "Sprites" [ref=e383] [cursor=pointer]:
+              - /url: /game-assets/free/tag-sprites
+            - link "+" [ref=e384] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-sprites
+          - generic [ref=e385]:
+            - link "RPG Maker" [ref=e386] [cursor=pointer]:
+              - /url: /game-assets/free/tag-rpgmaker
+            - link "+" [ref=e387] [cursor=pointer]:
+              - /url: /game-assets/free/tag-godot/tag-pixel-art/tag-rpgmaker
+          - generic [ref=e388]:
+            - link "16x16" [ref=e389] [cursor=pointer]:
+              - /url: /game-assets/free/tag-16x16
+            - link "+" [ref=e390] [cursor=pointer]:
+              - /url: /game-assets/free/tag-16x16/tag-godot/tag-pixel-art
+          - generic [ref=e392]:
+            - text: (
+            - link "View all tags" [ref=e393] [cursor=pointer]:
+              - /url: /tags/assets
+            - text: )
+        - paragraph [ref=e394]:
+          - text: Explore game assets tagged Godot and Pixel Art on itch.io ·
+          - link "Upload your game assets" [ref=e395] [cursor=pointer]:
+            - /url: /docs/creators/faq
+          - text: to itch.io to have them show up here.
+      - link "New itch.io is now on YouTube! Subscribe for game recommendations, clips, and more View Channel →" [ref=e396] [cursor=pointer]:
+        - /url: https://www.youtube.com/itchiogames?sub_confirmation=1
+        - img [ref=e398]
+        - generic [ref=e401]:
+          - heading "New itch.io is now on YouTube!" [level=4] [ref=e402]:
+            - generic [ref=e403]: New
+            - text: itch.io is now on YouTube!
+          - paragraph [ref=e404]: Subscribe for game recommendations, clips, and more
+        - generic [ref=e405]: View Channel →
+      - generic [ref=e407]:
+        - generic [ref=e408]:
+          - generic [ref=e409]:
+            - link [ref=e410] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io/pixel-planet-generator
+              - img [ref=e411]
+            - link " Add to collection" [ref=e413] [cursor=pointer]:
+              - /url: /g/deep-fold/pixel-planet-generator/add-to-collection?source=browse
+              - generic [ref=e414]: 
+              - text: Add to collection
+          - generic [ref=e415]:
+            - link "Pixel Planet Generator" [ref=e417] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io/pixel-planet-generator
+            - generic "Showcase of shader code for Godot game engine" [ref=e418]
+            - link "Deep-Fold" [ref=e420] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io
+        - generic [ref=e421]:
+          - generic [ref=e422]:
+            - link [ref=e423] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io/space-background-generator
+              - img [ref=e424]
+            - link " Add to collection" [ref=e426] [cursor=pointer]:
+              - /url: /g/deep-fold/space-background-generator/add-to-collection?source=browse
+              - generic [ref=e427]: 
+              - text: Add to collection
+          - generic [ref=e428]:
+            - link "Pixel Space Background Generator" [ref=e430] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io/space-background-generator
+            - generic "A generator that will generate pixel space backgrounds for you." [ref=e431]
+            - link "Deep-Fold" [ref=e433] [cursor=pointer]:
+              - /url: https://deep-fold.itch.io
+        - generic [ref=e434]:
+          - generic [ref=e435]:
+            - link [ref=e436] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-mechas
+              - img [ref=e437]
+            - link " Add to collection" [ref=e439] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-mechas/add-to-collection?source=browse
+              - generic [ref=e440]: 
+              - text: Add to collection
+          - generic [ref=e441]:
+            - generic [ref=e442]:
+              - link "Voxel Robot assets for free" [ref=e443] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxel-mechas
+              - link "In bundle" [ref=e444] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e445]: In bundle
+            - generic "3D animated robots - game ready" [ref=e446]
+            - link "monogon" [ref=e448] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e449]:
+          - generic [ref=e450]:
+            - link [ref=e451] [cursor=pointer]:
+              - /url: https://kbpixelart.itch.io/lioren-lael-main-character
+              - img [ref=e452]
+            - link " Add to collection" [ref=e454] [cursor=pointer]:
+              - /url: /g/kbpixelart/lioren-lael-main-character/add-to-collection?source=browse
+              - generic [ref=e455]: 
+              - text: Add to collection
+          - generic [ref=e456]:
+            - generic [ref=e457]:
+              - link "Lioren Lael - Main Character" [ref=e458] [cursor=pointer]:
+                - /url: https://kbpixelart.itch.io/lioren-lael-main-character
+              - link "-20%" [ref=e459] [cursor=pointer]:
+                - /url: /s/149887/2d-pixel-art-character-bundle
+                - generic [ref=e460]: "-20%"
+            - generic "64x64 Sprite Size 192x128 Canvas Size" [ref=e461]
+            - link "KBPixelArt" [ref=e463] [cursor=pointer]:
+              - /url: https://kbpixelart.itch.io
+        - generic [ref=e464]:
+          - generic [ref=e465]:
+            - link "GIF" [ref=e466] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/industrial-tileset
+              - img [ref=e467]
+              - generic [ref=e468]: GIF
+            - link " Add to collection" [ref=e471] [cursor=pointer]:
+              - /url: /g/atomicrealm/industrial-tileset/add-to-collection?source=browse
+              - generic [ref=e472]: 
+              - text: Add to collection
+          - generic [ref=e473]:
+            - link "Industrial Tileset" [ref=e475] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/industrial-tileset
+            - generic "16x16 & 32x32 Pixel Art Tileset for Platformer Games" [ref=e476]
+            - link "Atomic Realm" [ref=e478] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io
+        - generic [ref=e479]:
+          - generic [ref=e480]:
+            - link [ref=e481] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-desert-town
+              - img [ref=e482]
+            - link " Add to collection" [ref=e484] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-desert-town/add-to-collection?source=browse
+              - generic [ref=e485]: 
+              - text: Add to collection
+          - generic [ref=e486]:
+            - generic [ref=e487]:
+              - 'link "Voxel environment assets : Desert town" [ref=e488] [cursor=pointer]':
+                - /url: https://maxparata.itch.io/voxel-desert-town
+              - link "In bundle" [ref=e489] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e490]: In bundle
+            - generic "3D low poly models for game" [ref=e491]
+            - link "monogon" [ref=e493] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e494]:
+          - generic [ref=e495]:
+            - link [ref=e496] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-plane
+              - img [ref=e497]
+            - link " Add to collection" [ref=e499] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-plane/add-to-collection?source=browse
+              - generic [ref=e500]: 
+              - text: Add to collection
+          - generic [ref=e501]:
+            - generic [ref=e502]:
+              - link "Voxel Plane assets" [ref=e503] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxel-plane
+              - link "In bundle" [ref=e504] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e505]: In bundle
+            - generic "Old looking plane models in 3D and 2D" [ref=e506]
+            - link "monogon" [ref=e508] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e509]:
+          - generic [ref=e510]:
+            - link [ref=e511] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/isocyberpunkcity-monogon
+              - img [ref=e512]
+            - link " Add to collection" [ref=e514] [cursor=pointer]:
+              - /url: /g/maxparata/isocyberpunkcity-monogon/add-to-collection?source=browse
+              - generic [ref=e515]: 
+              - text: Add to collection
+          - generic [ref=e516]:
+            - generic [ref=e517]:
+              - link "Isometric Cyberpunk City - monogon" [ref=e518] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/isocyberpunkcity-monogon
+              - link "In bundle" [ref=e519] [cursor=pointer]:
+                - /url: /s/140110/2d-isometric-giga-enormous-bundle
+                - generic [ref=e520]: In bundle
+            - generic "HUNDREDS of isometric sprites" [ref=e521]
+            - link "monogon" [ref=e523] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e524]:
+          - generic [ref=e525]:
+            - link [ref=e526] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/medievaltown-monogon
+              - img [ref=e527]
+            - link " Add to collection" [ref=e529] [cursor=pointer]:
+              - /url: /g/maxparata/medievaltown-monogon/add-to-collection?source=browse
+              - generic [ref=e530]: 
+              - text: Add to collection
+          - generic [ref=e531]:
+            - generic [ref=e532]:
+              - link "Voxel Medieval Town - monogon" [ref=e533] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/medievaltown-monogon
+              - link "In bundle" [ref=e534] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e535]: In bundle
+            - generic "HUNDREDS of props + Skinned Characters" [ref=e536]
+            - link "monogon" [ref=e538] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e539]:
+          - generic [ref=e540]:
+            - link [ref=e541] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-spaceships
+              - img [ref=e542]
+            - link " Add to collection" [ref=e544] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-spaceships/add-to-collection?source=browse
+              - generic [ref=e545]: 
+              - text: Add to collection
+          - generic [ref=e546]:
+            - generic [ref=e547]:
+              - link "10+ Voxel Spaceships assets for free" [ref=e548] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxel-spaceships
+              - link "In bundle" [ref=e549] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e550]: In bundle
+            - generic "An collection of voxel spaceships models (.vox and .obj)" [ref=e551]
+            - link "monogon" [ref=e553] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e554]:
+          - generic [ref=e555]:
+            - link [ref=e556] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/cyberpunkcity-monogon
+              - img [ref=e557]
+            - link " Add to collection" [ref=e559] [cursor=pointer]:
+              - /url: /g/maxparata/cyberpunkcity-monogon/add-to-collection?source=browse
+              - generic [ref=e560]: 
+              - text: Add to collection
+          - generic [ref=e561]:
+            - generic [ref=e562]:
+              - link "Voxel Cyberpunk City - monogon" [ref=e563] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/cyberpunkcity-monogon
+              - link "In bundle" [ref=e564] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e565]: In bundle
+            - generic "HUNDREDS of props + Modular Buildings" [ref=e566]
+            - link "monogon" [ref=e568] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e569]:
+          - generic [ref=e570]:
+            - link [ref=e571] [cursor=pointer]:
+              - /url: https://kamisama887.itch.io/lorenz-fries-school-horror
+              - img [ref=e572]
+            - link " Add to collection" [ref=e574] [cursor=pointer]:
+              - /url: /g/kamisama887/lorenz-fries-school-horror/add-to-collection?source=browse
+              - generic [ref=e575]: 
+              - text: Add to collection
+          - generic [ref=e576]:
+            - link "Top Down Pixel Art Horror" [ref=e578] [cursor=pointer]:
+              - /url: https://kamisama887.itch.io/lorenz-fries-school-horror
+            - generic "Made for Rpg maker Mv/Mz but compatibel with other engines" [ref=e579]
+            - link "kamisama887" [ref=e581] [cursor=pointer]:
+              - /url: https://kamisama887.itch.io
+        - generic [ref=e582]:
+          - generic [ref=e583]:
+            - link [ref=e584] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/isometriczombieapocalypse-monogon
+              - img [ref=e585]
+            - link " Add to collection" [ref=e587] [cursor=pointer]:
+              - /url: /g/maxparata/isometriczombieapocalypse-monogon/add-to-collection?source=browse
+              - generic [ref=e588]: 
+              - text: Add to collection
+          - generic [ref=e589]:
+            - generic [ref=e590]:
+              - link "Isometric Zombie Apocalypse - monogon" [ref=e591] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/isometriczombieapocalypse-monogon
+              - link "In bundle" [ref=e592] [cursor=pointer]:
+                - /url: /s/140110/2d-isometric-giga-enormous-bundle
+                - generic [ref=e593]: In bundle
+            - generic "+600 Isometric sprites" [ref=e594]
+            - link "monogon" [ref=e596] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e597]:
+          - generic [ref=e598]:
+            - link [ref=e599] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/tinyvoxeldungeon
+              - img [ref=e600]
+            - link " Add to collection" [ref=e602] [cursor=pointer]:
+              - /url: /g/maxparata/tinyvoxeldungeon/add-to-collection?source=browse
+              - generic [ref=e603]: 
+              - text: Add to collection
+          - generic [ref=e604]:
+            - generic [ref=e605]:
+              - 'link "Voxel dungeon crawler environment assets : Desert" [ref=e606] [cursor=pointer]':
+                - /url: https://maxparata.itch.io/tinyvoxeldungeon
+              - link "In bundle" [ref=e607] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e608]: In bundle
+            - generic "3D and 2D sprites modular dungeons assets. Magicavoxel source files included!" [ref=e609]
+            - link "monogon" [ref=e611] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e612]:
+          - generic [ref=e613]:
+            - link [ref=e614] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/rocky-mountains
+              - img [ref=e615]
+            - link " Add to collection" [ref=e617] [cursor=pointer]:
+              - /url: /g/maxparata/rocky-mountains/add-to-collection?source=browse
+              - generic [ref=e618]: 
+              - text: Add to collection
+          - generic [ref=e619]:
+            - generic [ref=e620]:
+              - 'link "Voxel Nature Pack : Rocky Mountains" [ref=e621] [cursor=pointer]':
+                - /url: https://maxparata.itch.io/rocky-mountains
+              - link "In bundle" [ref=e622] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e623]: In bundle
+            - generic "Modular terrain assets" [ref=e624]
+            - link "monogon" [ref=e626] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e627]:
+          - generic [ref=e628]:
+            - link [ref=e629] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-dystopian-characters
+              - img [ref=e630]
+            - link " Add to collection" [ref=e632] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-dystopian-characters/add-to-collection?source=browse
+              - generic [ref=e633]: 
+              - text: Add to collection
+          - generic [ref=e634]:
+            - link "Free Voxel Dystopian Characters" [ref=e636] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-dystopian-characters
+            - generic "low-poly 3D Character models, in voxel art" [ref=e637]
+            - link "monogon" [ref=e639] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e640]:
+          - generic [ref=e641]:
+            - link [ref=e642] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/monogon-isometricdungeon
+              - img [ref=e643]
+            - link " Add to collection" [ref=e645] [cursor=pointer]:
+              - /url: /g/maxparata/monogon-isometricdungeon/add-to-collection?source=browse
+              - generic [ref=e646]: 
+              - text: Add to collection
+          - generic [ref=e647]:
+            - generic [ref=e648]:
+              - link "Isometric Dungeon Crawler - monogon" [ref=e649] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/monogon-isometricdungeon
+              - link "In bundle" [ref=e650] [cursor=pointer]:
+                - /url: /s/140110/2d-isometric-giga-enormous-bundle
+                - generic [ref=e651]: In bundle
+            - generic "THOUSANDS of Isometric Sprites for your rogue like, adventure, rpg and dungeon crawler games." [ref=e652]
+            - link "monogon" [ref=e654] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e655]:
+          - generic [ref=e656]:
+            - link [ref=e657] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/counrty-side
+              - img [ref=e658]
+            - link " Add to collection" [ref=e660] [cursor=pointer]:
+              - /url: /g/maxparata/counrty-side/add-to-collection?source=browse
+              - generic [ref=e661]: 
+              - text: Add to collection
+          - generic [ref=e662]:
+            - generic [ref=e663]:
+              - 'link "Voxel Environment : Counrty Side" [ref=e664] [cursor=pointer]':
+                - /url: https://maxparata.itch.io/counrty-side
+              - link "In bundle" [ref=e665] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e666]: In bundle
+            - generic "Modular Asset Pack with country side props" [ref=e667]
+            - link "monogon" [ref=e669] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e670]:
+          - generic [ref=e671]:
+            - link "GIF" [ref=e672] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/mini-dungeon-tileset
+              - img [ref=e673]
+              - generic [ref=e674]: GIF
+            - link " Add to collection" [ref=e677] [cursor=pointer]:
+              - /url: /g/atomicrealm/mini-dungeon-tileset/add-to-collection?source=browse
+              - generic [ref=e678]: 
+              - text: Add to collection
+          - generic [ref=e679]:
+            - link "Mini Dungeon Tileset" [ref=e681] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/mini-dungeon-tileset
+            - generic "16x16 Tileset & Assets for Top Down Games" [ref=e682]
+            - link "Atomic Realm" [ref=e684] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io
+        - generic [ref=e685]:
+          - generic [ref=e686]:
+            - link [ref=e687] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/isometricspace-monogon
+              - img [ref=e688]
+            - link " Add to collection" [ref=e690] [cursor=pointer]:
+              - /url: /g/maxparata/isometricspace-monogon/add-to-collection?source=browse
+              - generic [ref=e691]: 
+              - text: Add to collection
+          - generic [ref=e692]:
+            - generic [ref=e693]:
+              - link "Isometric Space Colony - monogon" [ref=e694] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/isometricspace-monogon
+              - link "In bundle" [ref=e695] [cursor=pointer]:
+                - /url: /s/140110/2d-isometric-giga-enormous-bundle
+                - generic [ref=e696]: In bundle
+            - generic "HUNDREDS of pixelart sprites for Space Games" [ref=e697]
+            - link "monogon" [ref=e699] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e700]:
+          - generic [ref=e701]:
+            - link "GIF" [ref=e702] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-ancient-environment
+              - img [ref=e703]
+              - generic [ref=e704]: GIF
+            - link " Add to collection" [ref=e707] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-ancient-environment/add-to-collection?source=browse
+              - generic [ref=e708]: 
+              - text: Add to collection
+          - generic [ref=e709]:
+            - link "Voxel Ancient Environment assets for free" [ref=e711] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-ancient-environment
+            - generic "A collection of Ancient Envrionment props in a voxel style" [ref=e712]
+            - link "monogon" [ref=e714] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e715]:
+          - generic [ref=e716]:
+            - link [ref=e717] [cursor=pointer]:
+              - /url: https://ansimuz.itch.io/mega-bot
+              - img [ref=e718]
+            - link " Add to collection" [ref=e720] [cursor=pointer]:
+              - /url: /g/ansimuz/mega-bot/add-to-collection?source=browse
+              - generic [ref=e721]: 
+              - text: Add to collection
+          - generic [ref=e722]:
+            - link "Mega Bot" [ref=e724] [cursor=pointer]:
+              - /url: https://ansimuz.itch.io/mega-bot
+            - generic "Game Assets and Godot Game Files" [ref=e725]
+            - generic [ref=e726]:
+              - link "ansimuz" [ref=e727] [cursor=pointer]:
+                - /url: https://ansimuz.itch.io
+              - img "Verified Account" [ref=e728]
+        - generic [ref=e731]:
+          - generic [ref=e732]:
+            - link [ref=e733] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxelspacecolony
+              - img [ref=e734]
+            - link " Add to collection" [ref=e736] [cursor=pointer]:
+              - /url: /g/maxparata/voxelspacecolony/add-to-collection?source=browse
+              - generic [ref=e737]: 
+              - text: Add to collection
+          - generic [ref=e738]:
+            - generic [ref=e739]:
+              - link "Voxel Space Colony - monogon" [ref=e740] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxelspacecolony
+              - link "In bundle" [ref=e741] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e742]: In bundle
+            - generic "HUNDREDS of props + Skinned Characters" [ref=e743]
+            - link "monogon" [ref=e745] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e746]:
+          - generic [ref=e747]:
+            - link [ref=e748] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxelpirates-monogon
+              - img [ref=e749]
+            - link " Add to collection" [ref=e751] [cursor=pointer]:
+              - /url: /g/maxparata/voxelpirates-monogon/add-to-collection?source=browse
+              - generic [ref=e752]: 
+              - text: Add to collection
+          - generic [ref=e753]:
+            - generic [ref=e754]:
+              - link "Voxel Pirates and Ships - monogon" [ref=e755] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxelpirates-monogon
+              - link "In bundle" [ref=e756] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e757]: In bundle
+            - generic "HUNDREDS of props + Modular Boats and Buildings" [ref=e758]
+            - link "monogon" [ref=e760] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e761]:
+          - generic [ref=e762]:
+            - link "GIF" [ref=e763] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io/dungeons-pack
+              - img [ref=e764]
+              - generic [ref=e765]: GIF
+            - link " Add to collection" [ref=e768] [cursor=pointer]:
+              - /url: /g/toadzillart/dungeons-pack/add-to-collection?source=browse
+              - generic [ref=e769]: 
+              - text: Add to collection
+          - generic [ref=e770]:
+            - link "8bit RPG tileset - Dungeons pack (Super Gameboy Quest by Toadzilla)" [ref=e772] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io/dungeons-pack
+            - generic "16x16px, 8bit pixelart asset for your game!" [ref=e773]
+            - link "Toadzillart" [ref=e775] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io
+        - generic [ref=e776]:
+          - generic [ref=e777]:
+            - link "GIF" [ref=e778] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/industrial-assets
+              - img [ref=e779]
+              - generic [ref=e780]: GIF
+            - link " Add to collection" [ref=e783] [cursor=pointer]:
+              - /url: /g/atomicrealm/industrial-assets/add-to-collection?source=browse
+              - generic [ref=e784]: 
+              - text: Add to collection
+          - generic [ref=e785]:
+            - link "Industrial Assets" [ref=e787] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/industrial-assets
+            - generic "16x16 & 32x32 Pixel Art Assets" [ref=e788]
+            - link "Atomic Realm" [ref=e790] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io
+        - generic [ref=e791]:
+          - generic [ref=e792]:
+            - link "GIF" [ref=e793] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io/monster-pack
+              - img [ref=e794]
+              - generic [ref=e795]: GIF
+            - link " Add to collection" [ref=e798] [cursor=pointer]:
+              - /url: /g/toadzillart/monster-pack/add-to-collection?source=browse
+              - generic [ref=e799]: 
+              - text: Add to collection
+          - generic [ref=e800]:
+            - link "8bit RPG tileset - Enemies pack (Super Gameboy Quest by Toadzilla)" [ref=e802] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io/monster-pack
+            - link "Toadzillart" [ref=e804] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io
+        - generic [ref=e805]:
+          - generic [ref=e806]:
+            - link [ref=e807] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxelinterior
+              - img [ref=e808]
+            - link " Add to collection" [ref=e810] [cursor=pointer]:
+              - /url: /g/maxparata/voxelinterior/add-to-collection?source=browse
+              - generic [ref=e811]: 
+              - text: Add to collection
+          - generic [ref=e812]:
+            - generic [ref=e813]:
+              - link "Voxel House Interior - monogon" [ref=e814] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxelinterior
+              - link "In bundle" [ref=e815] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e816]: In bundle
+            - generic "Interior furniture 3D models" [ref=e817]
+            - link "monogon" [ref=e819] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e820]:
+          - generic [ref=e821]:
+            - link "GIF" [ref=e822] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io/ui-pack
+              - img [ref=e823]
+              - generic [ref=e824]: GIF
+            - link " Add to collection" [ref=e827] [cursor=pointer]:
+              - /url: /g/toadzillart/ui-pack/add-to-collection?source=browse
+              - generic [ref=e828]: 
+              - text: Add to collection
+          - generic [ref=e829]:
+            - link "8bit RPG tileset - UI pack (Super Gameboy Quest by Toadzilla)" [ref=e831] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io/ui-pack
+            - generic "16x16px, 8bit pixelart asset for your game!" [ref=e832]
+            - link "Toadzillart" [ref=e834] [cursor=pointer]:
+              - /url: https://toadzillart.itch.io
+        - generic [ref=e835]:
+          - generic [ref=e836]:
+            - link [ref=e837] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxelnoir
+              - img [ref=e838]
+            - link " Add to collection" [ref=e840] [cursor=pointer]:
+              - /url: /g/maxparata/voxelnoir/add-to-collection?source=browse
+              - generic [ref=e841]: 
+              - text: Add to collection
+          - generic [ref=e842]:
+            - generic [ref=e843]:
+              - link "Voxel Noir Crime Detective" [ref=e844] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/voxelnoir
+              - link "In bundle" [ref=e845] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e846]: In bundle
+            - generic "Hundreds of 3D voxel assets for your Noir detective games" [ref=e847]
+            - link "monogon" [ref=e849] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e850]:
+          - generic [ref=e851]:
+            - link "GIF" [ref=e852] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/mine-tileset
+              - img [ref=e853]
+              - generic [ref=e854]: GIF
+            - link " Add to collection" [ref=e857] [cursor=pointer]:
+              - /url: /g/atomicrealm/mine-tileset/add-to-collection?source=browse
+              - generic [ref=e858]: 
+              - text: Add to collection
+          - generic [ref=e859]:
+            - link "Mine Tileset" [ref=e861] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io/mine-tileset
+            - generic "16x16 & 32x32 Pixel Art Tileset for Platformer Games" [ref=e862]
+            - link "Atomic Realm" [ref=e864] [cursor=pointer]:
+              - /url: https://atomicrealm.itch.io
+        - generic [ref=e865]:
+          - generic [ref=e866]:
+            - link [ref=e867] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/voxel-zombies
+              - img [ref=e868]
+            - link " Add to collection" [ref=e870] [cursor=pointer]:
+              - /url: /g/maxparata/voxel-zombies/add-to-collection?source=browse
+              - generic [ref=e871]: 
+              - text: Add to collection
+          - generic [ref=e872]:
+            - generic [ref=e873]:
+              - 'link "Voxel Apocalypse : Zombies" [ref=e874] [cursor=pointer]':
+                - /url: https://maxparata.itch.io/voxel-zombies
+              - link "In bundle" [ref=e875] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e876]: In bundle
+            - generic "Zombie 3D low poly models" [ref=e877]
+            - link "monogon" [ref=e879] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e880]:
+          - generic [ref=e881]:
+            - link [ref=e882] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/monogon-dungeonheroes
+              - img [ref=e883]
+            - link " Add to collection" [ref=e885] [cursor=pointer]:
+              - /url: /g/maxparata/monogon-dungeonheroes/add-to-collection?source=browse
+              - generic [ref=e886]: 
+              - text: Add to collection
+          - generic [ref=e887]:
+            - generic [ref=e888]:
+              - link "Voxel RPG Characters And Weapons - monogon" [ref=e889] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/monogon-dungeonheroes
+              - link "In bundle" [ref=e890] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e891]: In bundle
+            - generic "12 Skinned Voxel Heroes - Mixamo Compatible + 19 Weapons" [ref=e892]
+            - link "monogon" [ref=e894] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e895]:
+          - generic [ref=e896]:
+            - link [ref=e897] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/goreui
+              - img [ref=e898]
+            - link " Add to collection" [ref=e900] [cursor=pointer]:
+              - /url: /g/maxparata/goreui/add-to-collection?source=browse
+              - generic [ref=e901]: 
+              - text: Add to collection
+          - generic [ref=e902]:
+            - generic [ref=e903]:
+              - link "Pixel Gore UI" [ref=e904] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/goreui
+              - link "In bundle" [ref=e905] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e906]: In bundle
+            - generic "Trash and Bloody GUI elements, perfect for survival and zombie games" [ref=e907]
+            - link "monogon" [ref=e909] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e910]:
+          - generic [ref=e911]:
+            - link [ref=e912] [cursor=pointer]:
+              - /url: https://maxparata.itch.io/monogon-dungeon
+              - img [ref=e913]
+            - link " Add to collection" [ref=e915] [cursor=pointer]:
+              - /url: /g/maxparata/monogon-dungeon/add-to-collection?source=browse
+              - generic [ref=e916]: 
+              - text: Add to collection
+          - generic [ref=e917]:
+            - generic [ref=e918]:
+              - link "Voxel Dungeon Crawler - monogon" [ref=e919] [cursor=pointer]:
+                - /url: https://maxparata.itch.io/monogon-dungeon
+              - link "In bundle" [ref=e920] [cursor=pointer]:
+                - /url: /s/177442/43-packs-thousands-of-voxel-assets-one-bundle
+                - generic [ref=e921]: In bundle
+            - generic "HUNDREDS of assets for your rogue like, adventure, rpg and dungeon crawler games." [ref=e922]
+            - link "monogon" [ref=e924] [cursor=pointer]:
+              - /url: https://maxparata.itch.io
+        - generic [ref=e925]:
+          - generic [ref=e926]:
+            - link [ref=e927] [cursor=pointer]:
+              - /url: https://pedrovmvictor.itch.io/metroidvania-demo-godot
+              - img [ref=e928]
+            - link " Add to collection" [ref=e930] [cursor=pointer]:
+              - /url: /g/pedrovmvictor/metroidvania-demo-godot/add-to-collection?source=browse
+              - generic [ref=e931]: 
+              - text: Add to collection
+          - generic [ref=e932]:
+            - link "Metroidvania Demo [Godot]" [ref=e934] [cursor=pointer]:
+              - /url: https://pedrovmvictor.itch.io/metroidvania-demo-godot
+            - generic "A simple metroidvania demo made in Godot" [ref=e935]
+            - link "PedroVMVictor" [ref=e937] [cursor=pointer]:
+              - /url: https://pedrovmvictor.itch.io
+      - generic [ref=e939]:
+        - link "Next page" [ref=e940] [cursor=pointer]:
+          - /url: "?page=2"
+        - text: →
+  - generic [ref=e941]:
+    - generic [ref=e942]:
+      - generic [ref=e943]:
+        - link "itch.io on Twitter" [ref=e944] [cursor=pointer]:
+          - /url: https://twitter.com/itchio
+          - generic [ref=e945]: 
+          - generic [ref=e946]: itch.io on Twitter
+        - link "itch.io on Facebook" [ref=e947] [cursor=pointer]:
+          - /url: https://www.facebook.com/itchiogames
+          - generic [ref=e948]: 
+          - generic [ref=e949]: itch.io on Facebook
+      - link "About" [ref=e950] [cursor=pointer]:
+        - /url: /docs/general/about
+      - link "FAQ" [ref=e951] [cursor=pointer]:
+        - /url: /docs/general/faq
+      - link "Blog" [ref=e952] [cursor=pointer]:
+        - /url: /blog
+      - link "Contact us" [ref=e953] [cursor=pointer]:
+        - /url: /support
+    - generic [ref=e954]:
+      - text: Copyright © 2026 itch corp ·
+      - link "Directory" [ref=e955] [cursor=pointer]:
+        - /url: /directory
+      - text: ·
+      - link "Terms" [ref=e956] [cursor=pointer]:
+        - /url: /docs/legal/terms
+      - text: ·
+      - link "Privacy" [ref=e957] [cursor=pointer]:
+        - /url: /docs/legal/privacy-policy
+      - text: ·
+      - link "Cookies" [ref=e958] [cursor=pointer]:
+        - /url: /docs/legal/cookie-policy
+  - generic [ref=e959]: Select a tag...

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microverse 版本检查测试</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0f111a;
+      color: #fff;
+    }
+    h1 {
+      color: #3b82f6;
+    }
+    .section {
+      background: #1a1d2e;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button.secondary {
+      background: #6b7280;
+    }
+    button.secondary:hover {
+      background: #4b5563;
+    }
+    .info {
+      background: rgba(59, 130, 246, 0.1);
+      border-left: 3px solid #3b82f6;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    .success {
+      background: rgba(34, 197, 94, 0.1);
+      border-left: 3px solid #22c55e;
+      padding: 10px;
+      margin: 10px 0;
+    }
+    code {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+    pre {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎮 Microverse 版本检查测试工具</h1>
+
+  <div class="section">
+    <h2>当前状态</h2>
+    <div id="status"></div>
+  </div>
+
+  <div class="section">
+    <h2>测试操作</h2>
+
+    <h3>1. 模拟版本更新</h3>
+    <p>将本地缓存的版本设置为旧版本，然后访问 Microverse 页面应该会看到更新提示。</p>
+    <button onclick="simulateOldVersion()">设置为旧版本</button>
+    <button onclick="openMicroverse()">打开 Microverse 页面</button>
+
+    <h3>2. 清除缓存</h3>
+    <p>清除所有 Microverse 相关的缓存数据。</p>
+    <button class="secondary" onclick="clearCache()">清除所有缓存</button>
+
+    <h3>3. 查看当前版本</h3>
+    <p>从服务器获取当前的版本信息。</p>
+    <button onclick="fetchVersion()">获取版本信息</button>
+    <pre id="versionInfo"></pre>
+  </div>
+
+  <div class="section">
+    <h2>测试步骤</h2>
+    <div class="info">
+      <strong>方法 1: 使用测试工具</strong>
+      <ol>
+        <li>点击"设置为旧版本"按钮</li>
+        <li>点击"打开 Microverse 页面"按钮</li>
+        <li>应该看到版本更新提示对话框</li>
+      </ol>
+    </div>
+    <div class="info">
+      <strong>方法 2: 手动修改 localStorage</strong>
+      <ol>
+        <li>打开浏览器开发者工具 (F12)</li>
+        <li>在 Console 中执行: <code>localStorage.setItem('microverse_version', '2026-01-01T00:00:00Z')</code></li>
+        <li>刷新 Microverse 页面</li>
+        <li>应该看到版本更新提示对话框</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    // 更新状态显示
+    function updateStatus() {
+      const gameLoaded = localStorage.getItem('microverse_game_loaded');
+      const version = localStorage.getItem('microverse_version');
+
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = '';
+
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'info';
+
+      const p1 = document.createElement('p');
+      const strong1 = document.createElement('strong');
+      strong1.textContent = '游戏加载状态: ';
+      p1.appendChild(strong1);
+      p1.appendChild(document.createTextNode(gameLoaded === 'true' ? '✅ 已加载' : '❌ 未加载'));
+
+      const p2 = document.createElement('p');
+      const strong2 = document.createElement('strong');
+      strong2.textContent = '缓存版本: ';
+      p2.appendChild(strong2);
+      p2.appendChild(document.createTextNode(version || '❌ 未设置'));
+
+      infoDiv.appendChild(p1);
+      infoDiv.appendChild(p2);
+      statusDiv.appendChild(infoDiv);
+    }
+
+    // 模拟旧版本
+    function simulateOldVersion() {
+      localStorage.setItem('microverse_version', '2026-01-01T00:00:00Z');
+      alert('✅ 已设置为旧版本 (2026-01-01T00:00:00Z)\n\n现在打开 Microverse 页面应该会看到更新提示。');
+      updateStatus();
+    }
+
+    // 清除缓存
+    function clearCache() {
+      localStorage.removeItem('microverse_game_loaded');
+      localStorage.removeItem('microverse_version');
+      alert('✅ 已清除所有 Microverse 缓存');
+      updateStatus();
+    }
+
+    // 打开 Microverse 页面
+    function openMicroverse() {
+      window.open('/microverse', '_blank');
+    }
+
+    // 获取版本信息
+    async function fetchVersion() {
+      try {
+        const response = await fetch('/microverse/version.json', {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('版本文件不存在');
+        }
+
+        const version = await response.json();
+        document.getElementById('versionInfo').textContent = JSON.stringify(version, null, 2);
+      } catch (error) {
+        document.getElementById('versionInfo').textContent = '❌ 获取失败: ' + error.message;
+      }
+    }
+
+    // 页面加载时更新状态
+    updateStatus();
+  </script>
+</body>
+</html>

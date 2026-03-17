@@ -552,6 +552,53 @@ async def initialize_system(session: AsyncSession = Depends(get_db)):
                 "message": "扫描 Marketplace"
             })
 
+        # Step 7: 自动扫描并配置 Git 仓库
+        logger.info("Scanning git repositories...")
+        try:
+            from app.services.git_repo_scanner import GitRepoScanner
+            from app.repositories.project_path_repository import ProjectPathRepository
+            from app.services.project_path_service import ProjectPathService
+
+            scanner = GitRepoScanner()
+            base_dirs = ["/mnt", str(Path.home())]
+            git_repos = scanner.scan_directories(base_dirs, max_depth=3)
+
+            # 添加到项目路径配置
+            project_path_repo = ProjectPathRepository(session)
+            project_path_service = ProjectPathService(project_path_repo)
+
+            added_count = 0
+            for repo_path in git_repos:
+                try:
+                    # 检查是否已存在
+                    existing = await project_path_repo.get_by_path(repo_path)
+                    if not existing:
+                        await project_path_service.create_project_path(
+                            path=repo_path,
+                            alias=Path(repo_path).name,
+                            enabled=True,
+                            recursive_scan=True
+                        )
+                        added_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to add project path {repo_path}: {e}")
+
+            steps.append({
+                "name": "scan_git_repos",
+                "status": "completed",
+                "count": added_count,
+                "message": f"扫描 Git 仓库"
+            })
+            logger.info(f"Git repository scan completed: {added_count} repos added")
+        except Exception as e:
+            logger.warning(f"Failed to scan git repositories: {e}")
+            steps.append({
+                "name": "scan_git_repos",
+                "status": "completed",
+                "count": 0,
+                "message": "扫描 Git 仓库"
+            })
+
         duration_ms = int((time.time() - start_time) * 1000)
         logger.info(f"Initialization completed in {duration_ms}ms, total synced: {total_synced}")
 

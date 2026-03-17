@@ -23,6 +23,7 @@
 
 ### 📋 guides/
 使用指南和教程
+- `MICROVERSE_SYNC_QUICKSTART.md` - Microverse 自动同步快速开始指南 ⭐ NEW
 - `frontend/` - 前端开发指南
   - `Guidelines.md` - 前端开发规范
 - `backend/` - 后端开发指南
@@ -31,7 +32,19 @@
 - `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（13 个文件）
+技术文档和修复记录（26 个文件）
+- `20260316-microverse-dialog-fix.md` - Microverse 对话框和移动功能修复 ⭐ NEW
+- `20260316-godot-asset-fetcher-test-report.md` - Godot Asset Fetcher Skill 测试报告 ⭐ NEW
+- `20260316-godot-asset-fetcher-implementation.md` - Godot Asset Fetcher Skill 实施报告
+- `20260316-godot-auto-sync-implementation.md` - Godot 自动同步机制实现总结
+- `20260316-microverse-sync-mechanism.md` - Microverse 同步机制技术文档
+- `20260316-microverse-page-cache-optimization.md` - Microverse 游戏模式页面缓存优化
+- `20260316-microverse-cache-debug.md` - Microverse 缓存调试指南
+- `20260316-microverse-cache-verification-report.md` - Microverse 缓存验证报告
+- `20260316-microverse-cache-task-summary.md` - Microverse 缓存优化任务总结
+- `20260316-agent-run-page-optimization.md` - Agent Run 页面前端优化实施记录
+- `20260316-git-repo-auto-scan.md` - Git 仓库自动扫描功能实现
+- `20260315-clear-cache-mode.md` - Clear Cache 模式使用说明
 - `20260311-terminal-claude-auto-resume.md` - Terminal Claude 会话自动恢复功能
 - `20260311-terminal-mobile-input-optimization.md` - Terminal 移动端输入优化
 - `20260302-01-LAN-IP检测失败修复.md` - LAN IP 检测失败问题修复（v1.2.2）
@@ -98,7 +111,7 @@
 - **日志文件**: 14 个文件
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
-- **技术文档**: 12 个文件
+- **技术文档**: 26 个文件
 - **指南文档**: 11 个文件
 
 ## 🔍 快速查找
@@ -120,4 +133,4 @@
 
 ---
 
-*最后更新: 2026-03-10*
+*最后更新: 2026-03-16*

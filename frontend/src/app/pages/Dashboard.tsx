@@ -598,7 +598,7 @@ const Dashboard = () => {
                 <Activity size={24} className="hidden md:block" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-xs md:text-lg font-bold truncate">Claude CLI Status</h2>
+                <h2 className="text-xs md:text-lg font-bold truncate">System Status</h2>
                 <p className={`text-[10px] md:text-xs font-medium truncate ${
                   claudeHealth?.cli_available
                     ? 'text-green-500'

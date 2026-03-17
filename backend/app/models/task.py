@@ -111,6 +111,14 @@ class Task(Base):
     tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
 
+    # 依赖关系（新增）
+    depends_on: Mapped[list] = mapped_column(JSON, default=list, nullable=False)  # 前置任务 ID 列表
+    blocks: Mapped[list] = mapped_column(JSON, default=list, nullable=False)      # 后续任务 ID 列表
+
+    # 关联的 Plan 和 Progress（新增）
+    related_plan_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)     # 关联的 Plan ID 列表
+    related_progress_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False) # 关联的 Progress ID 列表
+
     # 元数据
     meta: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 

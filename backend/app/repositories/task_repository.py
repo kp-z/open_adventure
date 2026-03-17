@@ -37,7 +37,8 @@ class TaskRepository:
         self,
         skip: int = 0,
         limit: int = 100,
-        status: Optional[TaskStatus] = None
+        status: Optional[TaskStatus] = None,
+        agent_id: Optional[int] = None
     ) -> tuple[list[Task], int]:
         """Get all tasks with pagination"""
         query = select(Task)
@@ -45,6 +46,8 @@ class TaskRepository:
         # Apply filters
         if status is not None:
             query = query.where(Task.status == status)
+        if agent_id is not None:
+            query = query.where(Task.agent_id == agent_id)
 
         # Get total count
         count_query = select(func.count()).select_from(query.subquery())

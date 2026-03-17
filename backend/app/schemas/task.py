@@ -28,6 +28,10 @@ class TaskBase(BaseModel):
     deadline: Optional[datetime] = Field(None, description="截止时间")
     tags: List[str] = Field(default_factory=list, description="标签列表")
     category: Optional[str] = Field(None, description="分类")
+    depends_on: List[int] = Field(default_factory=list, description="前置任务ID列表")
+    blocks: List[int] = Field(default_factory=list, description="后续任务ID列表")
+    related_plan_ids: List[int] = Field(default_factory=list, description="关联的Plan ID列表")
+    related_progress_ids: List[int] = Field(default_factory=list, description="关联的Progress ID列表")
     meta: Optional[dict] = Field(None, description="元数据")
 
 
@@ -56,6 +60,10 @@ class TaskUpdate(BaseModel):
     status: Optional[TaskStatus] = None
     tags: Optional[List[str]] = None
     category: Optional[str] = None
+    depends_on: Optional[List[int]] = None
+    blocks: Optional[List[int]] = None
+    related_plan_ids: Optional[List[int]] = None
+    related_progress_ids: Optional[List[int]] = None
     meta: Optional[dict] = None
 
 

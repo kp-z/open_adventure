@@ -84,3 +84,17 @@ export async function toggleProjectPath(id: number): Promise<ProjectPath> {
 export async function deleteProjectPath(id: number): Promise<void> {
   await apiClient.delete(`/project-paths/${id}`);
 }
+
+/**
+ * 扫描 Git 仓库并添加到项目路径
+ */
+export interface ScanGitReposResponse {
+  success: boolean;
+  total_found: number;
+  added: number;
+  skipped: number;
+}
+
+export async function scanGitRepos(): Promise<ScanGitReposResponse> {
+  return await apiClient.post<ScanGitReposResponse>('/project-paths/scan-git-repos');
+}

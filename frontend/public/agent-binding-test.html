@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 绑定测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #555;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        select, button {
+            padding: 10px 15px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .agent-list, .character-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .agent-item, .character-item {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .agent-item:hover, .character-item:hover {
+            background-color: #e9e9e9;
+        }
+        .agent-item.selected, .character-item.selected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .binding-info {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        .agent-name {
+            font-weight: bold;
+        }
+        .agent-desc {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Godot Agent 绑定测试</h1>
+
+        <div class="section">
+            <h2>1. 选择角色</h2>
+            <button onclick="loadCharacters()">加载角色列表</button>
+            <div id="characterList" class="character-list"></div>
+            <div id="characterStatus" class="status" style="display:none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>2. 选择 Agent</h2>
+            <button onclick="loadAgents()">加载 Agent 列表</button>
+            <div id="agentList" class="agent-list"></div>
+            <div id="agentStatus" class="status" style="display:none;"></div>
+        </div>
+
+        <div class="section">
+            <h2>3. 绑定操作</h2>
+            <button id="bindButton" onclick="bindAgent()" disabled>绑定 Agent</button>
+            <button id="unbindButton" onclick="unbindAgent()" disabled>解绑 Agent</button>
+            <div id="bindingInfo" class="binding-info" style="display:none;"></div>
+            <div id="bindStatus" class="status" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:38080/api';
+        let selectedCharacter = null;
+        let selectedAgent = null;
+        let characters = [];
+        let agents = [];
+
+        function showStatus(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+        }
+
+        function hideStatus(elementId) {
+            document.getElementById(elementId).style.display = 'none';
+        }
+
+        async function loadCharacters() {
+            showStatus('characterStatus', '正在加载角色列表...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/microverse/characters`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                characters = await response.json();
+                const listElement = document.getElementById('characterList');
+                listElement.innerHTML = '';
+
+                if (characters.length === 0) {
+                    const p = document.createElement('p');
+                    p.textContent = '没有找到角色';
+                    listElement.appendChild(p);
+                    showStatus('characterStatus', '没有找到角色', 'info');
+                    return;
+                }
+
+                characters.forEach(char => {
+                    const item = document.createElement('div');
+                    item.className = 'character-item';
+                    let text = `${char.display_name || char.character_name} (${char.character_name})`;
+                    if (char.agent_id) {
+                        text += ` - 已绑定 Agent ID: ${char.agent_id}`;
+                    }
+                    item.textContent = text;
+                    item.onclick = () => selectCharacter(char, item);
+                    listElement.appendChild(item);
+                });
+
+                showStatus('characterStatus', `已加载 ${characters.length} 个角色`, 'success');
+            } catch (error) {
+                showStatus('characterStatus', `加载失败: ${error.message}`, 'error');
+            }
+        }
+
+        function selectCharacter(character, itemElement) {
+            selectedCharacter = character;
+            document.querySelectorAll('.character-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            itemElement.classList.add('selected');
+
+            // 显示当前绑定信息
+            const infoElement = document.getElementById('bindingInfo');
+            infoElement.innerHTML = '';
+
+            const line1 = document.createElement('div');
+            line1.textContent = `当前角色: ${character.display_name || character.character_name}`;
+            infoElement.appendChild(line1);
+
+            const line2 = document.createElement('div');
+            if (character.agent_id) {
+                line2.textContent = `已绑定 Agent ID: ${character.agent_id}`;
+                document.getElementById('unbindButton').disabled = false;
+            } else {
+                line2.textContent = '状态: 未绑定 Agent';
+                document.getElementById('unbindButton').disabled = true;
+            }
+            infoElement.appendChild(line2);
+
+            infoElement.style.display = 'block';
+            updateBindButton();
+        }
+
+        async function loadAgents() {
+            showStatus('agentStatus', '正在加载 Agent 列表...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/agents`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const data = await response.json();
+                agents = data.items || data;
+
+                const listElement = document.getElementById('agentList');
+                listElement.innerHTML = '';
+
+                if (agents.length === 0) {
+                    const p = document.createElement('p');
+                    p.textContent = '没有找到 Agent';
+                    listElement.appendChild(p);
+                    showStatus('agentStatus', '没有找到 Agent', 'info');
+                    return;
+                }
+
+                agents.forEach(agent => {
+                    const item = document.createElement('div');
+                    item.className = 'agent-item';
+
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'agent-name';
+                    nameDiv.textContent = agent.name;
+                    item.appendChild(nameDiv);
+
+                    const descDiv = document.createElement('div');
+                    descDiv.className = 'agent-desc';
+                    descDiv.textContent = agent.description || '无描述';
+                    item.appendChild(descDiv);
+
+                    item.onclick = () => selectAgent(agent, item);
+                    listElement.appendChild(item);
+                });
+
+                showStatus('agentStatus', `已加载 ${agents.length} 个 Agent`, 'success');
+            } catch (error) {
+                showStatus('agentStatus', `加载失败: ${error.message}`, 'error');
+            }
+        }
+
+        function selectAgent(agent, itemElement) {
+            selectedAgent = agent;
+            document.querySelectorAll('.agent-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            itemElement.classList.add('selected');
+
+            updateBindButton();
+        }
+
+        function updateBindButton() {
+            const bindButton = document.getElementById('bindButton');
+            bindButton.disabled = !(selectedCharacter && selectedAgent);
+        }
+
+        async function bindAgent() {
+            if (!selectedCharacter || !selectedAgent) {
+                showStatus('bindStatus', '请先选择角色和 Agent', 'error');
+                return;
+            }
+
+            showStatus('bindStatus', '正在绑定...', 'info');
+            try {
+                const response = await fetch(
+                    `${API_BASE}/microverse/characters/${selectedCharacter.character_name}/bind`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            agent_id: selectedAgent.id
+                        })
+                    }
+                );
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const result = await response.json();
+                showStatus('bindStatus', `成功绑定 Agent: ${selectedAgent.name}`, 'success');
+
+                // 更新角色信息
+                selectedCharacter.agent_id = selectedAgent.id;
+                const infoElement = document.getElementById('bindingInfo');
+                infoElement.innerHTML = '';
+
+                const line1 = document.createElement('div');
+                line1.textContent = `当前角色: ${selectedCharacter.display_name || selectedCharacter.character_name}`;
+                infoElement.appendChild(line1);
+
+                const line2 = document.createElement('div');
+                line2.textContent = `已绑定 Agent: ${selectedAgent.name} (ID: ${selectedAgent.id})`;
+                infoElement.appendChild(line2);
+
+                document.getElementById('unbindButton').disabled = false;
+
+                // 重新加载角色列表以显示更新
+                await loadCharacters();
+            } catch (error) {
+                showStatus('bindStatus', `绑定失败: ${error.message}`, 'error');
+            }
+        }
+
+        async function unbindAgent() {
+            if (!selectedCharacter) {
+                showStatus('bindStatus', '请先选择角色', 'error');
+                return;
+            }
+
+            showStatus('bindStatus', '正在解绑...', 'info');
+            try {
+                const response = await fetch(
+                    `${API_BASE}/microverse/characters/${selectedCharacter.character_name}/bind`,
+                    {
+                        method: 'DELETE'
+                    }
+                );
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                showStatus('bindStatus', '成功解绑 Agent', 'success');
+
+                // 更新角色信息
+                selectedCharacter.agent_id = null;
+                const infoElement = document.getElementById('bindingInfo');
+                infoElement.innerHTML = '';
+
+                const line1 = document.createElement('div');
+                line1.textContent = `当前角色: ${selectedCharacter.display_name || selectedCharacter.character_name}`;
+                infoElement.appendChild(line1);
+
+                const line2 = document.createElement('div');
+                line2.textContent = '状态: 未绑定 Agent';
+                infoElement.appendChild(line2);
+
+                document.getElementById('unbindButton').disabled = true;
+
+                // 重新加载角色列表以显示更新
+                await loadCharacters();
+            } catch (error) {
+                showStatus('bindStatus', `解绑失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动加载数据
+        window.onload = () => {
+            loadCharacters();
+            loadAgents();
+        };
+    </script>
+</body>
+</html>

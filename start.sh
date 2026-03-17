@@ -123,6 +123,17 @@ else
     echo ""
 fi
 
+# ============ Microverse 文件同步 ============
+if [ -d "$SCRIPT_DIR/microverse/export" ]; then
+    echo "🎮 Checking Microverse game files..."
+    if [ -f "$SCRIPT_DIR/scripts/sync_microverse.sh" ]; then
+        bash "$SCRIPT_DIR/scripts/sync_microverse.sh"
+    else
+        echo "⚠️  Microverse sync script not found, skipping..."
+    fi
+    echo ""
+fi
+
 # ============ Caddy HTTPS 代理设置 ============
 echo "🔐 Setting up Caddy HTTPS proxy..."
 
@@ -577,15 +588,29 @@ resolve_port_conflict() {
     done
 }
 
-# 清除缓存模式：清理前端缓存和 localStorage
+# 清除缓存模式：清理前端缓存、localStorage 和后端数据库
 if [ "$CLEAR_CACHE" = true ]; then
     echo ""
-    echo "🧹 Clear cache mode enabled: cleaning frontend cache and localStorage..."
+    echo "🧹 Clear cache mode enabled: cleaning frontend cache, localStorage, and backend database..."
 
     # 清理前端构建缓存
     rm -rf "$SCRIPT_DIR/frontend/.vite"
     rm -rf "$SCRIPT_DIR/frontend/dist"
     rm -rf "$SCRIPT_DIR/frontend/node_modules/.vite"
+
+    # 清理后端数据库（SQLite）
+    if [ -f "$SCRIPT_DIR/backend/open_adventure.db" ]; then
+        echo "🗑️  Removing backend database..."
+        rm -f "$SCRIPT_DIR/backend/open_adventure.db"
+        echo "✅ Backend database removed"
+    fi
+
+    # 清理根目录的数据库文件（如果存在）
+    if [ -f "$SCRIPT_DIR/open_adventure.db" ]; then
+        echo "🗑️  Removing root database..."
+        rm -f "$SCRIPT_DIR/open_adventure.db"
+        echo "✅ Root database removed"
+    fi
 
     # 创建一个标记文件，前端启动时会读取并清除 localStorage
     mkdir -p "$SCRIPT_DIR/frontend/public"
@@ -593,6 +618,7 @@ if [ "$CLEAR_CACHE" = true ]; then
 
     echo "✅ Cache cleanup completed"
     echo "📝 Frontend will clear localStorage on next load"
+    echo "📝 Backend will initialize a fresh database"
     echo ""
 fi
 
@@ -626,50 +652,56 @@ if [ "$FORCE_RESET" = true ]; then
     echo "✅ Force reset cleanup completed"
 fi
 
+# ============ 前端设置（在后端启动之前）============
+cd "$SCRIPT_DIR/frontend"
+echo ""
+echo "📦 Setting up frontend..."
+
+# 检查 npm 依赖健康状态
+if ! npm ls --depth=0 >/dev/null 2>&1; then
+    echo "Installing frontend dependencies..."
+    npm install
+    echo "✅ Frontend dependencies installed"
+fi
+
+# 检查前端构建是否存在，如果不存在则构建
+if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+    echo "Building frontend..."
+    npm run build
+    echo "✅ Frontend built"
+fi
+
+# 清理旧的 .env.local（如果存在）
+if [ -f ".env.local" ]; then
+    echo "Removing old .env.local (frontend now auto-detects API address)..."
+    rm -f .env.local
+fi
+
+# 返回后端目录
+cd "$SCRIPT_DIR/backend"
+
 # 检查端口占用
 echo "Checking port availability..."
 resolve_port_conflict "backend" "BACKEND_PORT" "cleanup_backend"
 resolve_port_conflict "frontend" "FRONTEND_PORT" "cleanup_frontend"
 
-# 后端启动前最终依赖验证（防止缺包导致启动失败）
-echo "Verifying backend dependencies..."
-if ! python -c "from app.core.security import create_access_token" 2>/dev/null; then
-    echo "❌ Backend dependency verification failed"
-    echo ""
-    echo "Missing or broken dependencies detected."
-    echo "Attempting to fix by reinstalling dependencies..."
-    echo ""
-
-    pip install --force-reinstall -q -r requirements.txt
-
-    if ! python -c "from app.core.security import create_access_token" 2>/dev/null; then
-        echo "❌ Still failed after reinstalling dependencies"
-        echo ""
-        echo "Please try manual fix:"
-        echo "  cd backend"
-        echo "  source venv/bin/activate"
-        echo "  pip install -r requirements.txt"
-        echo "  python -c 'from app.core.security import create_access_token'"
-        exit 1
-    fi
-
-    echo "✅ Dependencies fixed"
-fi
-
 # 启动后端服务器（后台运行）
 echo "Starting backend server on port $BACKEND_PORT..."
+
+# 使用虚拟环境的 Python（明确路径，避免环境变量问题）
+VENV_PYTHON="$SCRIPT_DIR/backend/venv/bin/python"
 
 # 根据操作系统选择启动方式
 if [ "$OS_TYPE" = "linux" ] && command -v setsid &> /dev/null; then
     # Linux: 使用 setsid 创建独立会话，避免终端关闭时进程被杀死
-    setsid python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+    setsid "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
 else
     # macOS 或不支持 setsid 的系统：直接后台运行
     if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
         # macOS + 防休眠模式：使用 caffeinate 包裹后端进程
-        caffeinate -i python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+        caffeinate -i "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
     else
-        python -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+        "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
     fi
 fi
 
@@ -721,24 +753,6 @@ if ! check_backend_endpoint "/api/terminal/status" "Terminal status"; then
     echo "👉 Please check docs/logs/backend.log for terminal initialization errors."
     echo "👉 Possible causes: backend service not fully initialized or port ${BACKEND_PORT} conflict."
     exit 1
-fi
-
-# ============ 前端设置 ============
-cd "$SCRIPT_DIR/frontend"
-echo ""
-echo "📦 Setting up frontend..."
-
-# 检查 npm 依赖健康状态
-if ! npm ls --depth=0 >/dev/null 2>&1; then
-    echo "Installing frontend dependencies..."
-    npm install
-    echo "✅ Frontend dependencies installed"
-fi
-
-# 清理旧的 .env.local（如果存在）
-if [ -f ".env.local" ]; then
-    echo "Removing old .env.local (frontend now auto-detects API address)..."
-    rm -f .env.local
 fi
 
 # 获取 IP 地址（仅用于显示，不生成配置文件）

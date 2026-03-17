@@ -2,15 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Settings as SettingsIcon,
   Monitor,
-  Palette,
   Database,
   Zap,
   Globe,
   Bell,
   Lock,
   ShieldCheck,
-  Sword,
-  LayoutDashboard,
   Check,
   Languages,
   FolderGit2,
@@ -23,7 +20,8 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
-  Plus
+  Plus,
+  Palette
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -36,7 +34,7 @@ import { cache } from '../../lib/storage';
 import { configApi, type AppConfig, type ModelConfig } from '@/lib/api';
 
 const Settings = () => {
-  const { mode, setMode, lang, setLang } = useMode();
+  const { lang, setLang } = useMode();
   const { t } = useTranslation();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('general');
@@ -233,7 +231,7 @@ const Settings = () => {
   };
 
   const handleClearCache = async () => {
-    if (!confirm('确定要清除所有缓存吗？这将删除 Service Worker 缓存和 IndexedDB 数据，下次加载时间会变长。')) {
+    if (!confirm('确定要清除所有缓存吗？这将删除 Service Worker 缓存、IndexedDB 数据和 Microverse 游戏缓存，下次加载时间会变长。')) {
       return;
     }
 
@@ -247,6 +245,14 @@ const Settings = () => {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
         console.log('✅ Service Worker 缓存已清除');
+      }
+
+      // 清除 Microverse 游戏缓存
+      try {
+        localStorage.removeItem('microverse_game_loaded');
+        console.log('✅ Microverse 游戏缓存已清除');
+      } catch (error) {
+        console.warn('清除 Microverse 缓存失败:', error);
       }
 
       alert('✅ 缓存已清除成功！');
@@ -460,40 +466,6 @@ const Settings = () => {
                     )}
                   </>
                 )}
-              </section>
-
-              {/* Interface Mode */}
-              <section className="space-y-4 pt-8 border-t border-white/10">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  <Palette size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
-                  {t("interfaceMode")}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <button
-                    onClick={() => setMode('professional')}
-                    className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${
-                      mode === 'professional' ? 'border-blue-500 bg-blue-500/5 shadow-[0_0_20px_rgba(59,130,246,0.2)]' : 'border-white/10 bg-white/5 hover:border-white/20'
-                    }`}
-                  >
-                    {mode === 'professional' && <div className="absolute top-4 right-4 text-blue-500"><Check size={20} /></div>}
-                    <LayoutDashboard className={`mb-4 ${mode === 'professional' ? 'text-blue-500' : 'text-gray-500'}`} size={32} />
-                    <h3 className="font-bold text-lg">{t("proTitle")}</h3>
-                    <p className="text-xs text-gray-400 mt-1">{t("proDesc")}</p>
-                  </button>
-
-                  <button
-                    onClick={() => setMode('adventure')}
-                    className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${
-                      false ? 'border-yellow-500 bg-yellow-500/5 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-white/10 bg-white/5 hover:border-white/20'
-                    }`}
-                  >
-                    {false && <div className="absolute top-4 right-4 text-yellow-500"><Check size={20} /></div>}
-                    <Sword className={`mb-4 ${false ? 'text-yellow-500' : 'text-gray-500'}`} size={32} />
-                    <h3 className="font-bold text-lg">{t("advTitle")}</h3>
-                    <p className="text-xs text-gray-400 mt-1">{t("advDesc")}</p>
-                    {false && <div className="absolute inset-0 bg-yellow-500/5 animate-pulse pointer-events-none" />}
-                  </button>
-                </div>
               </section>
 
               {/* Language Settings */}
@@ -875,6 +847,15 @@ const Settings = () => {
                   <p className="text-sm text-gray-400 mt-2">
                     配置需要扫描的项目路径，只有配置的路径才会被检索 project 级别的 skills 和 agents
                   </p>
+                  <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                    <p className="text-xs text-purple-300">
+                      💡 <span className="font-bold">自动扫描范围：</span>点击"扫描 Git 仓库"按钮将自动扫描以下目录（最大深度 3 层）：
+                    </p>
+                    <ul className="text-xs text-purple-300/80 mt-2 ml-4 space-y-1">
+                      <li>• <code className="px-1 py-0.5 bg-black/30 rounded">/mnt</code> - 挂载点目录</li>
+                      <li>• <code className="px-1 py-0.5 bg-black/30 rounded">~</code> - 用户主目录（{typeof window !== 'undefined' ? window.location.hostname === 'localhost' ? '当前用户' : '服务器用户' : '当前用户'}）</li>
+                    </ul>
+                  </div>
                 </div>
                 <ProjectPathManager />
               </section>
