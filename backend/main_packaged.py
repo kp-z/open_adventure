@@ -160,6 +160,98 @@ def check_port_available(port: int) -> bool:
         return False
 
 
+def find_process_using_port(port: int):
+    """查找占用端口的进程"""
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                for conn in proc.connections():
+                    if conn.laddr.port == port:
+                        return proc
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except ImportError:
+        # 如果 psutil 不可用，使用系统命令
+        import subprocess
+        import platform
+
+        system = platform.system()
+        try:
+            if system == "Darwin" or system == "Linux":
+                # macOS 和 Linux 使用 lsof
+                result = subprocess.run(
+                    ["lsof", "-i", f":{port}", "-t"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    pid = int(result.stdout.strip().split()[0])
+                    # 获取进程信息
+                    proc_result = subprocess.run(
+                        ["ps", "-p", str(pid), "-o", "comm="],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if proc_result.returncode == 0:
+                        name = proc_result.stdout.strip()
+                        return {"pid": pid, "name": name}
+            elif system == "Windows":
+                # Windows 使用 netstat
+                result = subprocess.run(
+                    ["netstat", "-ano"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                for line in result.stdout.split('\n'):
+                    if f":{port}" in line and "LISTENING" in line:
+                        parts = line.split()
+                        pid = int(parts[-1])
+                        # 获取进程名称
+                        proc_result = subprocess.run(
+                            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"],
+                            capture_output=True,
+                            text=True,
+                            timeout=5
+                        )
+                        if proc_result.returncode == 0:
+                            name = proc_result.stdout.split(',')[0].strip('"')
+                            return {"pid": pid, "name": name}
+        except Exception:
+            pass
+
+    return None
+
+
+def kill_process(pid: int) -> bool:
+    """终止进程"""
+    try:
+        import psutil
+        proc = psutil.Process(pid)
+        proc.terminate()
+        proc.wait(timeout=5)
+        return True
+    except ImportError:
+        # 如果 psutil 不可用，使用系统命令
+        import subprocess
+        import platform
+
+        system = platform.system()
+        try:
+            if system == "Windows":
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)], timeout=5)
+            else:
+                subprocess.run(["kill", str(pid)], timeout=5)
+            return True
+        except Exception:
+            return False
+    except Exception:
+        return False
+
+
 def parse_args():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description="Open Adventure - AI Configuration Management System")
@@ -226,9 +318,75 @@ if __name__ == "__main__":
 
     # 检查端口是否可用
     if not check_port_available(port):
-        print(f"⚠️  端口 {port} 已被占用", flush=True)
-        print(f"请使用 --port 参数指定其他端口，例如: ./open-adventure --port 8001", flush=True)
-        sys.exit(1)
+        print(f"\n⚠️  端口 {port} 已被占用", flush=True)
+
+        # 查找占用端口的进程
+        proc_info = find_process_using_port(port)
+        if proc_info:
+            if isinstance(proc_info, dict):
+                # 从系统命令获取的信息
+                pid = proc_info.get("pid")
+                name = proc_info.get("name", "未知进程")
+            else:
+                # 从 psutil 获取的进程对象
+                try:
+                    pid = proc_info.pid
+                    name = proc_info.name()
+                except:
+                    pid = None
+                    name = "未知进程"
+
+            if pid:
+                print(f"   占用进程: {name} (PID: {pid})")
+                print(f"\n是否终止该进程并启动 Open Adventure？")
+                print(f"   [y] 是，终止进程并启动")
+                print(f"   [n] 否，退出程序")
+                print(f"   [p] 使用其他端口启动")
+
+                try:
+                    choice = input("\n请选择 [y/n/p]: ").strip().lower()
+
+                    if choice == 'y':
+                        print(f"\n正在终止进程 {pid}...", flush=True)
+                        if kill_process(pid):
+                            print(f"✓ 进程已终止", flush=True)
+                            # 等待端口释放
+                            time.sleep(1)
+                            if not check_port_available(port):
+                                print(f"⚠️  端口仍被占用，请稍后重试", flush=True)
+                                sys.exit(1)
+                        else:
+                            print(f"❌ 无法终止进程，请手动终止后重试", flush=True)
+                            sys.exit(1)
+                    elif choice == 'p':
+                        # 提示用户输入新端口
+                        try:
+                            new_port = int(input("请输入新端口号: ").strip())
+                            if 1024 <= new_port <= 65535:
+                                port = new_port
+                                if not check_port_available(port):
+                                    print(f"⚠️  端口 {port} 也被占用，请使用 --port 参数指定其他端口", flush=True)
+                                    sys.exit(1)
+                            else:
+                                print(f"⚠️  端口号必须在 1024-65535 之间", flush=True)
+                                sys.exit(1)
+                        except ValueError:
+                            print(f"⚠️  无效的端口号", flush=True)
+                            sys.exit(1)
+                    else:
+                        print(f"\n已取消启动", flush=True)
+                        sys.exit(0)
+                except (KeyboardInterrupt, EOFError):
+                    print(f"\n\n已取消启动", flush=True)
+                    sys.exit(0)
+            else:
+                print(f"   无法获取占用进程信息")
+                print(f"\n请使用 --port 参数指定其他端口，例如: ./open-adventure --port 8001", flush=True)
+                sys.exit(1)
+        else:
+            print(f"   无法获取占用进程信息")
+            print(f"\n请使用 --port 参数指定其他端口，例如: ./open-adventure --port 8001", flush=True)
+            sys.exit(1)
 
     # 获取局域网 IP
     local_ip = get_local_ip()

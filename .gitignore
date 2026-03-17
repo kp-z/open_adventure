@@ -83,12 +83,14 @@ frontend/.vite/
 # Avatars and images (runtime generated)
 # frontend/public/avatars/  # 注释掉，avatars 是静态资源，应该提交到 git
 
-# Microverse runtime files
-frontend/public/microverse/*.html
-frontend/public/microverse/*.js
-frontend/public/microverse/*.pck
-frontend/public/microverse/*.wasm
+# Microverse runtime files (注释掉，这些是构建产物，应该提交到 git)
+# frontend/public/microverse/*.html
+# frontend/public/microverse/*.js
+# frontend/public/microverse/*.pck
+# frontend/public/microverse/*.wasm
 frontend/public/microverse/*.backup
+# 排除临时的 pck 文件
+frontend/public/microverse/*.pck-*
 
 # Microverse
 /microverse/export/
