@@ -10,6 +10,13 @@
 
 ## 🔴 严重问题修复
 
+### Python 3.8 兼容性
+- **修复 Linux 兼容版启动失败问题**：修复了 Python 3.8 环境下的类型注解兼容性问题
+  - 将 PEP 604 新式类型注解（`type | None`）改为 `Optional[type]`
+  - 将 `tuple[T1, T2]` 改为 `Tuple[T1, T2]`
+  - 影响文件：`backend/app/core/tag_definitions.py`、`backend/app/database/migration.py`
+  - 现在支持 Python 3.8+ 的所有版本
+
 ### Godot 游戏相关
 - **修复 Godot 游戏角色无法选中问题**：解决了点击游戏角色无响应的严重 Bug
 - **修复 Agent 对话系统**：修复了对话气泡资源缺失导致的对话功能失效
@@ -197,6 +204,8 @@
 
 1. **Microverse 游戏性能**：在低配置设备上可能存在性能问题
 2. **测试框架**：部分测试用例仍在完善中
+
+**注意**：v1.4.0 初始版本存在 Python 3.8 兼容性问题，已在后续提交中修复。如果您下载的是最新版本，此问题已解决。
 
 ---
 
