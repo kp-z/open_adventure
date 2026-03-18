@@ -33,8 +33,10 @@
 - `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（38 个文件）
-- `20260318-06-AgentDialogSystem缺失修复.md` - AgentDialogSystem 动态加载修复 ⭐ NEW
+技术文档和修复记录（41 个文件）
+- `20260318-10-Python38兼容性修复.md` - Python 3.8 类型注解兼容性修复 ⭐ NEW
+- `20260318-09-ECC安装成功总结.md` - Everything Claude Code 安装成功总结
+- `20260318-06-AgentDialogSystem缺失修复.md` - AgentDialogSystem 动态加载修复
 - `20260318-05-Console日志监控功能实现.md` - Console 日志监控功能实现
 - `20260318-05-今日修复总结.md` - 2026-03-18 所有修复工作总结
 - `20260318-04-HTTP请求并发问题修复.md` - Godot HTTP 请求并发冲突修复
@@ -120,6 +122,10 @@
   - `godot-cache-fix-test-guide.md` - Godot 游戏缓存修复快速测试指南
   - `linux-runtime-errors.md` - Linux 运行错误临时解决方案
 
+### 📝 plans/
+计划文档
+- `20260318-ecc-learning-plan.md` - Everything Claude Code 学习与改进计划 ⭐ NEW
+
 ## 📊 统计信息
 
 - **设计资源**: 110+ 个文件
@@ -127,9 +133,10 @@
 - **日志文件**: 14 个文件
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
-- **技术文档**: 38 个文件
+- **技术文档**: 40 个文件
 - **指南文档**: 11 个文件
 - **故障排查**: 3 个文件
+- **计划文档**: 1 个文件
 
 ## 🔍 快速查找
 
