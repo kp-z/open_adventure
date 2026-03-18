@@ -5,6 +5,7 @@
 """
 import logging
 from pathlib import Path
+from typing import Optional
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -30,7 +31,7 @@ def get_alembic_config() -> Config:
     return config
 
 
-def get_current_revision(database_url: str) -> str | None:
+def get_current_revision(database_url: str) -> Optional[str]:
     """获取当前数据库的迁移版本"""
     try:
         engine = create_engine(database_url)

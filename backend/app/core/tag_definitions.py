@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Optional, Tuple
 from enum import Enum
 
 
@@ -66,7 +66,7 @@ TAG_PRIORITY_RULES = {
 }
 
 
-def validate_tags(tags: List[str]) -> tuple[bool, str]:
+def validate_tags(tags: List[str]) -> Tuple[bool, str]:
     """
     验证标签列表是否符合规范
 
@@ -101,7 +101,7 @@ def validate_tags(tags: List[str]) -> tuple[bool, str]:
     return True, ""
 
 
-def get_tag_dimension(tag: str) -> TagDimension | None:
+def get_tag_dimension(tag: str) -> Optional[TagDimension]:
     """
     获取标签所属的维度
 
