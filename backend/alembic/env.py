@@ -12,8 +12,32 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from logging.config import fileConfig
+
+from sqlalchemy import engine_from_config
+from sqlalchemy import pool
+
+from alembic import context
+
+# Import settings
+import sys
+from pathlib import Path
+import os
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from app.config.settings import settings
+
+# 设置环境变量，告诉 database.py 不要创建 async engine
+os.environ["ALEMBIC_MIGRATION_MODE"] = "1"
+
+# Import Base - 现在可以安全导入了
 from app.core.database import Base
+
+# 清除环境变量
+if "ALEMBIC_MIGRATION_MODE" in os.environ:
+    del os.environ["ALEMBIC_MIGRATION_MODE"]
 
 # Import all models to ensure they're registered with Base
 from app.models.skill import Skill
@@ -27,9 +51,11 @@ from app.models.microverse import MicroverseCharacter
 # access to the values within the .ini file in use.
 config = context.config
 
-# Set sqlalchemy.url from settings (convert async URL to sync for Alembic)
-sync_url = settings.database_url.replace("sqlite+aiosqlite://", "sqlite://")
-config.set_main_option("sqlalchemy.url", sync_url)
+# Set sqlalchemy.url from settings if not already set
+# This allows programmatic override (e.g., for auto-migration)
+if not config.get_main_option("sqlalchemy.url"):
+    sync_url = settings.database_url.replace("sqlite+aiosqlite://", "sqlite://")
+    config.set_main_option("sqlalchemy.url", sync_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

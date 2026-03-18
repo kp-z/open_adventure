@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { LoadingScreen } from '../components/LoadingScreen';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
 
 // localStorage 缓存键
@@ -40,9 +40,16 @@ export default function Microverse() {
   const [isLoading, setIsLoading] = useState(!isGameCached()); // 检查 localStorage 缓存
   const [loadingText, setLoadingText] = useState('正在启动游戏模式...');
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingLogs, setLoadingLogs] = useState<string[]>([]); // 加载日志
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [gameVersion, setGameVersion] = useState<string>(''); // 游戏版本号，用于缓存破坏
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // 添加加载日志
+  const addLoadingLog = useCallback((message: string) => {
+    setLoadingLogs(prev => [...prev.slice(-9), message]); // 保留最近 10 条
+  }, []);
 
   // 调试：组件挂载时打印信息
   useEffect(() => {
@@ -52,14 +59,88 @@ export default function Microverse() {
     // 检查版本
     checkVersion();
 
+    // 添加全局点击监听器，检测点击事件是否被阻止
+    const handleGlobalClick = (e: MouseEvent) => {
+      console.log('[Microverse] 全局点击事件:', {
+        target: e.target,
+        currentTarget: e.currentTarget,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        isTrusted: e.isTrusted,
+        eventPhase: e.eventPhase,
+      });
+    };
+
+    const handleGlobalPointerDown = (e: PointerEvent) => {
+      console.log('[Microverse] 全局 pointerdown 事件:', {
+        target: e.target,
+        pointerType: e.pointerType,
+        isPrimary: e.isPrimary,
+        clientX: e.clientX,
+        clientY: e.clientY,
+      });
+    };
+
+    document.addEventListener('click', handleGlobalClick, true);
+    document.addEventListener('pointerdown', handleGlobalPointerDown, true);
+
     return () => {
       console.log('[Microverse] 组件卸载');
+      document.removeEventListener('click', handleGlobalClick, true);
+      document.removeEventListener('pointerdown', handleGlobalPointerDown, true);
     };
   }, []);
 
   // 调试：监听 isLoading 变化
   useEffect(() => {
     console.log('[Microverse] isLoading 变化:', isLoading);
+
+    // 如果加载完成，检查是否有元素阻挡 iframe
+    if (!isLoading && iframeRef.current) {
+      setTimeout(() => {
+        const iframe = iframeRef.current;
+        if (!iframe) return;
+
+        const rect = iframe.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        // 检查 iframe 中心点上的元素
+        const elementAtCenter = document.elementFromPoint(centerX, centerY);
+        console.log('[Microverse] iframe 中心点元素:', {
+          element: elementAtCenter,
+          tagName: elementAtCenter?.tagName,
+          className: elementAtCenter?.className,
+          zIndex: elementAtCenter ? window.getComputedStyle(elementAtCenter).zIndex : 'N/A',
+          pointerEvents: elementAtCenter ? window.getComputedStyle(elementAtCenter).pointerEvents : 'N/A',
+        });
+
+        // 检查所有高 z-index 的元素
+        const allElements = document.querySelectorAll('*');
+        const highZIndexElements: Array<{ element: Element; zIndex: string }> = [];
+        allElements.forEach(el => {
+          const zIndex = window.getComputedStyle(el).zIndex;
+          if (zIndex !== 'auto' && parseInt(zIndex) > 10) {
+            highZIndexElements.push({ element: el, zIndex });
+          }
+        });
+
+        console.log('[Microverse] 高 z-index 元素 (>10):', highZIndexElements);
+
+        // 检查 iframe 的样式
+        const iframeStyles = window.getComputedStyle(iframe);
+        console.log('[Microverse] iframe 样式:', {
+          position: iframeStyles.position,
+          zIndex: iframeStyles.zIndex,
+          pointerEvents: iframeStyles.pointerEvents,
+          display: iframeStyles.display,
+          visibility: iframeStyles.visibility,
+          opacity: iframeStyles.opacity,
+          width: iframeStyles.width,
+          height: iframeStyles.height,
+        });
+      }, 1000);
+    }
   }, [isLoading]);
 
   // 版本检查函数
@@ -74,7 +155,8 @@ export default function Microverse() {
       });
 
       if (!response.ok) {
-        console.warn('[Microverse] 版本文件不存在，跳过版本检查');
+        console.warn('[Microverse] 版本文件不存在，使用时间戳作为版本');
+        setGameVersion(Date.now().toString());
         return;
       }
 
@@ -85,6 +167,9 @@ export default function Microverse() {
         cached: cachedVersion,
         new: newVersion.exportTime
       });
+
+      // 设置游戏版本号（用于 iframe src 的缓存破坏）
+      setGameVersion(newVersion.exportTime);
 
       // 如果有缓存版本且与当前版本不匹配
       if (cachedVersion && cachedVersion !== newVersion.exportTime) {
@@ -98,7 +183,8 @@ export default function Microverse() {
         localStorage.setItem(VERSION_KEY, newVersion.exportTime);
       }
     } catch (error) {
-      console.warn('[Microverse] 版本检查失败:', error);
+      console.warn('[Microverse] 版本检查失败，使用时间戳作为版本:', error);
+      setGameVersion(Date.now().toString());
     }
   };
 
@@ -129,24 +215,49 @@ export default function Microverse() {
 
     // 监听来自游戏的消息
     const handleMessage = (event: MessageEvent) => {
+      // 转发 Godot 日志到后端
+      if (event.data?.type === 'godot-log') {
+        fetch('/api/logs/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...event.data.log,
+            source: 'microverse',
+            timestamp: new Date().toISOString(),
+          })
+        }).catch(err => {
+          console.error('[Microverse] Failed to forward log:', err);
+        });
+      }
+
       if (event.data?.type === 'godot-loading') {
         const { status, percentage, current, total } = event.data;
 
         switch (status) {
           case 'start':
-            setLoadingText('初始化游戏引擎...');
+            const startMsg = '初始化游戏引擎...';
+            setLoadingText(startMsg);
+            addLoadingLog(`✓ ${startMsg}`);
             break;
           case 'progress':
-            setLoadingText(`加载游戏资源... ${percentage || 0}%`);
+            const progressMsg = `加载游戏资源... ${percentage || 0}%`;
+            setLoadingText(progressMsg);
+            // 每 20% 记录一次日志，避免日志过多
+            if (percentage && percentage % 20 === 0) {
+              addLoadingLog(`✓ ${progressMsg}`);
+            }
             setLoadingProgress(percentage || 0);
             break;
           case 'complete':
-            setLoadingText('准备游戏画布...');
+            const completeMsg = '准备游戏画布...';
+            setLoadingText(completeMsg);
+            addLoadingLog(`✓ ${completeMsg}`);
             // 游戏加载完成，强制刷新画布
             setTimeout(() => {
               forceCanvasResize();
               setIsLoading(false);
               setGameCached(true); // 标记为已加载
+              addLoadingLog('✓ 游戏加载完成');
               console.log('[Microverse] 游戏加载完成，已设置缓存');
             }, 500);
             break;
@@ -173,9 +284,10 @@ export default function Microverse() {
     loadingSteps.forEach(({ text, delay }) => {
       setTimeout(() => {
         setLoadingText(text);
+        addLoadingLog(`✓ ${text}`);
       }, delay);
     });
-  }, []);
+  }, [addLoadingLog]);
 
   const forceCanvasResize = () => {
     if (iframeRef.current?.contentWindow) {
@@ -220,21 +332,34 @@ export default function Microverse() {
     if (isGameCached()) {
       setIsLoading(false);
       console.log('[Microverse] iframe 加载完成，游戏已缓存');
+      console.log('[Microverse] iframe 元素信息:', {
+        width: iframeRef.current?.offsetWidth,
+        height: iframeRef.current?.offsetHeight,
+        zIndex: window.getComputedStyle(iframeRef.current!).zIndex,
+        pointerEvents: window.getComputedStyle(iframeRef.current!).pointerEvents,
+        display: window.getComputedStyle(iframeRef.current!).display,
+        visibility: window.getComputedStyle(iframeRef.current!).visibility,
+      });
       return;
     }
 
     // iframe DOM 加载完成，但游戏可能还在加载
-    setLoadingText('等待游戏初始化...');
+    const waitMsg = '等待游戏初始化...';
+    setLoadingText(waitMsg);
+    addLoadingLog(`✓ ${waitMsg}`);
     console.log('[Microverse] iframe 加载完成，等待游戏初始化');
 
     // 如果 5 秒后还没收到游戏的加载消息，就强制完成加载
     setTimeout(() => {
       if (isLoading && !isGameCached()) {
-        setLoadingText('启动游戏...');
+        const startMsg = '启动游戏...';
+        setLoadingText(startMsg);
+        addLoadingLog(`✓ ${startMsg}`);
         forceCanvasResize();
         setTimeout(() => {
           setIsLoading(false);
           setGameCached(true); // 标记为已加载
+          addLoadingLog('✓ 游戏启动完成');
           console.log('[Microverse] 强制完成加载，已设置缓存');
         }, 1000);
       }
@@ -242,7 +367,9 @@ export default function Microverse() {
   };
 
   const handleIframeError = () => {
-    setLoadingText('游戏加载失败，请刷新页面重试');
+    const errorMsg = '游戏加载失败，请刷新页面重试';
+    setLoadingText(errorMsg);
+    addLoadingLog(`✗ ${errorMsg}`);
     // 加载失败时清除缓存标记
     setGameCached(false);
     setTimeout(() => {
@@ -328,37 +455,45 @@ export default function Microverse() {
 
       {/* 加载界面 */}
       {isLoading && (
-        <div className="absolute inset-0 z-10 bg-[#0f111a]">
-          <LoadingSpinner
-            size="lg"
-            text={loadingProgress > 0 ? `${loadingText}` : loadingText}
-            fullScreen={true}
-          />
-          {loadingProgress > 0 && (
-            <div className="absolute bottom-1/3 left-1/2 transform -translate-x-1/2 w-64">
-              <div className="w-full bg-white/10 rounded-full h-2">
-                <div
-                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${loadingProgress}%` }}
-                />
-              </div>
-              <p className="text-center text-sm text-gray-400 mt-2">
-                {loadingProgress}%
-              </p>
-            </div>
-          )}
-        </div>
+        <LoadingScreen
+          progress={loadingProgress}
+          currentStep={loadingText}
+          logs={loadingLogs}
+          theme="game"
+        />
       )}
 
       {/* 游戏 iframe */}
       <iframe
         ref={iframeRef}
-        src="/microverse/index.html"
+        src={gameVersion ? `/microverse/index.html?v=${gameVersion}` : '/microverse/index.html'}
         className={`w-full h-full border-0 block transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
         title="Microverse Game"
         allow="autoplay; fullscreen"
         onLoad={handleIframeLoad}
         onError={handleIframeError}
+        onClick={(e) => {
+          console.log('[Microverse] iframe 点击事件:', {
+            target: e.target,
+            currentTarget: e.currentTarget,
+            clientX: e.clientX,
+            clientY: e.clientY,
+            nativeEvent: e.nativeEvent,
+          });
+        }}
+        onPointerDown={(e) => {
+          console.log('[Microverse] iframe pointerdown 事件:', {
+            target: e.target,
+            pointerType: e.pointerType,
+            isPrimary: e.isPrimary,
+            clientX: e.clientX,
+            clientY: e.clientY,
+          });
+        }}
+        style={{
+          pointerEvents: 'auto',
+          touchAction: 'none',
+        }}
       />
     </div>
   );

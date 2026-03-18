@@ -1,4 +1,5 @@
 """Database configuration and session management."""
+import os
 from typing import AsyncGenerator
 
 from sqlalchemy import MetaData, pool
@@ -6,36 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config.settings import settings
-
-# 根据数据库类型配置引擎参数
-engine_kwargs = {
-    "echo": settings.debug,
-    "future": True,
-}
-
-# SQLite 不支持连接池参数，使用 NullPool
-if settings.database_url.startswith("sqlite"):
-    engine_kwargs["poolclass"] = pool.NullPool
-else:
-    # 其他数据库（PostgreSQL, MySQL 等）使用连接池
-    engine_kwargs.update({
-        "pool_size": 20,           # 增加连接池大小（默认 5）
-        "max_overflow": 40,        # 增加溢出连接数（默认 10）
-        "pool_recycle": 3600,      # 1小时回收连接，防止连接过期
-        "pool_pre_ping": True,     # 连接前检查可用性，防止使用失效连接
-    })
-
-# Create async engine with optimized settings
-engine = create_async_engine(settings.database_url, **engine_kwargs)
-
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
 
 # Naming convention for constraints
 convention = {
@@ -53,6 +24,44 @@ class Base(DeclarativeBase):
     """Base class for all database models."""
 
     metadata = metadata
+
+
+# 检查是否在 Alembic 迁移模式下
+# 在迁移模式下，不创建 async engine（避免同步/异步冲突）
+if os.environ.get("ALEMBIC_MIGRATION_MODE") != "1":
+    # 根据数据库类型配置引擎参数
+    engine_kwargs = {
+        "echo": settings.debug,
+        "future": True,
+    }
+
+    # SQLite 不支持连接池参数，使用 NullPool
+    if settings.database_url.startswith("sqlite"):
+        engine_kwargs["poolclass"] = pool.NullPool
+    else:
+        # 其他数据库（PostgreSQL, MySQL 等）使用连接池
+        engine_kwargs.update({
+            "pool_size": 20,           # 增加连接池大小（默认 5）
+            "max_overflow": 40,        # 增加溢出连接数（默认 10）
+            "pool_recycle": 3600,      # 1小时回收连接，防止连接过期
+            "pool_pre_ping": True,     # 连接前检查可用性，防止使用失效连接
+        })
+
+    # Create async engine with optimized settings
+    engine = create_async_engine(settings.database_url, **engine_kwargs)
+
+    # Create async session factory
+    AsyncSessionLocal = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
+else:
+    # 迁移模式下，不创建 engine 和 session factory
+    engine = None
+    AsyncSessionLocal = None
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -73,7 +82,24 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables and run migrations."""
+    # 先执行自动迁移
+    from app.database.migration import auto_migrate
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # 将异步数据库 URL 转换为同步 URL（Alembic 需要同步连接）
+    sync_db_url = settings.database_url.replace("+aiosqlite", "")
+
+    logger.info("Running auto-migration...")
+    migration_success = auto_migrate(sync_db_url)
+
+    if not migration_success:
+        logger.warning("⚠️  Auto-migration failed, falling back to create_all()")
+        logger.warning("This may cause issues if schema changes are required")
+
+    # 确保所有表都存在（兜底机制）
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

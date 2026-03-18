@@ -1,0 +1,104 @@
+# 测试树配置文件
+
+test_tree:
+  - id: "backend"
+    name: "后端功能测试"
+    type: "category"
+    order: 1
+    children:
+      - id: "backend.api"
+        name: "API 接口测试"
+        type: "category"
+        order: 1
+        children:
+          - id: "backend.api.skills"
+            name: "Skills API"
+            type: "test_suite"
+            test_file: "tests/integration/test_skills_api.py"
+            test_command: "pytest"
+            enabled: true
+            order: 1
+
+          - id: "backend.api.agents"
+            name: "Agents API"
+            type: "test_suite"
+            test_file: "tests/integration/test_agents_api.py"
+            test_command: "pytest"
+            enabled: true
+            order: 2
+
+          - id: "backend.api.workflows"
+            name: "Workflows API"
+            type: "test_suite"
+            test_file: "tests/integration/test_workflows_api.py"
+            test_command: "pytest"
+            enabled: true
+            order: 3
+
+      - id: "backend.services"
+        name: "业务逻辑测试"
+        type: "category"
+        order: 2
+        children:
+          - id: "backend.services.skill_sync"
+            name: "Skill 同步服务"
+            type: "test_suite"
+            test_file: "tests/unit/backend/test_skill_service.py"
+            test_command: "pytest"
+            enabled: true
+            order: 1
+
+          - id: "backend.services.agent"
+            name: "Agent 服务"
+            type: "test_suite"
+            test_file: "tests/unit/backend/test_agent_service.py"
+            test_command: "pytest"
+            enabled: true
+            order: 2
+
+  - id: "frontend"
+    name: "前端功能测试"
+    type: "category"
+    order: 2
+    children:
+      - id: "frontend.pages"
+        name: "页面渲染测试"
+        type: "category"
+        order: 1
+        children:
+          - id: "frontend.pages.skills"
+            name: "Skills 页面"
+            type: "test_suite"
+            test_file: "tests/unit/frontend/test_skills_page.spec.tsx"
+            test_command: "vitest"
+            enabled: true
+            order: 1
+
+          - id: "frontend.pages.agents"
+            name: "Agents 页面"
+            type: "test_suite"
+            test_file: "tests/unit/frontend/test_agents_page.spec.tsx"
+            test_command: "vitest"
+            enabled: true
+            order: 2
+
+  - id: "e2e"
+    name: "端到端测试"
+    type: "category"
+    order: 3
+    children:
+      - id: "e2e.workflow"
+        name: "工作流执行"
+        type: "test_suite"
+        test_file: "tests/e2e/test_workflow_execution.spec.ts"
+        test_command: "playwright test"
+        enabled: true
+        order: 1
+
+      - id: "e2e.agent_test"
+        name: "Agent 测试"
+        type: "test_suite"
+        test_file: "tests/e2e/test_agent_test.spec.ts"
+        test_command: "playwright test"
+        enabled: true
+        order: 2

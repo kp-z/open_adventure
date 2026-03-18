@@ -23,7 +23,8 @@
 
 ### 📋 guides/
 使用指南和教程
-- `MICROVERSE_SYNC_QUICKSTART.md` - Microverse 自动同步快速开始指南 ⭐ NEW
+- `console-logging-guide.md` - Console 日志监控功能使用指南 ⭐ NEW
+- `MICROVERSE_SYNC_QUICKSTART.md` - Microverse 自动同步快速开始指南
 - `frontend/` - 前端开发指南
   - `Guidelines.md` - 前端开发规范
 - `backend/` - 后端开发指南
@@ -32,9 +33,18 @@
 - `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（28 个文件）
-- `godot-e2e-test-report.md` - Godot 端到端集成测试详细报告 ⭐ NEW
-- `godot-e2e-test-summary.md` - Godot 端到端集成测试执行总结 ⭐ NEW
+技术文档和修复记录（38 个文件）
+- `20260318-06-AgentDialogSystem缺失修复.md` - AgentDialogSystem 动态加载修复 ⭐ NEW
+- `20260318-05-Console日志监控功能实现.md` - Console 日志监控功能实现
+- `20260318-05-今日修复总结.md` - 2026-03-18 所有修复工作总结
+- `20260318-04-HTTP请求并发问题修复.md` - Godot HTTP 请求并发冲突修复
+- `20260318-03-对话气泡修复总结.md` - 对话气泡资源修复完成总结
+- `20260318-02-对话气泡资源修复.md` - Godot 对话气泡背景资源修复
+- `20260317-09-Godot缓存问题修复.md` - Godot WebAssembly 缓存问题修复
+- `20260317-08-Linux运行错误修复总结.md` - Linux 运行错误修复总结
+- `20260317-07-Linux运行错误修复.md` - Linux 运行错误分析与修复方案
+- `godot-e2e-test-report.md` - Godot 端到端集成测试详细报告
+- `godot-e2e-test-summary.md` - Godot 端到端集成测试执行总结
 - `20260316-microverse-dialog-fix.md` - Microverse 对话框和移动功能修复
 - `20260316-godot-asset-fetcher-test-report.md` - Godot Asset Fetcher Skill 测试报告
 - `20260316-godot-asset-fetcher-implementation.md` - Godot Asset Fetcher Skill 实施报告
@@ -64,6 +74,7 @@
 
 ### 📢 release-notes/
 版本发布说明
+- `RELEASE_NOTES_v0.2.0.md` - v0.2.0 版本发布说明（草稿）⭐ NEW
 - `RELEASE_NOTES_v0.1.1.md` - v0.1.1 版本发布说明
 - `RELEASE_NOTES_v1.3.2.md` - v1.3.2 版本发布说明
 
@@ -105,6 +116,9 @@
 - `phase6/` - Phase 6 相关文档
 - `plans/` - 计划文档
 - `troubleshooting/` - 故障排查文档
+  - `dialog-bubble-fix-verification.md` - 对话气泡修复验证指南 ⭐ NEW
+  - `godot-cache-fix-test-guide.md` - Godot 游戏缓存修复快速测试指南
+  - `linux-runtime-errors.md` - Linux 运行错误临时解决方案
 
 ## 📊 统计信息
 
@@ -113,8 +127,9 @@
 - **日志文件**: 14 个文件
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
-- **技术文档**: 26 个文件
+- **技术文档**: 38 个文件
 - **指南文档**: 11 个文件
+- **故障排查**: 3 个文件
 
 ## 🔍 快速查找
 
@@ -135,4 +150,4 @@
 
 ---
 
-*最后更新: 2026-03-16*
+*最后更新: 2026-03-18*

@@ -1,6 +1,10 @@
 import { createRoot } from "react-dom/client";
 import App from "./app/App.tsx";
 import "./styles/index.css";
+import { consoleLogger } from "./lib/console-logger";
+
+// 初始化 console 日志拦截器
+consoleLogger.init();
 
 // 在应用渲染前同步 theme-color，避免与页面背景色不一致
 const syncInitialThemeColor = () => {

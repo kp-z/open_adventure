@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes, config, microverse, tasks_ws
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, token_usage, plugins, processes, config, microverse, tasks_ws, testing, logs
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -172,6 +172,8 @@ app.include_router(terminal.router, prefix=f"{settings.api_prefix}/terminal", ta
 app.include_router(processes.router, prefix=f"{settings.api_prefix}")
 app.include_router(websocket.router, prefix=f"{settings.api_prefix}/ws")
 app.include_router(tasks_ws.router, prefix=f"{settings.api_prefix}/ws")
+app.include_router(testing.router)
+app.include_router(logs.router)
 
 
 # 静态文件服务配置 - 先定义目录路径
@@ -247,6 +249,17 @@ async def delete_clear_cache_flag() -> dict:
 if os.path.exists(FRONTEND_DIR):
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse
+    from starlette.types import Scope
+
+    # 自定义 StaticFiles 类，为 Godot 游戏文件添加缓存控制
+    class MicroverseStaticFiles(StaticFiles):
+        async def get_response(self, path: str, scope: Scope):
+            response = await super().get_response(path, scope)
+            # 为 .pck 和 .wasm 文件设置短期缓存（5 分钟）
+            if path.endswith(('.pck', '.wasm')):
+                response.headers['Cache-Control'] = 'public, max-age=300'
+                logger.debug(f"Set cache header for {path}: max-age=300")
+            return response
 
     # 确保必要的子目录存在
     required_dirs = ["assets", "avatars", "images", "microverse"]
@@ -260,7 +273,8 @@ if os.path.exists(FRONTEND_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
     app.mount("/avatars", StaticFiles(directory=os.path.join(FRONTEND_DIR, "avatars")), name="avatars")
     app.mount("/images", StaticFiles(directory=os.path.join(FRONTEND_DIR, "images")), name="images")
-    app.mount("/microverse", StaticFiles(directory=os.path.join(FRONTEND_DIR, "microverse"), html=True), name="microverse")
+    # 使用自定义的 MicroverseStaticFiles 类
+    app.mount("/microverse", MicroverseStaticFiles(directory=os.path.join(FRONTEND_DIR, "microverse"), html=True), name="microverse")
 
     # SPA catch-all 路由 - 将所有非 API 请求重定向到 index.html
     @app.get("/{full_path:path}")

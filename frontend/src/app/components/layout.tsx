@@ -23,6 +23,8 @@ import {
   Loader,
   Bell,
   Gamepad2,
+  TestTube,
+  FlaskConical,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -30,6 +32,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { ActionButton } from "./ui-shared";
 import { useNotifications } from "../contexts/NotificationContext";
 import { useNavigation, NavigationProvider } from "../contexts/NavigationContext";
+import { useInitialization } from "../contexts/InitializationContext";
+import { InitializationScreen } from "./InitializationScreen";
 import Microverse from "../pages/Microverse";
 
 const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
@@ -339,6 +343,8 @@ const LayoutContent = () => {
   const location = useLocation();
   const { notifications, removeNotification } = useNotifications();
   const { canGoBack, canGoForward, goBack, goForward } = useNavigation();
+  const { isInitialized, isLoading } = useInitialization();
+
   // 检测是否为移动端，移动端默认隐藏侧边栏
   const [isMobile, setIsMobile] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -452,6 +458,11 @@ const LayoutContent = () => {
   React.useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  // 如果未初始化或正在加载，显示初始化界面
+  if (!isInitialized || isLoading) {
+    return <InitializationScreen />;
+  }
 
   return (
     <div
@@ -1062,6 +1073,23 @@ const LayoutContent = () => {
           </div>
         </div>
       </nav>
+      )}
+
+      {/* 测试功能悬浮按钮 - 仅开发模式 */}
+      {import.meta.env.DEV && (
+        <button
+          onClick={() => {
+            // 在新窗口打开独立的测试页面
+            window.open('/testing.html', '_blank', 'width=1400,height=900');
+          }}
+          title="测试功能"
+          className="fixed bottom-4 left-4 z-50 p-1 bg-transparent border-none transition-all duration-200 hover:scale-110 group"
+        >
+          <FlaskConical
+            size={16}
+            className="text-purple-400/40 group-hover:text-purple-400/70 transition-all"
+          />
+        </button>
       )}
     </div>
   );

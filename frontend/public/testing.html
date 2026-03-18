@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试功能 - Open Adventure</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      background: #0f111a;
+      color: white;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 2rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      color: #9ca3af;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 1024px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 1rem;
+      padding: 1.5rem;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+
+    .panel-header h3 {
+      font-weight: bold;
+      font-size: 1.125rem;
+    }
+
+    .refresh-btn {
+      padding: 0.5rem;
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      border-radius: 0.5rem;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .tree-container {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .tree-node {
+      margin-left: 0;
+      margin-bottom: 0.25rem;
+    }
+
+    .tree-node-content {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .tree-node-content:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tree-node-content.selected {
+      background: rgba(59, 130, 246, 0.2);
+      border-left: 2px solid #3b82f6;
+    }
+
+    .tree-node-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .tree-node-name {
+      flex: 1;
+      font-size: 0.875rem;
+    }
+
+    .status-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    .run-btn {
+      padding: 0.25rem;
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      border-radius: 0.25rem;
+      transition: all 0.2s;
+    }
+
+    .run-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .run-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      color: #9ca3af;
+    }
+
+    .empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    .details-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .info-row {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .info-label {
+      color: #9ca3af;
+    }
+
+    .info-value {
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+
+    .execution-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .execution-item {
+      padding: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .execution-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .execution-item.selected {
+      border-color: #3b82f6;
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .execution-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .execution-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .execution-stats {
+      display: flex;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .stat-passed {
+      color: #10b981;
+    }
+
+    .stat-failed {
+      color: #ef4444;
+    }
+
+    .stat-total {
+      color: #9ca3af;
+    }
+
+    .execution-output {
+      margin-top: 1rem;
+    }
+
+    .output-box {
+      background: rgba(0, 0, 0, 0.5);
+      color: #e5e7eb;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+      max-height: 200px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .error-box {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 0.5rem;
+    }
+
+    .error-title {
+      font-weight: bold;
+      color: #f87171;
+      font-size: 0.875rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .error-message {
+      color: #fca5a5;
+      font-size: 0.75rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .animate-spin {
+      animation: spin 1s linear infinite;
+    }
+
+    .dev-tools-section {
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .dev-tools-title {
+      font-size: 1rem;
+      font-weight: bold;
+      margin-bottom: 1rem;
+      color: #a78bfa;
+    }
+
+    .dev-tool-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .dev-tool-info {
+      flex: 1;
+    }
+
+    .dev-tool-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 0.25rem;
+    }
+
+    .dev-tool-desc {
+      font-size: 0.75rem;
+      color: #9ca3af;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 3rem;
+      height: 1.5rem;
+      background: #4b5563;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch.active {
+      background: #8b5cf6;
+    }
+
+    .toggle-switch-handle {
+      position: absolute;
+      top: 0.125rem;
+      left: 0.125rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      background: white;
+      border-radius: 9999px;
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch.active .toggle-switch-handle {
+      transform: translateX(1.5rem);
+    }
+
+    /* 日志监控面板样式 */
+    .log-stream {
+      max-height: 400px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+
+    .log-entry {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .log-entry.error { color: #ef4444; }
+    .log-entry.warn { color: #f59e0b; }
+    .log-entry.info { color: #3b82f6; }
+    .log-entry.log { color: #9ca3af; }
+
+    .log-timestamp { color: #6b7280; margin-right: 0.5rem; }
+    .log-source { color: #8b5cf6; margin-right: 0.5rem; }
+    .log-level { font-weight: bold; margin-right: 0.5rem; }
+
+    .control-btn {
+      padding: 0.5rem 1rem;
+      background: rgba(139, 92, 246, 0.2);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      color: #a78bfa;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    .control-btn:hover {
+      background: rgba(139, 92, 246, 0.3);
+      border-color: rgba(139, 92, 246, 0.5);
+    }
+
+    .control-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>测试功能</h1>
+      <p>管理和执行项目测试</p>
+    </div>
+
+    <div class="grid">
+      <!-- 日志监控面板 -->
+      <div class="panel full-width">
+        <div class="panel-header">
+          <h3>📋 实时日志流</h3>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="start-logging-btn" class="control-btn">开始监控</button>
+            <button id="stop-logging-btn" class="control-btn" disabled>停止监控</button>
+            <button id="clear-logs-btn" class="control-btn">清空</button>
+            <button id="export-logs-btn" class="control-btn">导出</button>
+            <button id="cleanup-logs-btn" class="control-btn">清理旧日志</button>
+          </div>
+        </div>
+
+        <div id="log-stream" class="log-stream">
+          <!-- 日志条目动态插入 -->
+        </div>
+      </div>
+
+      <!-- 左侧：测试树 -->
+      <div class="panel">
+        <div class="panel-header">
+          <h3>测试功能树</h3>
+          <button class="refresh-btn" onclick="loadTestTree()" title="刷新测试树">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+          </button>
+        </div>
+        <div id="tree-container" class="tree-container">
+          <div class="loading">加载测试树...</div>
+        </div>
+
+        <!-- 开发工具部分 -->
+        <div class="dev-tools-section">
+          <h4 class="dev-tools-title">🛠️ 开发工具</h4>
+
+          <!-- React Query DevTools -->
+          <div class="dev-tool-item">
+            <div class="dev-tool-info">
+              <div class="dev-tool-name">React Query DevTools</div>
+              <div class="dev-tool-desc">数据查询和缓存状态调试工具</div>
+            </div>
+            <div
+              id="devtools-toggle"
+              class="toggle-switch"
+              onclick="toggleDevTools()"
+            >
+              <div class="toggle-switch-handle"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：测试详情 -->
+      <div class="panel">
+        <div class="panel-header">
+          <h3>测试详情</h3>
+        </div>
+        <div id="details-container" class="details-container">
+          <div class="empty">选择一个测试节点查看详情</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let testTree = [];
+    let selectedNode = null;
+    let runningTests = new Set();
+
+    // 日志监控相关
+    let logWs = null;
+    let logs = [];
+    const MAX_LOGS = 100;
+
+    // 安全地创建文本节点
+    function createTextNode(text) {
+      return document.createTextNode(text);
+    }
+
+    // 安全地设置文本内容
+    function setTextContent(element, text) {
+      element.textContent = text;
+    }
+
+    // 加载测试树
+    async function loadTestTree() {
+      try {
+        const response = await fetch('/api/testing/tree');
+        const data = await response.json();
+        testTree = data.tree;
+        renderTestTree();
+      } catch (error) {
+        console.error('Failed to load test tree:', error);
+        const container = document.getElementById('tree-container');
+        container.textContent = '';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty';
+        emptyDiv.textContent = '加载失败';
+        container.appendChild(emptyDiv);
+      }
+    }
+
+    // 渲染测试树
+    function renderTestTree() {
+      const container = document.getElementById('tree-container');
+      container.textContent = '';
+
+      if (testTree.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty';
+        emptyDiv.textContent = '暂无测试数据';
+        container.appendChild(emptyDiv);
+        return;
+      }
+
+      testTree.forEach(node => {
+        container.appendChild(renderNode(node, 0));
+      });
+    }
+
+    // 渲染单个节点
+    function renderNode(node, level) {
+      const isRunning = runningTests.has(node.id);
+      const isSelected = selectedNode === node.id;
+      const statusIcon = getStatusIcon(node.last_execution?.status);
+      const folderIcon = node.type === 'category' ? '📁' : '📄';
+
+      const nodeDiv = document.createElement('div');
+      nodeDiv.className = 'tree-node';
+      nodeDiv.style.marginLeft = `${level * 20}px`;
+
+      const contentDiv = document.createElement('div');
+      contentDiv.className = `tree-node-content ${isSelected ? 'selected' : ''}`;
+      contentDiv.onclick = () => selectNode(node.id);
+
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'tree-node-icon';
+      iconSpan.textContent = folderIcon;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'tree-node-name';
+      nameSpan.textContent = node.name;
+
+      contentDiv.appendChild(iconSpan);
+      contentDiv.appendChild(nameSpan);
+
+      if (statusIcon) {
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'status-icon';
+        statusSpan.textContent = statusIcon;
+        contentDiv.appendChild(statusSpan);
+      }
+
+      if (node.type !== 'category') {
+        const runBtn = document.createElement('button');
+        runBtn.className = 'run-btn';
+        runBtn.disabled = isRunning;
+        runBtn.textContent = isRunning ? '⏳' : '▶️';
+        runBtn.onclick = (e) => {
+          e.stopPropagation();
+          runTest(node.id);
+        };
+        contentDiv.appendChild(runBtn);
+      }
+
+      nodeDiv.appendChild(contentDiv);
+
+      if (node.children) {
+        node.children.forEach(child => {
+          nodeDiv.appendChild(renderNode(child, level + 1));
+        });
+      }
+
+      return nodeDiv;
+    }
+
+    // 获取状态图标
+    function getStatusIcon(status) {
+      switch (status) {
+        case 'running': return '🔵';
+        case 'passed': return '✅';
+        case 'failed': return '❌';
+        case 'error': return '⚠️';
+        default: return null;
+      }
+    }
+
+    // 选择节点
+    async function selectNode(nodeId) {
+      selectedNode = nodeId;
+      renderTestTree();
+      await loadNodeDetails(nodeId);
+    }
+
+    // 加载节点详情
+    async function loadNodeDetails(nodeId) {
+      const container = document.getElementById('details-container');
+      container.textContent = '';
+
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'loading';
+      loadingDiv.textContent = '加载中...';
+      container.appendChild(loadingDiv);
+
+      try {
+        const response = await fetch(`/api/testing/nodes/${nodeId}`);
+        const node = await response.json();
+        renderNodeDetails(node);
+      } catch (error) {
+        console.error('Failed to load node details:', error);
+        container.textContent = '';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty';
+        emptyDiv.textContent = '加载失败';
+        container.appendChild(emptyDiv);
+      }
+    }
+
+    // 渲染节点详情
+    function renderNodeDetails(node) {
+      const container = document.getElementById('details-container');
+      container.textContent = '';
+
+      const infoSection = document.createElement('div');
+      infoSection.className = 'info-section';
+
+      const title = document.createElement('h3');
+      title.style.fontSize = '1.125rem';
+      title.style.fontWeight = 'bold';
+      title.style.marginBottom = '0.5rem';
+      title.textContent = node.name;
+      infoSection.appendChild(title);
+
+      const typeRow = document.createElement('div');
+      typeRow.className = 'info-row';
+      const typeLabel = document.createElement('span');
+      typeLabel.className = 'info-label';
+      typeLabel.textContent = '类型:';
+      const typeValue = document.createElement('span');
+      typeValue.textContent = node.type;
+      typeRow.appendChild(typeLabel);
+      typeRow.appendChild(typeValue);
+      infoSection.appendChild(typeRow);
+
+      if (node.test_file) {
+        const fileRow = document.createElement('div');
+        fileRow.className = 'info-row';
+        const fileLabel = document.createElement('span');
+        fileLabel.className = 'info-label';
+        fileLabel.textContent = '文件:';
+        const fileValue = document.createElement('span');
+        fileValue.className = 'info-value';
+        fileValue.textContent = node.test_file;
+        fileRow.appendChild(fileLabel);
+        fileRow.appendChild(fileValue);
+        infoSection.appendChild(fileRow);
+      }
+
+      if (node.test_command) {
+        const cmdRow = document.createElement('div');
+        cmdRow.className = 'info-row';
+        const cmdLabel = document.createElement('span');
+        cmdLabel.className = 'info-label';
+        cmdLabel.textContent = '命令:';
+        const cmdValue = document.createElement('span');
+        cmdValue.className = 'info-value';
+        cmdValue.textContent = node.test_command;
+        cmdRow.appendChild(cmdLabel);
+        cmdRow.appendChild(cmdValue);
+        infoSection.appendChild(cmdRow);
+      }
+
+      container.appendChild(infoSection);
+
+      if (node.recent_executions && node.recent_executions.length > 0) {
+        const execSection = document.createElement('div');
+        execSection.className = 'info-section';
+
+        const execTitle = document.createElement('h4');
+        execTitle.style.fontWeight = 'bold';
+        execTitle.style.marginBottom = '0.5rem';
+        execTitle.textContent = '执行历史';
+        execSection.appendChild(execTitle);
+
+        const execList = document.createElement('div');
+        execList.className = 'execution-list';
+
+        node.recent_executions.forEach(exec => {
+          const execItem = document.createElement('div');
+          execItem.className = 'execution-item';
+          execItem.onclick = () => loadExecutionDetails(exec.id);
+
+          const execHeader = document.createElement('div');
+          execHeader.className = 'execution-header';
+
+          const execStatus = document.createElement('div');
+          execStatus.className = 'execution-status';
+
+          const statusIcon = document.createElement('span');
+          statusIcon.textContent = getStatusIcon(exec.status);
+          execStatus.appendChild(statusIcon);
+
+          const statusInfo = document.createElement('div');
+          const statusText = document.createElement('div');
+          statusText.style.fontSize = '0.875rem';
+          statusText.style.fontWeight = '500';
+          statusText.textContent = exec.status;
+          const statusTime = document.createElement('div');
+          statusTime.style.fontSize = '0.75rem';
+          statusTime.style.color = '#9ca3af';
+          statusTime.textContent = new Date(exec.started_at).toLocaleString();
+          statusInfo.appendChild(statusText);
+          statusInfo.appendChild(statusTime);
+          execStatus.appendChild(statusInfo);
+
+          const execStats = document.createElement('div');
+          execStats.className = 'execution-stats';
+          const passedSpan = document.createElement('span');
+          passedSpan.className = 'stat-passed';
+          passedSpan.textContent = exec.passed;
+          const sep1 = document.createElement('span');
+          sep1.textContent = '/';
+          const failedSpan = document.createElement('span');
+          failedSpan.className = 'stat-failed';
+          failedSpan.textContent = exec.failed;
+          const sep2 = document.createElement('span');
+          sep2.textContent = '/';
+          const totalSpan = document.createElement('span');
+          totalSpan.className = 'stat-total';
+          totalSpan.textContent = exec.total;
+          execStats.appendChild(passedSpan);
+          execStats.appendChild(sep1);
+          execStats.appendChild(failedSpan);
+          execStats.appendChild(sep2);
+          execStats.appendChild(totalSpan);
+
+          execHeader.appendChild(execStatus);
+          execHeader.appendChild(execStats);
+          execItem.appendChild(execHeader);
+          execList.appendChild(execItem);
+        });
+
+        execSection.appendChild(execList);
+        container.appendChild(execSection);
+      }
+    }
+
+    // 加载执行详情
+    async function loadExecutionDetails(executionId) {
+      try {
+        const response = await fetch(`/api/testing/executions/${executionId}`);
+        const execution = await response.json();
+
+        const container = document.getElementById('details-container');
+
+        const outputSection = document.createElement('div');
+        outputSection.className = 'execution-output';
+
+        const outputTitle = document.createElement('h4');
+        outputTitle.style.fontWeight = 'bold';
+        outputTitle.style.marginBottom = '0.5rem';
+        outputTitle.textContent = '执行输出';
+        outputSection.appendChild(outputTitle);
+
+        if (execution.output) {
+          const outputBox = document.createElement('div');
+          outputBox.className = 'output-box';
+          outputBox.textContent = execution.output;
+          outputSection.appendChild(outputBox);
+        }
+
+        if (execution.error_message) {
+          const errorBox = document.createElement('div');
+          errorBox.className = 'error-box';
+
+          const errorTitle = document.createElement('div');
+          errorTitle.className = 'error-title';
+          errorTitle.textContent = '错误信息';
+
+          const errorMsg = document.createElement('div');
+          errorMsg.className = 'error-message';
+          errorMsg.textContent = execution.error_message;
+
+          errorBox.appendChild(errorTitle);
+          errorBox.appendChild(errorMsg);
+          outputSection.appendChild(errorBox);
+        }
+
+        container.appendChild(outputSection);
+      } catch (error) {
+        console.error('Failed to load execution details:', error);
+      }
+    }
+
+    // 运行测试
+    async function runTest(nodeId) {
+      runningTests.add(nodeId);
+      renderTestTree();
+
+      try {
+        const response = await fetch(`/api/testing/run/${nodeId}`, {
+          method: 'POST'
+        });
+        await response.json();
+        await loadTestTree();
+        if (selectedNode === nodeId) {
+          await loadNodeDetails(nodeId);
+        }
+      } catch (error) {
+        console.error('Failed to run test:', error);
+      } finally {
+        runningTests.delete(nodeId);
+        renderTestTree();
+      }
+    }
+
+    // React Query DevTools 控制
+    function toggleDevTools() {
+      const toggle = document.getElementById('devtools-toggle');
+      const currentValue = localStorage.getItem('showReactQueryDevTools') === 'true';
+      const newValue = !currentValue;
+
+      localStorage.setItem('showReactQueryDevTools', String(newValue));
+
+      // 更新开关状态
+      if (newValue) {
+        toggle.classList.add('active');
+      } else {
+        toggle.classList.remove('active');
+      }
+
+      // 通知主窗口更新（如果主窗口存在）
+      if (window.opener && !window.opener.closed) {
+        window.opener.dispatchEvent(new Event('reactQueryDevToolsChange'));
+        // 刷新主窗口以应用更改
+        window.opener.location.reload();
+      }
+    }
+
+    // 初始化 DevTools 开关状态
+    function initDevToolsToggle() {
+      const toggle = document.getElementById('devtools-toggle');
+      const isEnabled = localStorage.getItem('showReactQueryDevTools') === 'true';
+
+      if (isEnabled) {
+        toggle.classList.add('active');
+      }
+    }
+
+    // 初始化
+    loadTestTree();
+    initDevToolsToggle();
+
+    // 日志监控功能
+    function startLogging() {
+      logWs = new WebSocket('ws://localhost:38080/api/logs/stream');
+
+      logWs.onmessage = (event) => {
+        const log = JSON.parse(event.data);
+        addLogEntry(log);
+      };
+
+      logWs.onopen = () => {
+        document.getElementById('start-logging-btn').disabled = true;
+        document.getElementById('stop-logging-btn').disabled = false;
+
+        // 通知主应用开始日志捕获
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'enable-logging' }, '*');
+        }
+
+        // 加载后端日志
+        loadBackendLogs();
+      };
+
+      logWs.onerror = (error) => {
+        console.error('WebSocket error:', error);
+      };
+
+      logWs.onclose = () => {
+        document.getElementById('start-logging-btn').disabled = false;
+        document.getElementById('stop-logging-btn').disabled = true;
+      };
+    }
+
+    function stopLogging() {
+      if (logWs) {
+        logWs.close();
+        logWs = null;
+      }
+
+      document.getElementById('start-logging-btn').disabled = false;
+      document.getElementById('stop-logging-btn').disabled = true;
+
+      // 通知主应用停止日志捕获
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'disable-logging' }, '*');
+      }
+    }
+
+    function addLogEntry(log) {
+      logs.push(log);
+      if (logs.length > MAX_LOGS) {
+        logs.shift();
+      }
+
+      const container = document.getElementById('log-stream');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${log.level}`;
+
+      const timestamp = document.createElement('span');
+      timestamp.className = 'log-timestamp';
+      timestamp.textContent = new Date(log.timestamp).toLocaleTimeString();
+
+      const source = document.createElement('span');
+      source.className = 'log-source';
+      source.textContent = `[${log.source}]`;
+
+      const level = document.createElement('span');
+      level.className = 'log-level';
+      level.textContent = log.level.toUpperCase();
+
+      const message = document.createElement('span');
+      message.textContent = log.message;
+
+      entry.appendChild(timestamp);
+      entry.appendChild(source);
+      entry.appendChild(level);
+      entry.appendChild(message);
+
+      container.appendChild(entry);
+
+      // 自动滚动到底部
+      container.scrollTop = container.scrollHeight;
+
+      // 限制 DOM 元素数量
+      while (container.children.length > MAX_LOGS) {
+        container.removeChild(container.firstChild);
+      }
+    }
+
+    function clearLogs() {
+      logs = [];
+      document.getElementById('log-stream').textContent = '';
+    }
+
+    async function exportLogs() {
+      const response = await fetch('/api/logs/export');
+      const data = await response.json();
+
+      const blob = new Blob([JSON.stringify(data.logs, null, 2)], {
+        type: 'application/json'
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `console-logs-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function cleanupOldLogs() {
+      const response = await fetch('/api/logs/cleanup', { method: 'POST' });
+      const data = await response.json();
+      alert(`已清理 ${data.count} 个旧日志文件`);
+    }
+
+    async function loadBackendLogs() {
+      try {
+        const response = await fetch('/api/logs/backend?lines=50');
+        const data = await response.json();
+        data.logs.forEach(log => addLogEntry(log));
+      } catch (error) {
+        console.error('Failed to load backend logs:', error);
+      }
+    }
+
+    // 绑定按钮事件
+    document.getElementById('start-logging-btn').onclick = startLogging;
+    document.getElementById('stop-logging-btn').onclick = stopLogging;
+    document.getElementById('clear-logs-btn').onclick = clearLogs;
+    document.getElementById('export-logs-btn').onclick = exportLogs;
+    document.getElementById('cleanup-logs-btn').onclick = cleanupOldLogs;
+  </script>
+</body>
+</html>

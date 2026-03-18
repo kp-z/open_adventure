@@ -13,7 +13,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
-        enabled: true, // 在开发模式下启用 PWA
+        enabled: false, // 在开发模式下禁用 PWA，避免影响热更新
         type: 'module',
       },
       includeAssets: ['**/*.{png,jpg,svg,ico}'],

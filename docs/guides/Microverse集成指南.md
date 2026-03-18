@@ -48,8 +48,8 @@ cd ..
 
 这会同时启动：
 - 后端 API: http://localhost:38080
-- React 前端: http://localhost:5173
-- Microverse: http://localhost:5174
+- 前端界面: http://localhost:38080
+- Microverse 游戏: http://localhost:38080/microverse
 
 #### 方式 3：后台运行
 
@@ -140,9 +140,10 @@ microverse/
 
 ### 端口配置
 
-- **Microverse 端口**: 5174（在 `start.sh` 中配置）
-- **后端 API 端口**: 38080
-- **React 前端端口**: 5173
+- **统一端口**: 38080
+- **前端界面**: http://localhost:38080
+- **后端 API**: http://localhost:38080/api
+- **Microverse 游戏**: http://localhost:38080/microverse
 
 ## API 对接（未来计划）
 

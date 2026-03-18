@@ -9,6 +9,8 @@ import Settings from './pages/Settings';
 import Teams from './pages/Teams';
 import Terminal from './pages/Terminal';
 import Microverse from './pages/Microverse';
+import Testing from './pages/Testing';
+import DevCheck from './pages/DevCheck';
 
 export const router = createBrowserRouter([
   {
@@ -50,6 +52,14 @@ export const router = createBrowserRouter([
       {
         path: 'microverse',
         Component: Microverse,
+      },
+      {
+        path: 'testing',
+        Component: Testing,
+      },
+      {
+        path: 'dev-check',
+        Component: DevCheck,
       },
     ],
   },

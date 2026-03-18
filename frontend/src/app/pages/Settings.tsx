@@ -21,7 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
-  Palette
+  Palette,
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -516,37 +516,11 @@ const Settings = () => {
                   开发者工具
                 </h2>
                 <div className="space-y-4">
-                  {/* React Query DevTools */}
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-white">React Query DevTools</h3>
-                      <p className="text-sm text-gray-400 mt-1">
-                        显示数据查询和缓存状态的调试工具（左下角）
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        const newValue = !localStorage.getItem('showReactQueryDevTools') || localStorage.getItem('showReactQueryDevTools') === 'false';
-                        localStorage.setItem('showReactQueryDevTools', String(newValue));
-                        // 触发自定义事件通知 App 组件更新
-                        window.dispatchEvent(new Event('reactQueryDevToolsChange'));
-                        // 刷新页面以应用更改
-                        window.location.reload();
-                      }}
-                      className={`relative w-14 h-7 rounded-full transition-colors ${
-                        localStorage.getItem('showReactQueryDevTools') === 'true'
-                          ? 'bg-blue-500'
-                          : 'bg-gray-600'
-                      }`}
-                    >
-                      <div
-                        className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full transition-transform ${
-                          localStorage.getItem('showReactQueryDevTools') === 'true'
-                            ? 'translate-x-7'
-                            : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
+                  {/* 开发者工具说明 */}
+                  <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                    <p className="text-sm text-gray-400">
+                      开发者工具已移至测试页面。点击左下角的紫色烧杯图标打开测试页面，在那里可以管理所有开发工具。
+                    </p>
                   </div>
                 </div>
               </section>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>测试初始化加载界面</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0f111a;
+      color: white;
+    }
+    .section {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #60a5fa;
+      margin-bottom: 30px;
+    }
+    h2 {
+      color: #93c5fd;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    button {
+      background: #3b82f6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover {
+      background: #2563eb;
+    }
+    button.danger {
+      background: #ef4444;
+    }
+    button.danger:hover {
+      background: #dc2626;
+    }
+    .info {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 15px;
+      font-size: 14px;
+      color: #93c5fd;
+    }
+    .status {
+      margin-top: 15px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .status-item {
+      margin: 5px 0;
+    }
+    .status-key {
+      color: #60a5fa;
+      font-weight: bold;
+    }
+    .status-value {
+      color: #d1d5db;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 初始化加载界面测试</h1>
+
+  <div class="section">
+    <h2>📋 当前状态</h2>
+    <div id="status" class="status">
+      <div class="status-item">
+        <span class="status-key">已初始化:</span>
+        <span class="status-value" id="initialized">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-key">版本:</span>
+        <span class="status-value" id="version">-</span>
+      </div>
+      <div class="status-item">
+        <span class="status-key">缓存数据:</span>
+        <span class="status-value" id="cache">-</span>
+      </div>
+    </div>
+    <button onclick="checkStatus()">🔄 刷新状态</button>
+  </div>
+
+  <div class="section">
+    <h2>🧹 清除缓存（触发加载界面）</h2>
+    <p style="color: #9ca3af; font-size: 14px; margin-bottom: 15px;">
+      清除 localStorage 后，应用会显示初始化加载界面
+    </p>
+    <button class="danger" onclick="clearAndReload()">清除缓存并重新加载</button>
+    <button onclick="clearOnly()">仅清除缓存（不重载）</button>
+    <div class="info">
+      ⚠️ 点击"清除缓存并重新加载"后，应用会显示初始化加载界面，包括进度条和日志
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🔧 手动控制</h2>
+    <button onclick="setInitialized(true)">✅ 标记为已初始化</button>
+    <button onclick="setInitialized(false)">❌ 标记为未初始化</button>
+    <button onclick="changeVersion()">🔄 更改版本号（触发重新初始化）</button>
+  </div>
+
+  <div class="section">
+    <h2>🚀 打开应用</h2>
+    <button onclick="openApp()">打开 Open Adventure</button>
+    <div class="info">
+      💡 提示：如果已清除缓存，打开应用时会看到初始化加载界面
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'open-adventure-initialized';
+    const VERSION_KEY = 'open-adventure-version';
+    const CACHE_KEY = 'open-adventure-cache';
+    const CURRENT_VERSION = '1.3.5';
+
+    function checkStatus() {
+      const initialized = localStorage.getItem(STORAGE_KEY);
+      const version = localStorage.getItem(VERSION_KEY);
+      const cache = localStorage.getItem(CACHE_KEY);
+
+      document.getElementById('initialized').textContent = initialized || '未设置';
+      document.getElementById('version').textContent = version || '未设置';
+      document.getElementById('cache').textContent = cache ? '已缓存' : '未缓存';
+    }
+
+    function clearAndReload() {
+      if (confirm('确定要清除所有缓存并重新加载吗？\n\n这将触发初始化加载界面。')) {
+        localStorage.clear();
+        alert('✅ 缓存已清除！\n\n点击确定后将打开应用，您会看到初始化加载界面。');
+        window.open('/', '_blank');
+      }
+    }
+
+    function clearOnly() {
+      if (confirm('确定要清除所有缓存吗？')) {
+        localStorage.clear();
+        checkStatus();
+        alert('✅ 缓存已清除！\n\n现在打开应用会显示初始化加载界面。');
+      }
+    }
+
+    function setInitialized(value) {
+      if (value) {
+        localStorage.setItem(STORAGE_KEY, 'true');
+        localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+        alert('✅ 已标记为已初始化');
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(VERSION_KEY);
+        alert('❌ 已标记为未初始化');
+      }
+      checkStatus();
+    }
+
+    function changeVersion() {
+      const newVersion = prompt('输入新版本号（当前: ' + CURRENT_VERSION + '）:', '1.0.0');
+      if (newVersion) {
+        localStorage.setItem(VERSION_KEY, newVersion);
+        alert('✅ 版本号已更改为: ' + newVersion + '\n\n由于版本不匹配，打开应用时会重新初始化。');
+        checkStatus();
+      }
+    }
+
+    function openApp() {
+      window.open('/', '_blank');
+    }
+
+    // 页面加载时检查状态
+    checkStatus();
+  </script>
+</body>
+</html>

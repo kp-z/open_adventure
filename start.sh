@@ -69,6 +69,7 @@ FORCE_RESET=false
 PREVENT_SLEEP=false
 CLEAR_CACHE=false
 WITH_MICROVERSE=false
+DEV_MODE=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -86,6 +87,9 @@ for arg in "$@"; do
             ;;
         --with-microverse)
             WITH_MICROVERSE=true
+            ;;
+        --dev)
+            DEV_MODE=true
             ;;
     esac
 done
@@ -110,6 +114,9 @@ if [ "$CLEAR_CACHE" = true ]; then
 fi
 if [ "$WITH_MICROVERSE" = true ]; then
     echo "🎮 Microverse mode enabled"
+fi
+if [ "$DEV_MODE" = true ]; then
+    echo "🔧 Development mode enabled (frontend hot reload)"
 fi
 echo ""
 
@@ -670,11 +677,25 @@ if ! npm ls --depth=0 >/dev/null 2>&1; then
     echo "✅ Frontend dependencies installed"
 fi
 
-# 检查前端构建是否存在，如果不存在则构建
-if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
-    echo "Building frontend..."
-    npm run build
-    echo "✅ Frontend built"
+# 同步 Godot/Microverse 导出文件（如果存在）
+echo "Checking Microverse export files..."
+if [ -f "$SCRIPT_DIR/scripts/sync_microverse.sh" ]; then
+    bash "$SCRIPT_DIR/scripts/sync_microverse.sh"
+else
+    echo "⚠️  Microverse sync script not found, skipping..."
+fi
+echo ""
+
+# 前端构建或开发模式准备
+if [ "$DEV_MODE" = true ]; then
+    echo "Skipping frontend build (dev mode will use npm run dev)..."
+else
+    # 检查前端构建是否存在，如果不存在则构建
+    if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
+        echo "Building frontend..."
+        npm run build
+        echo "✅ Frontend built"
+    fi
 fi
 
 # 清理旧的 .env.local（如果存在）
@@ -794,9 +815,36 @@ else
     echo "✅ Network access configured"
 fi
 
-# 前端静态文件由后端提供（38080 端口）
-echo ""
-echo "Frontend static files served by backend on port $BACKEND_PORT"
+# 启动前端服务器（开发模式或生产模式）
+if [ "$DEV_MODE" = true ]; then
+    echo ""
+    echo "Starting frontend development server on port $FRONTEND_PORT..."
+    cd "$SCRIPT_DIR/frontend"
+
+    # 启动 Vite 开发服务器（后台运行）
+    npm run dev > "$SCRIPT_DIR/docs/logs/frontend.log" 2>&1 &
+    FRONTEND_PID=$!
+    echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"
+
+    # 等待前端启动
+    echo "Waiting for frontend dev server to start..."
+    for i in {1..20}; do
+        if lsof -Pi :$FRONTEND_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+            echo "✅ Frontend dev server is ready (PID: $FRONTEND_PID)"
+            break
+        fi
+        if [ $i -eq 20 ]; then
+            echo "⚠️  Frontend dev server may not have started properly, check docs/logs/frontend.log"
+        fi
+        sleep 0.5
+    done
+
+    cd "$SCRIPT_DIR"
+else
+    # 前端静态文件由后端提供（38080 端口）
+    echo ""
+    echo "Frontend static files served by backend on port $BACKEND_PORT"
+fi
 
 if [ "$DAEMON_MODE" = true ]; then
     # 后台模式
@@ -806,16 +854,27 @@ if [ "$DAEMON_MODE" = true ]; then
     echo "============================================"
     echo ""
     echo "🌐 Access URL:"
-    echo "   http://localhost:${BACKEND_PORT}"
-    echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    if [ "$DEV_MODE" = true ]; then
+        echo "   Frontend (Dev): http://localhost:${FRONTEND_PORT}"
+        echo "   Backend API: http://localhost:${BACKEND_PORT}"
+        echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    else
+        echo "   http://localhost:${BACKEND_PORT}"
+        echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    fi
     if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
         echo "   Microverse (HTTPS): https://localhost:${CADDY_PORT}/microverse"
     fi
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
-        echo "   http://${DISPLAY_IP}:${BACKEND_PORT}"
-        echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        if [ "$DEV_MODE" = true ]; then
+            echo "   Frontend (Dev): http://${DISPLAY_IP}:${FRONTEND_PORT}"
+            echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        else
+            echo "   http://${DISPLAY_IP}:${BACKEND_PORT}"
+            echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        fi
         if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
             echo "   Microverse (HTTPS): https://${DISPLAY_IP}:${CADDY_PORT}/microverse"
         fi
@@ -823,14 +882,18 @@ if [ "$DAEMON_MODE" = true ]; then
     echo ""
     echo "📋 Process IDs:"
     echo "   Backend PID: $BACKEND_PID"
-    echo "   Frontend PID: $FRONTEND_PID"
+    if [ "$DEV_MODE" = true ] && [ -n "$FRONTEND_PID" ]; then
+        echo "   Frontend PID: $FRONTEND_PID"
+    fi
     if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
         echo "   Caddy PID: $CADDY_PID"
     fi
     echo ""
     echo "📝 Logs:"
     echo "   Backend: docs/logs/backend.log"
-    echo "   Frontend: docs/logs/frontend.log"
+    if [ "$DEV_MODE" = true ]; then
+        echo "   Frontend: docs/logs/frontend.log"
+    fi
     echo ""
     echo "🛑 To stop all servers, run: ./stop.sh"
     echo "============================================"
@@ -881,21 +944,36 @@ else
     echo "============================================"
     echo ""
     echo "🌐 Access URL:"
-    echo "   http://localhost:${BACKEND_PORT}"
-    echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    if [ "$DEV_MODE" = true ]; then
+        echo "   Frontend (Dev): http://localhost:${FRONTEND_PORT}"
+        echo "   Backend API: http://localhost:${BACKEND_PORT}"
+        echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    else
+        echo "   http://localhost:${BACKEND_PORT}"
+        echo "   API Docs: http://localhost:${BACKEND_PORT}/docs"
+    fi
     if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
         echo "   Microverse (HTTPS): https://localhost:${CADDY_PORT}/microverse"
     fi
     if [ -n "$DISPLAY_IP" ]; then
         echo ""
         echo "🌍 Network Access:"
-        echo "   http://${DISPLAY_IP}:${BACKEND_PORT}"
-        echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        if [ "$DEV_MODE" = true ]; then
+            echo "   Frontend (Dev): http://${DISPLAY_IP}:${FRONTEND_PORT}"
+            echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        else
+            echo "   http://${DISPLAY_IP}:${BACKEND_PORT}"
+            echo "   Backend API: http://${DISPLAY_IP}:${BACKEND_PORT}"
+        fi
         if [ "$CADDY_USER_ENABLED" = true ] && [ -n "$CADDY_PID" ]; then
             echo "   Microverse (HTTPS): https://${DISPLAY_IP}:${CADDY_PORT}/microverse"
         fi
     fi
     echo ""
+    if [ "$DEV_MODE" = true ]; then
+        echo "💡 Development mode: Frontend has hot reload enabled"
+        echo ""
+    fi
     echo "Press Ctrl+C to stop all servers"
     echo "============================================"
     echo ""
