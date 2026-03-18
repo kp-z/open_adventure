@@ -58,6 +58,42 @@ if config_dir.exists():
 else:
     print("⚠️  警告: app/config 目录不存在")
 
+# 收集 Alembic 配置文件和迁移文件
+alembic_ini = backend_dir / 'alembic.ini'
+alembic_dir = backend_dir / 'alembic'
+if alembic_ini.exists():
+    datas.append((str(alembic_ini), '.'))
+    print(f"✓ 收集 Alembic 配置: alembic.ini")
+else:
+    print("⚠️  警告: alembic.ini 不存在")
+
+if alembic_dir.exists():
+    # 收集 alembic/env.py
+    env_py = alembic_dir / 'env.py'
+    if env_py.exists():
+        datas.append((str(env_py), 'alembic'))
+        print(f"✓ 收集 Alembic env.py")
+
+    # 收集 alembic/script.py.mako
+    script_mako = alembic_dir / 'script.py.mako'
+    if script_mako.exists():
+        datas.append((str(script_mako), 'alembic'))
+        print(f"✓ 收集 Alembic script.py.mako")
+
+    # 收集所有迁移文件
+    versions_dir = alembic_dir / 'versions'
+    if versions_dir.exists():
+        migration_count = 0
+        for migration_file in versions_dir.glob('*.py'):
+            if migration_file.name != '__pycache__' and not migration_file.name.startswith('.'):
+                datas.append((str(migration_file), 'alembic/versions'))
+                migration_count += 1
+        print(f"✓ 收集 Alembic 迁移文件: {migration_count} 个")
+    else:
+        print("⚠️  警告: alembic/versions 目录不存在")
+else:
+    print("⚠️  警告: alembic 目录不存在")
+
 # 隐藏导入（确保所有运行时需要的模块都被包含）
 hiddenimports = [
     # App 模块
