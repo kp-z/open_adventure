@@ -22,8 +22,9 @@
   - 包含所有 UI 组件的设计稿和图标
 
 ### 📋 guides/
-使用指南和教程
-- `console-logging-guide.md` - Console 日志监控功能使用指南 ⭐ NEW
+使用指南和教程（12 个文件）
+- `ecc-quick-reference.md` - ECC 核心概念快速参考 ⭐ NEW
+- `console-logging-guide.md` - Console 日志监控功能使用指南
 - `MICROVERSE_SYNC_QUICKSTART.md` - Microverse 自动同步快速开始指南
 - `frontend/` - 前端开发指南
   - `Guidelines.md` - 前端开发规范
@@ -33,8 +34,17 @@
 - `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（41 个文件）
-- `20260318-10-Python38兼容性修复.md` - Python 3.8 类型注解兼容性修复 ⭐ NEW
+技术文档和修复记录（49 个文件）
+- `20260319-20-Controller功能验证报告.md` - Controller 功能验证报告 ⭐ NEW
+- `20260319-19-Controller路由问题修复.md` - Controller 路由问题修复 ⭐ NEW
+- `20260319-18-Controller项目交付清单.md` - Controller 项目交付清单 ⭐ NEW
+- `20260319-17-Controller页面功能实施总结.md` - Controller 快捷键配置工具实施总结 ⭐ NEW
+- `20260319-16-Terminal-Tmux-Resize乱码修复.md` - Terminal Tmux Resize 乱码修复实施总结
+- `20260319-15-Terminal-Tmux连接优化实施总结.md` - Terminal Tmux detach/attach 模式实现
+- `20260319-15-Projects目录重构.md` - Projects 一级菜单和独立项目管理
+- `20260318-14-Controller页面实施总结.md` - Controller DMX 灯光控制器页面实施
+- `20260318-11-ECC安装内容清单.md` - ECC install.sh 安装内容详细清单
+- `20260318-10-Python38兼容性修复.md` - Python 3.8 类型注解兼容性修复
 - `20260318-09-ECC安装成功总结.md` - Everything Claude Code 安装成功总结
 - `20260318-06-AgentDialogSystem缺失修复.md` - AgentDialogSystem 动态加载修复
 - `20260318-05-Console日志监控功能实现.md` - Console 日志监控功能实现
@@ -133,8 +143,8 @@
 - **日志文件**: 14 个文件
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
-- **技术文档**: 40 个文件
-- **指南文档**: 11 个文件
+- **技术文档**: 42 个文件
+- **指南文档**: 12 个文件
 - **故障排查**: 3 个文件
 - **计划文档**: 1 个文件
 

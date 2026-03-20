@@ -1,6 +1,6 @@
 
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="en" class="dark">
     <head>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
@@ -17,10 +17,197 @@
       <title>Open Adventure</title>
     </head>
 
-    <body>
+    <body style="margin: 0; padding: 0; background-color: #0f111a; overflow: hidden;">
       <!-- 运行时配置（二进制版本动态生成） -->
       <script src="/config.js"></script>
-      <div id="root"></div>
+      <div id="root">
+        <!-- 内联加载界面 - 在 React 挂载前显示 -->
+        <style>
+          /* 加载界面样式 */
+          .inline-loading-screen {
+            position: fixed;
+            inset: 0;
+            background-color: #0f111a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+          }
+
+          .inline-loading-container {
+            max-width: 28rem;
+            width: 100%;
+            padding: 0 1.5rem;
+          }
+
+          /* Logo 容器 */
+          .inline-logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.5s ease-out;
+          }
+
+          /* Logo 图标 */
+          .inline-logo-icon {
+            width: 5rem;
+            height: 5rem;
+            border-radius: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            background-color: rgba(59, 130, 246, 0.1);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1);
+          }
+
+          .inline-logo-icon::before {
+            content: '⚡';
+            font-size: 2.5rem;
+            color: rgb(96, 165, 250);
+            filter: drop-shadow(0 0 20px rgba(96, 165, 250, 0.6));
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            position: relative;
+            z-index: 10;
+          }
+
+          .inline-logo-icon::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-color: rgba(96, 165, 250, 0.2);
+            filter: blur(24px);
+            transform: scale(1.5);
+            border-radius: 9999px;
+          }
+
+          /* Logo 文字 */
+          .inline-logo-text {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+          }
+
+          .inline-logo-title {
+            font-size: 1.875rem;
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            text-transform: uppercase;
+            font-style: italic;
+            line-height: 0.85;
+            color: white;
+            margin-bottom: 0.5rem;
+          }
+
+          .inline-logo-subtitle {
+            font-size: 1.125rem;
+            font-weight: 900;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            line-height: 1.25;
+            color: rgba(96, 165, 250, 0.8);
+          }
+
+          /* 进度条容器 */
+          .inline-progress-container {
+            margin-bottom: 2rem;
+            animation: fadeIn 0.5s ease-out 0.3s both;
+          }
+
+          .inline-progress-bar {
+            position: relative;
+            height: 0.5rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 9999px;
+            overflow: hidden;
+          }
+
+          .inline-progress-fill {
+            position: absolute;
+            inset-y: 0;
+            left: 0;
+            width: 0%;
+            background: linear-gradient(to right, rgb(59, 130, 246), rgb(96, 165, 250));
+            border-radius: 9999px;
+            animation: progressAnimation 2s ease-in-out infinite;
+          }
+
+          .inline-progress-text {
+            margin-top: 0.75rem;
+            font-size: 0.875rem;
+            color: rgb(156, 163, 175);
+            text-align: center;
+          }
+
+          /* 动画定义 */
+          @keyframes fadeInDown {
+            from {
+              opacity: 0;
+              transform: translateY(-20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+          }
+
+          @keyframes progressAnimation {
+            0% {
+              width: 0%;
+            }
+            50% {
+              width: 60%;
+            }
+            100% {
+              width: 0%;
+            }
+          }
+        </style>
+
+        <div class="inline-loading-screen">
+          <div class="inline-loading-container">
+            <!-- Logo -->
+            <div class="inline-logo-container">
+              <div class="inline-logo-icon"></div>
+              <div class="inline-logo-text">
+                <span class="inline-logo-title">Open</span>
+                <span class="inline-logo-subtitle">Adventure</span>
+              </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="inline-progress-container">
+              <div class="inline-progress-bar">
+                <div class="inline-progress-fill"></div>
+              </div>
+              <div class="inline-progress-text">正在加载...</div>
+            </div>
+          </div>
+        </div>
+      </div>
       <script type="module" src="/src/main.tsx"></script>
     </body>
   </html>

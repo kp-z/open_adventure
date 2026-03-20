@@ -1,12 +1,15 @@
 /**
  * HTTP 客户端配置
- * 基于 fetch API 实现，包含请求/响应拦截器
+ * 基于 fetch API 实现，包含请求/响应拦截器和 IndexedDB 缓存
  */
 
 import { API_CONFIG } from '../../config/api';
+import { cache } from '../storage';
 
 interface RequestConfig extends RequestInit {
   params?: Record<string, any>;
+  cache?: boolean; // 是否启用缓存
+  cacheTTL?: number; // 缓存有效期（秒）
 }
 
 interface ApiResponse<T = any> {
@@ -38,7 +41,7 @@ class ApiClient {
     endpoint: string,
     config: RequestConfig = {}
   ): Promise<T> {
-    const { params, ...fetchConfig } = config;
+    const { params, cache: enableCache = false, cacheTTL = 300, ...fetchConfig } = config;
 
     // 构建 URL
     let url = `${this.baseURL}${endpoint}`;
@@ -55,6 +58,34 @@ class ApiClient {
       }
     }
 
+    // 缓存键
+    const cacheKey = `api:${endpoint}:${JSON.stringify(params || {})}`;
+
+    // 获取请求方法（默认为 GET）
+    const method = (fetchConfig.method || 'GET').toUpperCase();
+
+    // 仅对 GET 请求启用缓存
+    if (enableCache && method === 'GET') {
+      // 尝试从缓存读取
+      const cached = await cache.get<T>(cacheKey);
+      if (cached) {
+        console.log('[Cache] 命中缓存:', endpoint);
+        // 后台更新缓存
+        this.fetchAndCache<T>(url, fetchConfig, cacheKey, cacheTTL).catch(() => {});
+        return cached;
+      }
+    }
+
+    // 缓存未命中或不启用缓存，直接请求
+    return this.fetchAndCache<T>(url, fetchConfig, enableCache ? cacheKey : null, cacheTTL);
+  }
+
+  private async fetchAndCache<T>(
+    url: string,
+    fetchConfig: RequestInit,
+    cacheKey: string | null,
+    cacheTTL: number
+  ): Promise<T> {
     // 设置默认 headers
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -86,6 +117,13 @@ class ApiClient {
       }
 
       const data = await response.json();
+
+      // 保存到缓存
+      if (cacheKey) {
+        await cache.set(cacheKey, data, cacheTTL);
+        console.log('[Cache] 保存缓存:', cacheKey);
+      }
+
       return data;
     } catch (error) {
       console.error('API Request Error:', error);

@@ -36,6 +36,57 @@ from app.schemas.microverse import (
 
 router = APIRouter(prefix="/microverse", tags=["microverse"])
 
+
+# ===== Agent 列表接口（仅项目级） =====
+
+@router.get("/agents")
+async def list_project_agents(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取项目级 Agent 列表（游戏模式专用）
+
+    只返回 scope="project" 的 agent，忽略 user 和 plugin 类型。
+
+    Args:
+        skip: 跳过数量
+        limit: 返回数量
+        db: 数据库会话
+
+    Returns:
+        List[Agent]: 项目级 agent 列表
+    """
+    repo = AgentRepository(db)
+    agents, total = await repo.get_all(
+        skip=skip,
+        limit=limit,
+        scope="project",  # 只返回项目级 agent
+        active_only=False
+    )
+
+    return {
+        "agents": [
+            {
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "scope": agent.scope,
+                "priority": agent.priority,
+                "framework": agent.framework,
+                "agent_type": agent.agent_type,
+                "is_active": agent.is_active,
+                "meta": agent.meta
+            }
+            for agent in agents
+        ],
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
+
+
 class ChatRequest(BaseModel):
     """对话请求"""
     character_name: str

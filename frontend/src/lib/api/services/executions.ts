@@ -16,13 +16,13 @@ export const executionsApi = {
     workflow_id?: number;
     execution_type?: ExecutionType;
   }) =>
-    apiClient.get<ExecutionListResponse>('/executions/', { params }),
+    apiClient.get<ExecutionListResponse>('/executions/', { params, cache: true, cacheTTL: 300 }),
 
   /**
    * 获取单个执行详情
    */
   get: (id: number) =>
-    apiClient.get<Execution>(`/executions/${id}`),
+    apiClient.get<Execution>(`/executions/${id}`, { cache: true, cacheTTL: 300 }),
 
   /**
    * 获取 Dashboard 历史卡片数据
@@ -30,13 +30,13 @@ export const executionsApi = {
   getHistoryCard: (params?: {
     limit?: number;
   }) =>
-    apiClient.get<Execution[]>('/executions/cards/history', { params }),
+    apiClient.get<Execution[]>('/executions/cards/history', { params, cache: true, cacheTTL: 300 }),
 
   /**
    * 获取各类型执行数量统计
    */
   getStatsByType: () =>
-    apiClient.get<ExecutionStatsByType>('/executions/stats/by-type'),
+    apiClient.get<ExecutionStatsByType>('/executions/stats/by-type', { cache: true, cacheTTL: 300 }),
 
   /**
    * 删除执行记录

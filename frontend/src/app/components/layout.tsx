@@ -25,6 +25,8 @@ import {
   Gamepad2,
   TestTube,
   FlaskConical,
+  FolderOpen,
+  ExternalLink,
 } from "lucide-react";
 import { useMode } from "../contexts/ModeContext";
 import { useTranslation } from "../hooks/useTranslation";
@@ -143,6 +145,26 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
       path: "/terminal",
       icon: Terminal,
     },
+    {
+      name: "Projects",
+      path: "/projects",
+      icon: FolderOpen,
+      id: 'projects',
+      subItems: [
+        {
+          name: "Controller",
+          path: "/projects/controller/index.html",
+          icon: Gamepad2,
+          external: true,
+        },
+        {
+          name: "OpenClaw Controller",
+          path: "http://localhost:18789",
+          icon: Network,
+          external: true,
+        },
+      ],
+    },
   ];
 
   return (
@@ -202,26 +224,47 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden ml-4 mt-1 space-y-1"
                     >
-                      {item.subItems?.map((subItem) => (
-                        <NavLink
-                          key={subItem.path}
-                          to={subItem.path}
-                          end={subItem.path === '/workflows'}
-                          className={({ isActive }) => `
-                            flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all
-                            ${
-                              isActive
-                                ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                                : "text-gray-400 hover:bg-white/5 hover:text-white"
-                            }
-                          `}
-                        >
-                          <subItem.icon size={18} />
-                          <span className="font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis">
-                            {subItem.name}
-                          </span>
-                        </NavLink>
-                      ))}
+                      {item.subItems?.map((subItem) => {
+                        // 如果是外部链接，使用 <a> 标签在新标签页打开
+                        if (subItem.external) {
+                          return (
+                            <a
+                              key={subItem.path}
+                              href={subItem.path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-gray-400 hover:bg-white/5 hover:text-white"
+                            >
+                              <subItem.icon size={18} />
+                              <span className="font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis flex-1">
+                                {subItem.name}
+                              </span>
+                              <ExternalLink size={14} className="opacity-50" />
+                            </a>
+                          );
+                        }
+                        // 普通内部链接
+                        return (
+                          <NavLink
+                            key={subItem.path}
+                            to={subItem.path}
+                            end={subItem.path === '/workflows'}
+                            className={({ isActive }) => `
+                              flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all
+                              ${
+                                isActive
+                                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                                  : "text-gray-400 hover:bg-white/5 hover:text-white"
+                              }
+                            `}
+                          >
+                            <subItem.icon size={18} />
+                            <span className="font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis">
+                              {subItem.name}
+                            </span>
+                          </NavLink>
+                        );
+                      })}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -262,26 +305,48 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                             <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10">
                               {item.name}
                             </div>
-                            {item.subItems?.map((subItem) => (
-                              <NavLink
-                                key={subItem.path}
-                                to={subItem.path}
-                                onClick={() => setCollapsedMenuOpen(null)}
-                                className={({ isActive }) => `
-                                  flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
-                                  ${
-                                    isActive
-                                      ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                                      : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                  }
-                                `}
-                              >
-                                <subItem.icon size={18} />
-                                <span className="font-medium text-sm whitespace-nowrap">
-                                  {subItem.name}
-                                </span>
-                              </NavLink>
-                            ))}
+                            {item.subItems?.map((subItem) => {
+                              // 如果是外部链接，使用 <a> 标签在新标签页打开
+                              if (subItem.external) {
+                                return (
+                                  <a
+                                    key={subItem.path}
+                                    href={subItem.path}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setCollapsedMenuOpen(null)}
+                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-gray-400 hover:bg-white/5 hover:text-white"
+                                  >
+                                    <subItem.icon size={18} />
+                                    <span className="font-medium text-sm whitespace-nowrap flex-1">
+                                      {subItem.name}
+                                    </span>
+                                    <ExternalLink size={14} className="opacity-50" />
+                                  </a>
+                                );
+                              }
+                              // 普通内部链接
+                              return (
+                                <NavLink
+                                  key={subItem.path}
+                                  to={subItem.path}
+                                  onClick={() => setCollapsedMenuOpen(null)}
+                                  className={({ isActive }) => `
+                                    flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
+                                    ${
+                                      isActive
+                                        ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                    }
+                                  `}
+                                >
+                                  <subItem.icon size={18} />
+                                  <span className="font-medium text-sm whitespace-nowrap">
+                                    {subItem.name}
+                                  </span>
+                                </NavLink>
+                              );
+                            })}
                           </div>
                         </motion.div>
                       )}
@@ -1073,23 +1138,6 @@ const LayoutContent = () => {
           </div>
         </div>
       </nav>
-      )}
-
-      {/* 测试功能悬浮按钮 - 仅开发模式 */}
-      {import.meta.env.DEV && (
-        <button
-          onClick={() => {
-            // 在新窗口打开独立的测试页面
-            window.open('/testing.html', '_blank', 'width=1400,height=900');
-          }}
-          title="测试功能"
-          className="fixed bottom-4 left-4 z-50 p-1 bg-transparent border-none transition-all duration-200 hover:scale-110 group"
-        >
-          <FlaskConical
-            size={16}
-            className="text-purple-400/40 group-hover:text-purple-400/70 transition-all"
-          />
-        </button>
       )}
     </div>
   );

@@ -10,13 +10,13 @@ export const workflowsApi = {
    * 获取工作流列表
    */
   list: (params?: { skip?: number; limit?: number }) =>
-    apiClient.get<WorkflowListResponse>('/workflows', { params }),
+    apiClient.get<WorkflowListResponse>('/workflows', { params, cache: true, cacheTTL: 300 }),
 
   /**
    * 获取单个工作流详情
    */
   get: (id: number) =>
-    apiClient.get<Workflow>(`/workflows/${id}`),
+    apiClient.get<Workflow>(`/workflows/${id}`, { cache: true, cacheTTL: 300 }),
 
   /**
    * 创建新工作流

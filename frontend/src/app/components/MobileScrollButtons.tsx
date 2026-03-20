@@ -121,7 +121,8 @@ export const MobileScrollButtons: React.FC<MobileScrollButtonsProps> = ({
     <div className={`
       fixed right-1 top-1/2 -translate-y-1/2
       flex flex-col gap-2
-      z-50
+      z-[9998]
+      pointer-events-auto
       md:hidden
       ${className}
     `}>

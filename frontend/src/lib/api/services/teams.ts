@@ -22,13 +22,13 @@ export const teamsApi = {
    * 获取团队列表
    */
   list: (params?: { skip?: number; limit?: number }) =>
-    apiClient.get<TeamListResponse>('/agent-teams', { params }),
+    apiClient.get<TeamListResponse>('/agent-teams', { params, cache: true, cacheTTL: 300 }),
 
   /**
    * 获取单个团队详情
    */
   get: (id: number) =>
-    apiClient.get<Team>(`/agent-teams/${id}`),
+    apiClient.get<Team>(`/agent-teams/${id}`, { cache: true, cacheTTL: 300 }),
 
   /**
    * 创建新团队

@@ -227,6 +227,39 @@ const router = createBrowserRouter(
 
 // 创建一个内部组件来使用 useInitialization hook
 function AppContent() {
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  useEffect(() => {
+    // 恢复上次的路由
+    const lastRoute = sessionStorage.getItem('last-route');
+    if (lastRoute && lastRoute !== window.location.pathname) {
+      console.log('[Route] 恢复上次路由:', lastRoute);
+      window.history.replaceState(null, '', lastRoute);
+    }
+    setIsRestoring(false);
+
+    // 保存当前路由到 sessionStorage
+    const saveRoute = () => {
+      const currentPath = window.location.pathname;
+      sessionStorage.setItem('last-route', currentPath);
+      console.log('[Route] 保存当前路由:', currentPath);
+    };
+
+    // 监听路由变化
+    window.addEventListener('popstate', saveRoute);
+    // 监听页面卸载
+    window.addEventListener('beforeunload', saveRoute);
+
+    return () => {
+      window.removeEventListener('popstate', saveRoute);
+      window.removeEventListener('beforeunload', saveRoute);
+    };
+  }, []);
+
+  if (isRestoring) {
+    return null; // 避免闪烁
+  }
+
   return (
     <>
       <OfflineIndicator />

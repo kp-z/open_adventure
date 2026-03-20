@@ -58,6 +58,9 @@ export interface TerminalInstance {
   useTmux: boolean; // 是否使用 tmux
   tmuxSessionName?: string; // tmux 会话名称
   tmuxAlive: boolean; // tmux 会话是否存活
+  kicked?: boolean;           // 是否被踢出
+  kickedReason?: string;      // 被踢出原因
+  kickedAt?: number;          // 被踢出时间戳
 }
 
 interface ClaudeConversation {
@@ -74,7 +77,7 @@ interface TerminalContextType {
   activeTabId: string | null;
   setActiveTabId: (id: string | null) => void;
   createTerminal: (projectPath?: string, autoStartClaude?: boolean) => TerminalInstance | null;
-  closeTerminal: (id: string) => void;
+  closeTerminal: (id: string, action?: 'detach' | 'kill') => void;
   cleanupAll: () => void;
   sendInput: (terminalId: string, data: string) => void;
   sendResize: (terminalId: string, rows: number, cols: number) => void;
@@ -199,8 +202,16 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const restoreActiveSetRef = useRef(false);
   const queueOverflowNotifyRef = useRef<Record<string, number>>({});
 
-  const getTerminalTitle = (projectPath?: string, claudeCodeId?: string, terminalIndex?: number): string => {
-    console.log('[TerminalContext] getTerminalTitle called', { projectPath, claudeCodeId, terminalIndex });
+  const getTerminalTitle = (projectPath?: string, claudeCodeId?: string, terminalIndex?: number, tmuxSessionName?: string): string => {
+    console.log('[TerminalContext] getTerminalTitle called', { projectPath, claudeCodeId, terminalIndex, tmuxSessionName });
+
+    // 如果有 tmux session name，直接使用它作为标题
+    if (tmuxSessionName) {
+      console.log('[TerminalContext] Using tmux session name as title:', tmuxSessionName);
+      return tmuxSessionName;
+    }
+
+    // 降级：使用原有逻辑
     let projectName = '';
     if (projectPath) {
       const pathParts = projectPath.split('/').filter((p) => p);
@@ -255,7 +266,8 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       const data = await response.json();
       const activeSessions = Array.isArray(data.active_sessions) ? data.active_sessions : [];
       return activeSessions.map((session: any, index: number) => {
-        const title = getTerminalTitle(session.initial_dir, session.claude_code_id, index);
+        // 优先使用 tmux session name 作为标题
+        const title = getTerminalTitle(session.initial_dir, session.claude_code_id, index, session.tmux_session_name);
         return {
           id: `terminal-restored-${session.session_id}`,
           sessionId: session.session_id,
@@ -435,10 +447,11 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     restoreSessionId?: string;
     claudeResumeSession?: string;  // Claude 会话恢复的 session ID
     useTmux?: boolean;  // 是否使用 tmux
+    tmuxSessionName?: string;  // 🔧 新增：tmux session 名称
     mode: 'create' | 'restore';
     onSettled?: (state: 'open' | 'error' | 'close') => void;
   }): TerminalInstance => {
-    const { id, title, projectPath, autoStartClaude, restoreSessionId, claudeResumeSession, useTmux = true, mode, onSettled } = options;
+    const { id, title, projectPath, autoStartClaude, restoreSessionId, claudeResumeSession, useTmux = true, tmuxSessionName, mode, onSettled } = options;
 
     const isMobile = window.innerWidth < 768;
     const fontSize = isMobile ? 11 : 13;
@@ -506,6 +519,11 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       }
       if (useTmux !== undefined) {
         params.append('use_tmux', useTmux.toString());
+      }
+      // 🔧 新增：如果有 tmux session 名称，添加到 URL 参数
+      if (tmuxSessionName) {
+        params.append('tmux_session_name', tmuxSessionName);
+        console.log('[TerminalContext] Adding tmux_session_name to WebSocket URL:', tmuxSessionName);
       }
       const queryString = params.toString();
       wsUrl = `${API_CONFIG.WS_BASE_URL}/terminal/ws${queryString ? `?${queryString}` : ''}`;
@@ -662,6 +680,37 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
           return;
         }
 
+        // 处理 kicked 消息
+        if (parsed?.type === 'kicked') {
+          console.warn(`[TerminalContext] ⚠️ Terminal kicked: ${id}`, parsed);
+
+          // 1. 显示通知
+          addNotification({
+            type: 'warning',
+            title: '终端已在其他设备打开',
+            message: parsed.message || '此终端已在其他设备上打开',
+            duration: 0  // 持久显示
+          });
+
+          // 2. 标记终端为被踢出状态
+          terminal.kicked = true;
+          terminal.kickedReason = parsed.reason;
+          terminal.kickedAt = Date.now();
+
+          // 3. 禁用输入
+          term.options.disableStdin = true;
+
+          // 4. 在终端显示提示信息
+          term.write('\r\n\x1b[33m⚠️  此终端已在其他设备上打开\x1b[0m\r\n');
+          term.write('\x1b[36m提示：点击右上角"重新连接"按钮恢复连接\x1b[0m\r\n');
+
+          // 5. 触发 UI 更新（显示重连按钮）
+          setTerminals((currentTerminals) => [...currentTerminals]);
+
+          // 6. 不自动重连，等待用户手动操作
+          return;
+        }
+
         if (raw.includes('SESSION_ID:')) {
           const extracted = extractSessionId(raw);
           if (extracted) {
@@ -685,12 +734,17 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
               if (tmuxInfo.type === 'tmux_created' && tmuxInfo.session_name) {
                 terminal.tmuxSessionName = tmuxInfo.session_name;
                 terminal.tmuxAlive = true;
+                // 更新 terminal 标题为 tmux session name
+                terminal.title = tmuxInfo.session_name;
+                localStorage.setItem(`terminal_title_${id}`, terminal.title);
                 localStorage.setItem(`terminal_tmux_${id}`, JSON.stringify({
                   sessionName: tmuxInfo.session_name,
                   useTmux: terminal.useTmux,
                   createdAt: Date.now()
                 }));
-                console.log(`[TerminalContext] tmux session created: ${tmuxInfo.session_name}`);
+                console.log(`[TerminalContext] tmux session created: ${tmuxInfo.session_name}, title updated`);
+                // 触发 terminals 状态更新
+                setTerminals((prev) => [...prev]);
               }
             }
           } catch (error) {
@@ -719,8 +773,12 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
                     const term = currentTerminals[termIndex];
                     if (term) {
                       term.claudeCodeId = claudeStatus.claude_resume_session;
-                      term.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session, termIndex);
-                      localStorage.setItem(`terminal_title_${id}`, term.title);
+                      // 如果已经有 tmux session name（由 TMUX_INFO 设置），保留它作为标题
+                      if (!term.tmuxSessionName) {
+                        term.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session, termIndex);
+                        localStorage.setItem(`terminal_title_${id}`, term.title);
+                      }
+                      // 否则保持 TMUX_INFO 设置的标题不变
                     }
                     return [...currentTerminals];
                   });
@@ -750,6 +808,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     };
 
     ws.onclose = (event) => {
+      console.log(`[TerminalContext] WebSocket closed: ${id}, code=${event.code}, reason=${event.reason}`);
       logLifecycle(terminal, 'disposed', `ws close:${event.code}`);
 
       // 清理心跳定时器
@@ -757,6 +816,15 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         clearInterval(terminal.heartbeatInterval);
         terminal.heartbeatInterval = undefined;
         console.log(`[TerminalContext] Heartbeat cleared: terminal=${id}`);
+      }
+
+      // 区分被踢出和其他关闭原因
+      if (event.code === 4001 || terminal.kicked) {
+        // 被踢出，不自动重连
+        console.log(`[TerminalContext] Terminal was kicked, not auto-reconnecting`);
+        terminal.lifecycle = 'disposed';
+        settleOnce('close');
+        return;
       }
 
       if (event.code !== 1000) {
@@ -1243,12 +1311,15 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
               const terminalIndex = currentTerminals.findIndex(t => t.sessionId === sessionId);
               const terminal = currentTerminals[terminalIndex];
               if (terminal && terminal.ws && terminal.ws.readyState === WebSocket.OPEN) {
-                // 更新 terminal 的 claudeCodeId 和标题
+                // 更新 terminal 的 claudeCodeId
                 terminal.claudeCodeId = claudeStatus.claude_resume_session;
-                terminal.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session, terminalIndex);
-
-                // 保存到 localStorage
-                localStorage.setItem(`terminal_title_${terminal.id}`, terminal.title);
+                // 如果已经有 tmux session name（由 TMUX_INFO 设置），保留它作为标题
+                if (!terminal.tmuxSessionName) {
+                  terminal.title = getTerminalTitle(claudeStatus.initial_dir, claudeStatus.claude_resume_session, terminalIndex);
+                  // 保存到 localStorage
+                  localStorage.setItem(`terminal_title_${terminal.id}`, terminal.title);
+                }
+                // 否则保持 TMUX_INFO 设置的标题不变
 
                 // 发送 claude --resume 命令
                 const resumeCommand = `claude --resume ${claudeStatus.claude_resume_session}\n`;
@@ -1390,31 +1461,31 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
               console.log(`[TerminalContext] tmux session ${finalTmuxSessionName} alive: ${alive}`);
               terminal.tmuxAlive = alive;
 
-              // 如果 tmux 会话存活，多次发送 resize 以修复显示问题
+              // 如果 tmux 会话存活，优化 resize 策略
               if (alive && terminal.ws.readyState === WebSocket.OPEN) {
-                // 第一次 resize：300ms 后发送
-                setTimeout(() => {
-                  const rows = terminal.term.rows;
-                  const cols = terminal.term.cols;
-                  console.log(`[TerminalContext] Sending first resize for tmux: ${rows}x${cols}`);
-                  sendResize(terminal.id, rows, cols);
-                }, 300);
+                console.log('[TerminalContext] tmux session alive, optimizing resize strategy');
 
-                // 第二次 resize：800ms 后发送，确保 tmux 已处理完第一次
-                setTimeout(() => {
-                  const rows = terminal.term.rows;
-                  const cols = terminal.term.cols;
-                  console.log(`[TerminalContext] Sending second resize for tmux: ${rows}x${cols}`);
-                  sendResize(terminal.id, rows, cols);
-                }, 800);
+                // 🔧 关键修复：只在 restore_ready 之后发送 resize
+                // 避免与 scrollback 回放冲突
 
-                // 第三次 resize：1500ms 后发送，最终确认
+                // 第一次 resize：500ms 后发送（给 scrollback 回放留出时间）
                 setTimeout(() => {
                   const rows = terminal.term.rows;
                   const cols = terminal.term.cols;
-                  console.log(`[TerminalContext] Sending final resize for tmux: ${rows}x${cols}`);
+                  console.log(`[TerminalContext] Sending first post-restore resize: ${rows}x${cols}`);
                   sendResize(terminal.id, rows, cols);
-                }, 1500);
+                }, 500);
+
+                // 第二次 resize：1200ms 后发送，确保 tmux 已处理完第一次
+                setTimeout(() => {
+                  const rows = terminal.term.rows;
+                  const cols = terminal.term.cols;
+                  console.log(`[TerminalContext] Sending second post-restore resize: ${rows}x${cols}`);
+                  sendResize(terminal.id, rows, cols);
+                }, 1200);
+
+                // 移除第三次 resize，两次足够
+                // 减少不必要的 resize，避免显示错乱
               }
 
               // 触发 UI 更新
@@ -1443,8 +1514,54 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     };
   }, [initTerminal]);
 
-  const createTerminal = (projectPath?: string, autoStartClaude?: boolean): TerminalInstance | null => {
-    console.log('[TerminalContext] createTerminal called', { projectPath, autoStartClaude, restoreSettled, isRestoring });
+  // 页面卸载时自动 detach tmux sessions
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      console.log('[TerminalContext] Page unloading, detaching tmux sessions...');
+
+      // 遍历所有使用 tmux 的 terminal
+      for (const terminal of terminals) {
+        if (terminal.useTmux && terminal.tmuxSessionName && terminal.sessionId) {
+          console.log(`[TerminalContext] Detaching tmux session on unload: ${terminal.tmuxSessionName}`);
+
+          // 使用 sendBeacon 发送 detach 请求（在页面卸载时更可靠）
+          const detachUrl = `${API_CONFIG.BASE_URL}/terminal/sessions/${terminal.sessionId}/detach`;
+          try {
+            // 使用 fetch with keepalive 选项（比 sendBeacon 更灵活）
+            fetch(detachUrl, {
+              method: 'POST',
+              keepalive: true,  // 确保请求在页面卸载后仍能完成
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }).catch(err => {
+              console.error('[TerminalContext] Failed to detach on unload:', err);
+            });
+
+            // 保存 detached 状态到 localStorage
+            saveTmuxSessionState(terminal.tmuxSessionName, {
+              sessionName: terminal.tmuxSessionName,
+              state: 'detached',
+              lastDetachTime: Date.now(),
+              projectPath: terminal.projectName
+            });
+          } catch (error) {
+            console.error('[TerminalContext] Error detaching on unload:', error);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [terminals]);
+
+  const createTerminal = (
+    projectPath?: string,
+    autoStartClaude?: boolean,
+    tmuxSessionName?: string  // 🔧 新增：tmux session 名称参数
+  ): TerminalInstance | null => {
+    console.log('[TerminalContext] createTerminal called', { projectPath, autoStartClaude, tmuxSessionName, restoreSettled, isRestoring });
 
     if (!restoreSettled || isRestoring) {
       console.log('[TerminalContext] Skip createTerminal - restore not settled', { isRestoring, restoreSettled });
@@ -1454,10 +1571,11 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     const id = `terminal-${Date.now()}`;
     // 使用当前 terminals 数量作为索引
     const terminalIndex = terminals.length;
-    const title = getTerminalTitle(projectPath, undefined, terminalIndex);
+    // 如果有 tmuxSessionName（恢复 tmux 会话时），使用它作为标题
+    const title = getTerminalTitle(projectPath, undefined, terminalIndex, tmuxSessionName);
 
-    console.log('[TerminalContext] Creating terminal', { id, title, projectPath, autoStartClaude, terminalIndex });
-    const terminal = initTerminal({ id, title, projectPath, autoStartClaude, mode: 'create' });
+    console.log('[TerminalContext] Creating terminal', { id, title, projectPath, autoStartClaude, tmuxSessionName, terminalIndex });
+    const terminal = initTerminal({ id, title, projectPath, autoStartClaude, tmuxSessionName, mode: 'create' });
     console.log('[TerminalContext] initTerminal returned', terminal.id);
 
     setTerminals((prev) => {
@@ -1469,17 +1587,53 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     return terminal;
   };
 
-  const closeTerminal = async (id: string) => {
+  const closeTerminal = async (id: string, action: 'detach' | 'kill' = 'detach') => {
     const terminal = terminals.find((item) => item.id === id);
     if (!terminal) {
       return;
     }
 
-    // 如果使用 tmux，先关闭 tmux 会话
+    // 如果使用 tmux，根据 action 决定是 detach 还是 kill
     if (terminal.useTmux && terminal.tmuxSessionName) {
-      console.log(`[TerminalContext] Killing tmux session: ${terminal.tmuxSessionName}`);
-      await killTmuxSession(terminal.tmuxSessionName);
-      localStorage.removeItem(`terminal_tmux_${id}`);
+      if (action === 'detach') {
+        console.log(`[TerminalContext] Detaching from tmux session: ${terminal.tmuxSessionName}`);
+        // 调用 detach endpoint
+        try {
+          const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/sessions/${terminal.sessionId}/detach`, {
+            method: 'POST'
+          });
+          if (response.ok) {
+            const data = await response.json();
+            console.log('[TerminalContext] Detach response:', data);
+
+            // 保存 detached 状态到 localStorage
+            saveTmuxSessionState(terminal.tmuxSessionName, {
+              sessionName: terminal.tmuxSessionName,
+              state: 'detached',
+              lastDetachTime: Date.now(),
+              projectPath: terminal.projectName
+            });
+
+            // 显示通知
+            addNotification({
+              type: 'info',
+              title: 'tmux 会话已暂离',
+              message: `会话 ${terminal.tmuxSessionName} 仍在后台运行，刷新页面可恢复连接`
+            });
+          } else {
+            console.error('[TerminalContext] Failed to detach session:', response.status);
+          }
+        } catch (error) {
+          console.error('[TerminalContext] Error detaching session:', error);
+        }
+      } else {
+        // Kill tmux session
+        console.log(`[TerminalContext] Killing tmux session: ${terminal.tmuxSessionName}`);
+        await killTmuxSession(terminal.tmuxSessionName);
+        localStorage.removeItem(`terminal_tmux_${id}`);
+        // 从 tmux sessions 状态中移除
+        removeTmuxSessionState(terminal.tmuxSessionName);
+      }
     }
 
     if (terminal.sessionId) {
@@ -1576,7 +1730,12 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       const sessions = getTmuxSessionsFromStorage();
       const sessionInfo = sessions[sessionName];
 
-      const terminal = createTerminal(sessionInfo?.projectPath, false);
+      // 🔧 关键修复：传递 tmux session 名称给 createTerminal
+      const terminal = createTerminal(
+        sessionInfo?.projectPath,
+        false,  // autoStartClaude = false，因为 Claude 已经在 tmux session 中运行
+        sessionName  // 🔧 新增：传递 tmux session 名称
+      );
       if (!terminal) {
         throw new Error('Failed to create terminal instance');
       }
@@ -1618,19 +1777,31 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     setDetachedSessions([]);
   }, [restoreTmuxSession]);
 
-  const handleIgnoreSessions = useCallback((sessionNames: string[]) => {
-    console.log('[TerminalContext] Ignoring sessions:', sessionNames);
+  const handleIgnoreSessions = useCallback(async (sessionNames: string[]) => {
+    console.log('[TerminalContext] Ignoring and killing sessions:', sessionNames);
 
-    // 关闭对话框
+    // 1. Kill 这些 tmux sessions 并清理 localStorage
+    for (const sessionName of sessionNames) {
+      try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/tmux/kill/${sessionName}`, { method: 'POST' });
+        if (response.ok) {
+          console.log(`[TerminalContext] Killed tmux session: ${sessionName}`);
+        } else {
+          console.warn(`[TerminalContext] Failed to kill tmux session ${sessionName}: ${response.status}`);
+        }
+      } catch (error) {
+        console.error(`[TerminalContext] Failed to kill tmux session ${sessionName}:`, error);
+      }
+
+      // 2. 清理 localStorage
+      removeTmuxSessionState(sessionName);
+    }
+
+    // 3. 关闭对话框
     setShowRestoreDialog(false);
 
-    // 清空 detachedSessions
+    // 4. 清空 detachedSessions
     setDetachedSessions([]);
-
-    // 可选：清理 localStorage 中的会话信息
-    // sessionNames.forEach(sessionName => {
-    //   removeTmuxSessionState(sessionName);
-    // });
   }, []);
 
 

@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "bindings": [
+    {
+      "id": "button-rec",
+      "type": "button",
+      "name": "启动后端",
+      "description": "启动 FastAPI 后端服务",
+      "action": {
+        "type": "shell",
+        "command": "cd ~/项目/Proj/open_adventure/backend && ./start.sh"
+      },
+      "enabled": true
+    },
+    {
+      "id": "button-play",
+      "type": "button",
+      "name": "启动前端",
+      "description": "启动 React 前端开发服务器",
+      "action": {
+        "type": "shell",
+        "command": "cd ~/项目/Proj/open_adventure/frontend && npm run dev"
+      },
+      "enabled": true
+    },
+    {
+      "id": "button-loop",
+      "type": "button",
+      "name": "运行测试",
+      "description": "执行后端单元测试",
+      "action": {
+        "type": "shell",
+        "command": "cd ~/项目/Proj/open_adventure/backend && pytest"
+      },
+      "enabled": true
+    },
+    {
+      "id": "button-stop",
+      "type": "button",
+      "name": "停止服务",
+      "description": "停止前后端服务",
+      "action": {
+        "type": "shell",
+        "command": "pkill -f 'uvicorn|vite'"
+      },
+      "enabled": true
+    }
+  ]
+}

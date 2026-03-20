@@ -94,7 +94,7 @@ export const skillsApi = {
    * @param params 分页和过滤参数
    */
   list: (params?: SkillListParams) =>
-    apiClient.get<SkillListResponse>('/skills', { params }),
+    apiClient.get<SkillListResponse>('/skills', { params, cache: true, cacheTTL: 300 }),
 
   /**
    * 获取技能分类和子分类
@@ -119,14 +119,14 @@ export const skillsApi = {
    * @param id 技能 ID
    */
   get: (id: number) =>
-    apiClient.get<Skill>(`/skills/${id}`),
+    apiClient.get<Skill>(`/skills/${id}`, { cache: true, cacheTTL: 300 }),
 
   /**
    * 获取技能完整内容（包括文件）
    * @param id 技能 ID
    */
   getContent: (id: number) =>
-    apiClient.get<SkillContentResponse>(`/skills/${id}/content`),
+    apiClient.get<SkillContentResponse>(`/skills/${id}/content`, { cache: true, cacheTTL: 300 }),
 
   /**
    * 创建新技能

@@ -20,7 +20,56 @@ const InitializationContext = createContext<InitializationContextType | undefine
 const STORAGE_KEY = 'open-adventure-initialized';
 const VERSION_KEY = 'open-adventure-version';
 const CACHE_KEY = 'open-adventure-cache';
+const MICROVERSE_LOADED_KEY = 'microverse_game_loaded';
 const CURRENT_VERSION = '1.3.5'; // 从 package.json 读取
+
+/**
+ * 预加载 Microverse 游戏
+ * 在后台静默加载游戏资源，不阻塞用户操作
+ */
+function preloadMicroverse() {
+  // 检查是否已预加载
+  if (localStorage.getItem(MICROVERSE_LOADED_KEY) === 'true') {
+    console.log('[Preload] Microverse 已预加载，跳过');
+    return;
+  }
+
+  console.log('[Preload] 开始预加载 Microverse...');
+
+  // 创建隐藏的 iframe
+  const iframe = document.createElement('iframe');
+  iframe.src = '/microverse/index.html';
+  iframe.style.display = 'none';
+  iframe.style.position = 'absolute';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+
+  // 监听游戏加载完成消息
+  const handleMessage = (event: MessageEvent) => {
+    if (event.data?.type === 'godot-loading' && event.data?.status === 'complete') {
+      localStorage.setItem(MICROVERSE_LOADED_KEY, 'true');
+      console.log('[Preload] Microverse 预加载完成');
+      // 移除 iframe
+      iframe.remove();
+      window.removeEventListener('message', handleMessage);
+    }
+  };
+
+  // 设置超时，避免预加载失败阻塞
+  const timeout = setTimeout(() => {
+    console.warn('[Preload] Microverse 预加载超时，清理资源');
+    iframe.remove();
+    window.removeEventListener('message', handleMessage);
+  }, 30000); // 30 秒超时
+
+  window.addEventListener('message', handleMessage);
+  document.body.appendChild(iframe);
+
+  // 清理超时定时器
+  iframe.addEventListener('load', () => {
+    clearTimeout(timeout);
+  });
+}
 
 export function InitializationProvider({ children }: { children: React.ReactNode }) {
   // 立即检查 localStorage，避免闪烁
@@ -103,6 +152,9 @@ export function InitializationProvider({ children }: { children: React.ReactNode
         };
         localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
         addLog('✓ Dashboard 数据已缓存');
+
+        // 后台预加载 Microverse 游戏
+        preloadMicroverse();
       } catch (err) {
         console.warn('Failed to preload dashboard data:', err);
         // 预加载失败不影响初始化流程
@@ -131,6 +183,7 @@ export function InitializationProvider({ children }: { children: React.ReactNode
   const resetInitialization = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(VERSION_KEY);
+    localStorage.removeItem(MICROVERSE_LOADED_KEY);
     setState({
       isInitialized: false,
       isLoading: false,
@@ -143,34 +196,24 @@ export function InitializationProvider({ children }: { children: React.ReactNode
 
   // 检查是否需要初始化
   useEffect(() => {
-    // 检查是否有清除缓存标记
-    const checkClearCache = async () => {
-      try {
-        const response = await fetch('/.clear-cache');
-        if (response.ok) {
-          console.log('🧹 Clear cache flag detected, clearing localStorage...');
-          localStorage.clear();
-          // 删除标记文件（通过后端 API）
-          // 注意：这里只是尝试，如果失败也不影响
-          fetch('/.clear-cache', { method: 'DELETE' }).catch(() => {});
-        }
-      } catch (error) {
-        // 文件不存在或网络错误，忽略
-      }
-    };
+    const initialized = localStorage.getItem(STORAGE_KEY) === 'true';
+    const version = localStorage.getItem(VERSION_KEY);
 
-    checkClearCache().then(() => {
-      const initialized = localStorage.getItem(STORAGE_KEY) === 'true';
-      const version = localStorage.getItem(VERSION_KEY);
+    if (initialized && version === CURRENT_VERSION) {
+      // 已初始化且版本匹配，直接标记为已完成，无需显示加载界面
+      console.log('[Init] 用户已初始化，跳过加载界面');
+      setState(prev => ({ ...prev, isInitialized: true }));
 
-      if (initialized && version === CURRENT_VERSION) {
-        // 已初始化且版本匹配，直接标记为已完成
-        setState(prev => ({ ...prev, isInitialized: true }));
-      } else {
-        // 未初始化或版本不匹配，自动开始初始化
-        startInitialization();
-      }
-    });
+      // 在后台静默检查服务器健康状态
+      claudeApi.health().catch(error => {
+        console.warn('[Init] 后台健康检查失败:', error);
+        // 不影响用户体验，仅记录日志
+      });
+    } else {
+      // 未初始化或版本不匹配，自动开始初始化
+      console.log('[Init] 首次访问或版本更新，开始初始化');
+      startInitialization();
+    }
   }, [startInitialization]);
 
   return (

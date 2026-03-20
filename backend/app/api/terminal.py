@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class TerminalSession:
     """Manages a PTY terminal session"""
 
-    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False, claude_resume_session: Optional[str] = None, use_tmux: bool = True):
+    def __init__(self, session_id: str, initial_dir: Optional[str] = None, auto_start_claude: bool = False, claude_resume_session: Optional[str] = None, use_tmux: bool = True, tmux_session_name: Optional[str] = None):
         self.session_id = session_id
         self.master_fd = None
         self.pid = None
@@ -46,7 +46,7 @@ class TerminalSession:
         self.auto_start_claude = auto_start_claude
         self.claude_resume_session = claude_resume_session  # Claude 会话恢复的 session ID
         self.use_tmux = use_tmux  # 是否使用 tmux
-        self.tmux_session_name = None  # tmux 会话名称
+        self.tmux_session_name = tmux_session_name  # 🔧 修改：接收传入的 tmux session 名称
         self.websocket = None  # 当前连接的 WebSocket
         self.execution_id = None  # 关联的 execution ID
         self.claude_running = False  # 标记是否运行了 claude code
@@ -202,9 +202,10 @@ class TerminalSession:
             # 设置初始目录
             target_dir = self.initial_dir if self.initial_dir and os.path.isdir(self.initial_dir) else os.path.expanduser('~')
 
-            # 创建 detached tmux 会话
+            # 🔧 新增：创建 tmux session 时指定初始窗口大小
+            # 使用默认的 80x24，后续会通过 resize 调整
             result = subprocess.run(
-                ['tmux', 'new-session', '-d', '-s', session_name, '-c', target_dir],
+                ['tmux', 'new-session', '-d', '-s', session_name, '-c', target_dir, '-x', '80', '-y', '24'],
                 capture_output=True,
                 text=True
             )
@@ -213,7 +214,7 @@ class TerminalSession:
                 print(f"[Terminal] Failed to create tmux session: {result.stderr}")
                 return None
 
-            print(f"[Terminal] Created tmux session: {session_name}")
+            print(f"[Terminal] Created tmux session: {session_name} (80x24)")
             return session_name
 
         except Exception as e:
@@ -234,9 +235,43 @@ class TerminalSession:
             print(f"[Terminal] Error killing tmux session: {e}")
             return False
 
+    @staticmethod
+    def detach_tmux_session(session_name: str) -> bool:
+        """Detach from tmux session without killing it"""
+        try:
+            import subprocess
+            # 检查 tmux session 是否存在
+            result = subprocess.run(
+                ['tmux', 'has-session', '-t', session_name],
+                capture_output=True
+            )
+            if result.returncode == 0:
+                print(f"[Terminal] tmux session {session_name} exists and will remain running")
+                return True
+            else:
+                print(f"[Terminal] tmux session {session_name} does not exist")
+                return False
+        except Exception as e:
+            print(f"[Terminal] Error checking tmux session: {e}")
+            return False
+
+    def detach(self):
+        """Detach from terminal session without killing it"""
+        print(f"[Terminal] Detaching from session {self.session_id}")
+        self.websocket = None
+
+        # 如果使用 tmux，保持 tmux session 运行
+        if self.use_tmux and self.tmux_session_name:
+            print(f"[Terminal] Detaching from tmux session: {self.tmux_session_name}")
+            # tmux session 会自动保持运行，不需要额外操作
+            # 只需要断开 WebSocket 连接即可
+        else:
+            # 非 tmux session，保持 PTY 进程运行
+            print(f"[Terminal] Detaching from PTY session (PID: {self.pid})")
+
     def start(self):
         """Start a new PTY session"""
-        print(f"[Terminal] Starting new PTY session (use_tmux={self.use_tmux})...")
+        print(f"[Terminal] Starting new PTY session (use_tmux={self.use_tmux}, tmux_session_name={self.tmux_session_name})...")
 
         # 如果启用 tmux，先检查是否已安装
         if self.use_tmux:
@@ -244,11 +279,26 @@ class TerminalSession:
                 print("[Terminal] tmux not installed, falling back to pty")
                 self.use_tmux = False
             else:
-                # 创建 tmux 会话
-                self.tmux_session_name = self.create_tmux_session()
-                if not self.tmux_session_name:
-                    print("[Terminal] Failed to create tmux session, falling back to pty")
-                    self.use_tmux = False
+                # 🔧 关键修复：判断是创建新 session 还是 attach 到现有 session
+                if self.tmux_session_name:
+                    # 如果指定了 tmux session 名称，检查是否存在
+                    if self.tmux_session_exists(self.tmux_session_name):
+                        print(f"[Terminal] ✅ Attaching to existing tmux session: {self.tmux_session_name}")
+                        # 不需要创建新 session，直接使用现有的
+                    else:
+                        print(f"[Terminal] ⚠️ Specified tmux session '{self.tmux_session_name}' does not exist")
+                        print(f"[Terminal] Creating new tmux session instead")
+                        # 指定的 session 不存在，创建新的
+                        self.tmux_session_name = self.create_tmux_session()
+                        if not self.tmux_session_name:
+                            print("[Terminal] Failed to create tmux session, falling back to pty")
+                            self.use_tmux = False
+                else:
+                    # 没有指定 session 名称，创建新的
+                    self.tmux_session_name = self.create_tmux_session()
+                    if not self.tmux_session_name:
+                        print("[Terminal] Failed to create tmux session, falling back to pty")
+                        self.use_tmux = False
 
         self.pid, self.master_fd = pty.fork()
         print(f"[Terminal] PTY forked - PID: {self.pid}, FD: {self.master_fd}")
@@ -268,7 +318,7 @@ class TerminalSession:
             os.environ['DISABLE_UPDATE_PROMPT'] = 'true'
 
             if self.use_tmux and self.tmux_session_name:
-                # 连接到 tmux 会话
+                # 连接到 tmux 会话（无论是新创建的还是现有的）
                 print(f"[Terminal] Child process - Attaching to tmux session: {self.tmux_session_name}")
                 os.execvp('tmux', ['tmux', 'attach', '-t', self.tmux_session_name])
             else:
@@ -546,7 +596,8 @@ async def terminal_websocket(
     session_id: str = None,  # 支持重新连接到已存在的 session
     auto_start_claude: bool = False,  # 是否自动启动 Claude
     claude_resume_session: str = None,  # Claude 会话恢复的 session ID
-    use_tmux: bool = True  # 是否使用 tmux
+    use_tmux: bool = True,  # 是否使用 tmux
+    tmux_session_name: str = None  # 🔧 新增：tmux session 名称参数
 ):
     """WebSocket endpoint for terminal interaction"""
     await websocket.accept()
@@ -558,6 +609,7 @@ async def terminal_websocket(
     print(f"[Terminal] Project path type: {type(project_path)}")
     print(f"[Terminal] Auto-start Claude param: {auto_start_claude}")
     print(f"[Terminal] Claude resume session param: {claude_resume_session}")
+    print(f"[Terminal] Tmux session name param: {tmux_session_name}")  # 🔧 新增日志
     print(f"[Terminal] Active sessions before: {len(sessions)}")
     print(f"[Terminal] Active session IDs: {list(sessions.keys())}")
 
@@ -574,10 +626,35 @@ async def terminal_websocket(
             del sessions[session_id]
             session_id = None  # 创建新 session
         else:
-            # 重新连接到已存在的 session
+            # 检查是否有旧的 WebSocket 连接
+            if session.websocket is not None:
+                old_ws = session.websocket
+                print(f"[Terminal] ⚠️ Detected existing WebSocket connection, kicking old device")
+
+                try:
+                    # 1. 向旧设备发送 kicked 消息
+                    await old_ws.send_text(json.dumps({
+                        "type": "kicked",
+                        "reason": "new_device_connected",
+                        "message": "此终端已在其他设备上打开",
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    print(f"[Terminal] ✓ Sent kicked message to old device")
+
+                    # 2. 等待短暂时间确保消息发送
+                    await asyncio.sleep(0.1)
+
+                    # 3. 关闭旧连接
+                    await old_ws.close(code=4001, reason="Kicked by new connection")
+                    print(f"[Terminal] ✓ Closed old WebSocket connection")
+                except Exception as e:
+                    print(f"[Terminal] ⚠️ Failed to kick old device: {e}")
+                    # 即使失败也继续，因为新连接会覆盖旧引用
+
+            # 4. 更新为新的 WebSocket 连接
             print(f"[Terminal] ✅ Process is alive, proceeding with reconnection")
             session.websocket = websocket
-            print(f"[Terminal] Successfully reconnected to session {session_id}")
+            print(f"[Terminal] ✓ Updated to new WebSocket connection")
 
             # 仅做会话恢复提示与回放，不注入额外命令，保留当前 shell 上下文
             print(f"[Terminal] ========== SESSION RECONNECT CONTEXT ==========")
@@ -636,10 +713,11 @@ async def terminal_websocket(
             initial_dir=initial_dir,
             auto_start_claude=auto_start_claude,
             claude_resume_session=claude_resume_session,
-            use_tmux=use_tmux
+            use_tmux=use_tmux,
+            tmux_session_name=tmux_session_name  # 🔧 新增：传递 tmux session 名称
         )
         print(f"[Terminal] Creating new TerminalSession with ID: {session_id}")
-        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}, Claude resume: {claude_resume_session}, Use tmux: {use_tmux}")
+        print(f"[Terminal] Initial dir: {initial_dir}, Auto-start Claude: {auto_start_claude}, Claude resume: {claude_resume_session}, Use tmux: {use_tmux}, Tmux session: {tmux_session_name}")  # 🔧 更新日志
         sessions[session_id] = session
         session.websocket = websocket
         print(f"[Terminal] Active sessions after: {len(sessions)}")
@@ -975,6 +1053,18 @@ async def terminal_websocket(
                             await asyncio.get_event_loop().run_in_executor(
                                 None, session.resize, rows, cols
                             )
+
+                            # 🔧 新增：如果是 tmux session，发送 refresh-client 命令
+                            if session.use_tmux and session.tmux_session_name:
+                                try:
+                                    import subprocess
+                                    subprocess.run(
+                                        ['tmux', 'refresh-client', '-t', session.tmux_session_name],
+                                        capture_output=True,
+                                        timeout=1
+                                    )
+                                except Exception as e:
+                                    print(f"[Terminal] Failed to refresh tmux client on resize: {e}")
                         except Exception:
                             logger.exception(
                                 "[Terminal] resize failed: session_id=%s, rows=%s, cols=%s",
@@ -1006,12 +1096,28 @@ async def terminal_websocket(
                             cols = data.get('cols', 80)
                             print(f"[Terminal] Frontend terminal size: rows={rows}, cols={cols}")
 
-                            # 🔧 关键修复：在回放前先调整 PTY 尺寸以匹配前端
+                            # 🔧 关键修复 1：在回放前先调整 PTY 尺寸以匹配前端
                             try:
                                 session.resize(rows, cols)
                                 print(f"[Terminal] ✅ Resized PTY to match frontend: {rows}x{cols}")
                             except Exception as e:
                                 logger.error(f"[Terminal] Failed to resize PTY: {e}")
+
+                            # 🔧 关键修复 2：如果是 tmux session，发送 refresh-client 命令
+                            if session.use_tmux and session.tmux_session_name:
+                                try:
+                                    import subprocess
+                                    subprocess.run(
+                                        ['tmux', 'refresh-client', '-t', session.tmux_session_name],
+                                        capture_output=True,
+                                        timeout=1
+                                    )
+                                    print(f"[Terminal] Sent tmux refresh-client for {session.tmux_session_name}")
+                                except Exception as e:
+                                    print(f"[Terminal] Failed to refresh tmux client: {e}")
+
+                            # 🔧 关键修复 3：等待 resize 完成后再回放
+                            await asyncio.sleep(0.1)  # 100ms 延迟，确保 PTY 和 tmux 都已完成 resize
 
                             # 发送清屏命令，确保干净的起始状态
                             await websocket.send_text("\x1b[2J\x1b[H")
@@ -1364,6 +1470,73 @@ async def close_session(
     return JSONResponse({"success": True, "message": f"Session {session_id} closed"})
 
 
+@router.post("/sessions/{session_id}/detach")
+async def detach_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Detach from terminal session without killing it"""
+    session = sessions.get(session_id)
+
+    logger.info(
+        "[Terminal] Detach session requested: session_id=%s, session_exists=%s",
+        session_id,
+        session is not None,
+    )
+
+    if not session:
+        return JSONResponse(
+            {"success": False, "message": f"Session {session_id} not found"},
+            status_code=404
+        )
+
+    # Detach from session (只断开 WebSocket，不 kill session)
+    session.detach()
+
+    # 更新 execution 记录（标记为 detached 状态）
+    if session.execution_id:
+        try:
+            execution_repo = ExecutionRepository(db)
+            execution = await execution_repo.get(session.execution_id)
+            if execution:
+                execution.last_activity_at = datetime.now()
+                # 可以添加一个 metadata 字段记录 detach 状态
+                if not execution.metadata:
+                    execution.metadata = {}
+                execution.metadata['detached'] = True
+                execution.metadata['detach_time'] = datetime.now().isoformat()
+                await db.commit()
+
+                # 广播 detach 事件
+                ws_manager = get_connection_manager()
+                await ws_manager.broadcast_terminal_execution_update({
+                    "id": execution.id,
+                    "session_id": session_id,
+                    "status": "running",  # 保持 running 状态
+                    "metadata": execution.metadata
+                })
+        except Exception as e:
+            logger.exception(
+                "[Terminal] Failed to update execution when detaching session: session_id=%s",
+                session_id,
+            )
+            await db.rollback()
+
+    logger.info(
+        "[Terminal] Session detached: session_id=%s, tmux_session=%s, active_sessions_count=%s",
+        session_id,
+        session.tmux_session_name,
+        len(sessions),
+    )
+
+    return JSONResponse({
+        "success": True,
+        "message": f"Session {session_id} detached",
+        "tmux_session_name": session.tmux_session_name,
+        "project_path": session.initial_dir
+    })
+
+
 @router.get("/tmux/check")
 async def check_tmux():
     """检查 tmux 是否已安装"""
@@ -1398,6 +1571,54 @@ async def list_tmux_sessions():
             })
     except Exception as e:
         logger.error(f"[Terminal] Error listing tmux sessions: {e}")
+        return JSONResponse({
+            "success": False,
+            "sessions": [],
+            "message": str(e)
+        }, status_code=500)
+
+
+@router.get("/sessions/detached")
+async def list_detached_sessions(db: AsyncSession = Depends(get_db)):
+    """列出所有 detached 的 terminal sessions（包含详细信息）"""
+    try:
+        detached_sessions = []
+
+        # 遍历所有 session，找出 detached 的
+        for session_id, session in sessions.items():
+            # 如果 websocket 为 None，说明已经 detached
+            if session.websocket is None and session.is_process_alive():
+                session_info = {
+                    "session_id": session_id,
+                    "tmux_session_name": session.tmux_session_name,
+                    "project_path": session.initial_dir,
+                    "created_at": session.created_at.isoformat(),
+                    "last_activity": session.last_activity.isoformat(),
+                    "use_tmux": session.use_tmux,
+                    "process_alive": True
+                }
+
+                # 如果有 execution_id，获取更多信息
+                if session.execution_id:
+                    try:
+                        execution_repo = ExecutionRepository(db)
+                        execution = await execution_repo.get(session.execution_id)
+                        if execution:
+                            session_info["execution_id"] = execution.id
+                            session_info["task_id"] = execution.task_id
+                            if execution.metadata and execution.metadata.get('detached'):
+                                session_info["detach_time"] = execution.metadata.get('detach_time')
+                    except Exception as e:
+                        logger.error(f"[Terminal] Error getting execution info: {e}")
+
+                detached_sessions.append(session_info)
+
+        return JSONResponse({
+            "success": True,
+            "sessions": detached_sessions
+        })
+    except Exception as e:
+        logger.error(f"[Terminal] Error listing detached sessions: {e}")
         return JSONResponse({
             "success": False,
             "sessions": [],

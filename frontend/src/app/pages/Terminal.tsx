@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { Terminal as TerminalIcon, X, Plus, RefreshCw, FolderOpen, Send, ChevronRight, ChevronLeft, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Terminal as TerminalIcon, X, Plus, RefreshCw, FolderOpen, Send, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
 import { ActionButton } from '../components/ui-shared';
 import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -9,6 +9,8 @@ import { useIsMobile } from '../components/ui/use-mobile';
 import { MobileScrollbar } from '../components/MobileScrollbar';
 import { MobileScrollButtons } from '../components/MobileScrollButtons';
 import { TmuxRestoreDialog } from '../components/TmuxRestoreDialog';
+import { TerminalShortcutBar, Shortcut } from '../components/TerminalShortcutBar';
+import { useVisualViewport } from '../hooks/useVisualViewport';
 import { API_CONFIG } from '../../config/api';
 import 'xterm/css/xterm.css';
 
@@ -121,19 +123,22 @@ const TerminalPane: React.FC<{
             stableSizeCount++;
             console.log('[TerminalPane] 📊 Stable size count:', stableSizeCount);
 
-            // 移动端需要更多次稳定确认
-            const requiredStableCount = isMobile ? 2 : 1;
+            // 🔧 优化：移动端和桌面端都使用相同的稳定次数
+            // 确保尺寸真正稳定后再发送 restore_ready
+            const requiredStableCount = 2;  // 统一为 2 次
 
             if (stableSizeCount >= requiredStableCount) {
-              console.log('[TerminalPane] ✅ Terminal size stable, sending restore_ready');
+              console.log(`[TerminalPane] Sending restore_ready: ${currentRows}x${currentCols}`);
               sendRestoreReady(terminal.id, currentRows, currentCols);
               restoreReadySentRef.current = true;
             }
           } else {
+            // 尺寸变化，重置计数器
             stableSizeCount = 0;
-            lastRows = currentRows;
-            lastCols = currentCols;
           }
+
+          lastRows = currentRows;
+          lastCols = currentCols;
         }
 
         // 正常发送 resize
@@ -278,10 +283,17 @@ const Terminal = () => {
   const [isMobileInputFocused, setIsMobileInputFocused] = useState(false);
   const [lockedKeyboardHeight, setLockedKeyboardHeight] = useState<number | null>(null); // 锁定的键盘高度
   const [inputValue, setInputValue] = useState('');
-  const [showShortcuts, setShowShortcuts] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isFullscreenInput, setIsFullscreenInput] = useState(false);
   const [debugExpanded, setDebugExpanded] = useState(false);
+
+  // 历史命令管理
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [currentDraft, setCurrentDraft] = useState('');
+
+  // 使用 visualViewport hook
+  const { keyboardHeight: vvKeyboardHeight, isKeyboardVisible: vvIsKeyboardVisible } = useVisualViewport();
   const viewportRafRef = useRef<number | null>(null);
   const viewportBaselineRef = useRef<number>(0);
   const keyboardLockTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -667,12 +679,6 @@ const Terminal = () => {
     return () => window.removeEventListener('resize', handleWindowResize);
   }, [isMobile, showDebugInfo]);
 
-  useEffect(() => {
-    if (!isKeyboardVisible && !isMobileInputFocused) {
-      setShowShortcuts(false);
-    }
-  }, [isKeyboardVisible, isMobileInputFocused]);
-
   // 在移动端输入框获得焦点时隐藏底部 dock
   useEffect(() => {
     if (!isMobile) return;
@@ -852,6 +858,11 @@ const Terminal = () => {
     if (!inputValue.trim()) return;
     const terminal = terminals.find(t => t.id === activeTabId);
     if (terminal) {
+      // 添加到历史命令
+      setCommandHistory(prev => [...prev, inputValue]);
+      setHistoryIndex(-1);
+      setCurrentDraft('');
+
       // 发送输入内容
       sendInput(terminal.id, inputValue);
       // 发送回车键（Enter）
@@ -869,11 +880,77 @@ const Terminal = () => {
     }
   };
 
-  // 处理快捷键展开按钮点击
-  const handleShortcutToggle = () => {
-    setShowShortcuts((prev) => !prev);
+  // 历史命令导航
+  const navigateHistory = useCallback((direction: 'up' | 'down') => {
+    if (direction === 'up') {
+      if (historyIndex === -1) {
+        // 保存当前草稿
+        setCurrentDraft(inputValue);
+        if (commandHistory.length > 0) {
+          setHistoryIndex(commandHistory.length - 1);
+          setInputValue(commandHistory[commandHistory.length - 1]);
+        }
+      } else if (historyIndex > 0) {
+        setHistoryIndex(historyIndex - 1);
+        setInputValue(commandHistory[historyIndex - 1]);
+      }
+    } else {
+      if (historyIndex === -1) return;
+      if (historyIndex < commandHistory.length - 1) {
+        setHistoryIndex(historyIndex + 1);
+        setInputValue(commandHistory[historyIndex + 1]);
+      } else {
+        // 恢复草稿
+        setInputValue(currentDraft);
+        setHistoryIndex(-1);
+      }
+    }
     triggerHaptic();
-  };
+  }, [historyIndex, commandHistory, inputValue, currentDraft]);
+
+  // 处理快捷键点击
+  const handleShortcutClick = useCallback((shortcut: Shortcut) => {
+    triggerHaptic();
+
+    switch (shortcut.type) {
+      case 'history':
+        // 历史命令导航
+        navigateHistory(shortcut.value as 'up' | 'down');
+        break;
+
+      case 'insert':
+        // 插入类：插入到光标处
+        insertTextIntoInput(shortcut.value);
+        break;
+
+      case 'control':
+        // 控制类：发送控制事件
+        if (shortcut.value === 'tab') {
+          sendKeyToTerminal('Tab');
+        } else if (shortcut.value === 'ctrl-c') {
+          sendKeyToTerminal('Ctrl+C');
+        } else if (shortcut.value === 'ctrl-d') {
+          const terminal = terminals.find(t => t.id === activeTabId);
+          if (terminal) {
+            sendInput(terminal.id, '\x04'); // Ctrl+D
+          }
+        } else if (shortcut.value === 'esc') {
+          const terminal = terminals.find(t => t.id === activeTabId);
+          if (terminal) {
+            sendInput(terminal.id, '\x1b'); // Esc
+          }
+        }
+        break;
+
+      case 'command':
+        // 命令类：写入输入框并执行
+        setInputValue(shortcut.value);
+        setTimeout(() => {
+          handleSendInput();
+        }, 100);
+        break;
+    }
+  }, [navigateHistory, insertTextIntoInput, sendKeyToTerminal, terminals, activeTabId, sendInput, handleSendInput]);
 
   // 处理 Copy 按钮
   const handleCopy = async () => {
@@ -1168,12 +1245,19 @@ const Terminal = () => {
                   `}
                 >
                   <span className="truncate text-xs sm:text-sm flex items-center gap-1">
-                    {terminal.title}
-                    {terminal.useTmux && terminal.tmuxAlive && (
-                      <span className="text-yellow-400" title="tmux 会话运行中">
-                        🔒
+                    {terminal.useTmux && terminal.tmuxSessionName && (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          reconnectTerminal(terminal.id);
+                        }}
+                        className="w-5 h-5 flex items-center justify-center rounded bg-white/10 hover:bg-blue-500/30 hover:text-blue-400 transition-colors cursor-pointer shrink-0"
+                        title="刷新 tmux 会话连接"
+                      >
+                        <RefreshCw size={10} />
                       </span>
                     )}
+                    {terminal.title}
                   </span>
                   <span
                     onClick={(e) => {
@@ -1224,36 +1308,14 @@ const Terminal = () => {
             overflow-y: auto !important;
             overflow-x: hidden !important;
             -webkit-overflow-scrolling: touch;
-            scrollbar-width: auto;
-            scrollbar-color: rgba(34, 211, 238, 0.95) rgba(15, 23, 42, 0.9);
-            scrollbar-gutter: stable;
+            /* 隐藏滚动条，保留滚动能力 */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE/Edge */
           }
 
+          /* Chrome/Safari 隐藏滚动条 */
           .terminal-mobile-pane .xterm-viewport::-webkit-scrollbar {
-            width: 10px;
-          }
-
-          .terminal-mobile-pane .xterm-viewport::-webkit-scrollbar-track {
-            background: rgba(15, 23, 42, 0.9);
-            border-radius: 9999px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-          }
-
-          .terminal-mobile-pane .xterm-viewport::-webkit-scrollbar-corner {
-            background: transparent;
-          }
-
-          .terminal-mobile-pane .xterm-viewport::-webkit-scrollbar-thumb {
-            background: rgba(34, 211, 238, 0.95);
-            border-radius: 9999px;
-            border: 2px solid rgba(15, 23, 42, 0.9);
-            background-clip: padding-box;
-          }
-
-          .terminal-mobile-pane .xterm-viewport::-webkit-scrollbar-thumb:hover,
-          .terminal-mobile-pane .xterm-viewport::-webkit-scrollbar-thumb:active {
-            background: rgba(103, 232, 249, 1);
-            background-clip: padding-box;
+            display: none;
           }
         }
       `}</style>
@@ -1276,105 +1338,13 @@ const Terminal = () => {
         >
           <div className="px-4 pb-3">
             <div className="space-y-2 rounded-[22px] border border-white/12 bg-slate-950/78 px-3 py-3 shadow-[0_-12px_40px_rgba(15,23,42,0.4)] backdrop-blur-xl supports-[backdrop-filter]:bg-slate-950/65">
-              {showShortcuts && (
-                <div className="rounded-2xl bg-white/8 border border-white/12 px-3 py-2 overflow-x-auto shadow-inner animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-                  <div className="flex items-center gap-2 min-w-max">
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        preserveInputFocusOnPress(event);
-                        handleEnterKey();
-                      }}
-                      className="px-3 py-1.5 bg-emerald-500/90 hover:bg-emerald-500 rounded text-xs font-mono text-white whitespace-nowrap transition-all duration-200 border border-emerald-500/50 shadow-[0_8px_20px_rgba(16,185,129,0.2)]"
-                    >
-                      Enter
-                    </button>
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        preserveInputFocusOnPress(event);
-                        handlePaste();
-                      }}
-                      className="px-3 py-1.5 bg-blue-500/90 hover:bg-blue-500 rounded text-xs font-mono text-white whitespace-nowrap transition-all duration-200 border border-blue-500/50 shadow-[0_8px_20px_rgba(59,130,246,0.22)]"
-                    >
-                      Paste
-                    </button>
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        preserveInputFocusOnPress(event);
-                        sendKeyToTerminal('Tab');
-                      }}
-                      className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
-                    >
-                      Tab
-                    </button>
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        preserveInputFocusOnPress(event);
-                        sendKeyToTerminal('Shift+Tab');
-                      }}
-                      className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
-                    >
-                      Shift+Tab
-                    </button>
-                    {['↑', '↓', '←', '→'].map((key) => (
-                      <button
-                        type="button"
-                        key={key}
-                        onPointerDown={(event) => {
-                          preserveInputFocusOnPress(event);
-                          sendKeyToTerminal(key);
-                        }}
-                        className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
-                      >
-                        {key}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        preserveInputFocusOnPress(event);
-                        sendKeyToTerminal('Ctrl+C');
-                      }}
-                      className="px-3 py-1.5 bg-red-500/90 hover:bg-red-500 rounded text-xs font-mono text-white whitespace-nowrap transition-colors border border-red-500/50 shadow-lg"
-                    >
-                      Ctrl+C
-                    </button>
-                    <button
-                      type="button"
-                      onPointerDown={(event) => {
-                        preserveInputFocusOnPress(event);
-                        sendKeyToTerminal('Ctrl+L');
-                      }}
-                      className="px-3 py-1.5 bg-white/90 hover:bg-white rounded text-xs font-mono text-gray-900 whitespace-nowrap transition-colors shadow-lg"
-                    >
-                      Ctrl+L
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* 快捷键栏 - 移动端始终显示 */}
+              <div className="rounded-2xl bg-white/8 border border-white/12 overflow-hidden shadow-inner">
+                <TerminalShortcutBar onShortcutClick={handleShortcutClick} />
+              </div>
 
+              {/* 输入框区域 - 无左侧按钮 */}
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onPointerDown={(event) => {
-                    preserveInputFocusOnPress(event);
-                    handleShortcutToggle();
-                  }}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center border border-white/20 bg-white/8 backdrop-blur-xl transition-all duration-200 shrink-0 ${
-                    showShortcuts ? 'bg-violet-400/25 border-violet-300/30 text-white shadow-[0_0_20px_rgba(167,139,250,0.2)]' : 'text-slate-100 hover:bg-white/12'
-                  }`}
-                  aria-label={showShortcuts ? '收起快捷键' : '展开快捷键'}
-                >
-                  {showShortcuts ? (
-                    <ChevronLeft size={18} className="text-white" />
-                  ) : (
-                    <ChevronRight size={18} className="text-white" />
-                  )}
-                </button>
-
                 <div className="relative flex-1 min-w-0">
                   <textarea
                     ref={inputRef}

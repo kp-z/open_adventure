@@ -45,7 +45,7 @@ export const agentsApi = {
     scope?: AgentScope;
     active_only?: boolean;
   }) =>
-    apiClient.get<AgentListResponse>('/agents', { params }),
+    apiClient.get<AgentListResponse>('/agents', { params, cache: true, cacheTTL: 300 }),
 
   /**
    * 获取代理分类和子分类
@@ -77,7 +77,7 @@ export const agentsApi = {
    * 获取单个子代理详情
    */
   get: (id: number) =>
-    apiClient.get<Agent>(`/agents/${id}`),
+    apiClient.get<Agent>(`/agents/${id}`, { cache: true, cacheTTL: 300 }),
 
   /**
    * 获取子代理文件内容（用于编辑）

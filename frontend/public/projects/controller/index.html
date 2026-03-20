@@ -1,0 +1,407 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controller - 快捷键配置工具</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="w-full h-full bg-gray-100">
+
+    <div class="w-full h-full flex items-center justify-center">
+        <div class="device-case" vid="10">
+            
+            <div class="section-left" vid="11">
+                <div class="grille" vid="12">
+                    <div class="dot" vid="13"></div><div class="dot" vid="14"></div><div class="dot" vid="15"></div><div class="dot" vid="16"></div><div class="dot" vid="17"></div><div class="dot" vid="18"></div><div class="dot" vid="19"></div><div class="dot" vid="20"></div><div class="dot" vid="21"></div><div class="dot" vid="22"></div><div class="dot" vid="23"></div><div class="dot" vid="24"></div>
+                    <div class="dot" vid="25"></div><div class="dot" vid="26"></div><div class="dot" vid="27"></div><div class="dot" vid="28"></div><div class="dot" vid="29"></div><div class="dot" vid="30"></div><div class="dot" vid="31"></div><div class="dot" vid="32"></div><div class="dot" vid="33"></div><div class="dot" vid="34"></div><div class="dot" vid="35"></div><div class="dot" vid="36"></div>
+                    <div class="dot" vid="37"></div><div class="dot" vid="38"></div><div class="dot" vid="39"></div><div class="dot" vid="40"></div><div class="dot" vid="41"></div><div class="dot" vid="42"></div><div class="dot" vid="43"></div><div class="dot" vid="44"></div><div class="dot" vid="45"></div><div class="dot" vid="46"></div><div class="dot" vid="47"></div><div class="dot" vid="48"></div>
+                </div>
+                <div style="display: flex; gap: 12px;" vid="49">
+                    <div class="btn-round" style="width:32px; height:32px;" vid="50">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" vid="51"><circle cx="12" cy="12" r="10" vid="52"></circle></svg>
+                    </div>
+                    <div class="btn-round" style="width:32px; height:32px;" vid="53">
+                        <svg width="12" height="12" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" vid="54"><line x1="4" y1="12" x2="20" y2="12" vid="55"></line></svg>
+                    </div>
+                </div>
+                
+                <div class="screen-display" vid="56">
+                    <div id="canvas-container" vid="57"></div>
+                    <div class="screen-ui" vid="58">
+                        <div class="screen-header" vid="59">
+                            <span vid="60">DMX-FIELD</span>
+                            <span id="data-readout" vid="61">UNI:1 ACTIVE</span>
+                        </div>
+                        <div class="screen-footer" vid="62">
+                            <span vid="63">WAVE: SINE</span>
+                            <span vid="64">SYNC: INT</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto;" vid="65">
+                    <button class="btn-round" style="width: 100%; border-radius: 6px;" vid="66">PAGE 1</button>
+                    <button class="btn-round" style="width: 100%; border-radius: 6px;" vid="67">PAGE 2</button>
+                </div>
+                
+                
+                <div class="btn-group-round">
+                    <button class="btn-round" id="button-m1">M1</button>
+                    <button class="btn-round" id="button-m2">M2</button>
+                    <button class="btn-round" id="button-rec">rec</button>
+                    <button class="btn-round" id="button-play" style="color: var(--cap-orange)">play</button>
+
+                    <button class="btn-round" id="button-forward"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"></polygon></svg></button>
+                    <button class="btn-round" id="button-stop"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12"></rect></svg></button>
+                    <button class="btn-round" id="button-loop">loop</button>
+                    <button class="btn-round" id="button-shift">shift</button>
+                </div>
+            </div>
+            
+            <div class="section-right" vid="81">
+                
+                
+                <div class="encoder-row">
+                    <div class="encoder-unit">
+                        <div class="knob-socket" id="socket-1">
+                            <div class="knob-cap knob-blue joystick" id="knob-1" data-id="1"></div>
+                        </div>
+                        <span class="label">Pan</span>
+                    </div>
+                    <div class="encoder-unit">
+                        <div class="knob-socket" id="socket-2">
+                            <div class="knob-cap knob-ochre joystick" id="knob-2" data-id="2"></div>
+                        </div>
+                        <span class="label">Tilt</span>
+                    </div>
+                    <div class="encoder-unit">
+                        <div class="knob-socket" id="socket-3">
+                            <div class="knob-cap knob-grey joystick" id="knob-3" data-id="3"></div>
+                        </div>
+                        <span class="label">Dimmer</span>
+                    </div>
+                    <div class="encoder-unit">
+                        <div class="knob-socket" id="socket-4">
+                            <div class="knob-cap knob-orange joystick" id="knob-4" data-id="4"></div>
+                        </div>
+                        <span class="label">FX Rate</span>
+                    </div>
+                    <div class="encoder-unit" style="margin-left: auto;">
+                        <button class="btn-round" id="setting-btn" title="配置管理">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                            </svg>
+                        </button>
+                        <span class="label">Setting</span>
+                    </div>
+                </div>
+                
+                <div class="fader-bank" vid="103">
+                    <div class="channel-strip" vid="104">
+                        <span class="label" vid="105">01</span>
+                        <div class="fader-track" id="track-1" vid="106">
+                            <div class="fader-cap" id="fader-1" style="bottom: 60%;" vid="107"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="108"></button>
+                    </div>
+                    <div class="channel-strip" vid="109">
+                        <span class="label" vid="110">02</span>
+                        <div class="fader-track" id="track-2" vid="111">
+                            <div class="fader-cap" id="fader-2" style="bottom: 45%;" vid="112"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="113"></button>
+                    </div>
+                    <div class="channel-strip" vid="114">
+                        <span class="label" vid="115">03</span>
+                        <div class="fader-track" id="track-3" vid="116">
+                            <div class="fader-cap" id="fader-3" style="bottom: 80%;" vid="117"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="118"></button>
+                    </div>
+                    <div class="channel-strip" vid="119">
+                        <span class="label" vid="120">04</span>
+                        <div class="fader-track" id="track-4" vid="121">
+                            <div class="fader-cap" id="fader-4" style="bottom: 10%;" vid="122"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="123"></button>
+                    </div>
+                    <div class="channel-strip" vid="124">
+                        <span class="label" vid="125">05</span>
+                        <div class="fader-track" id="track-5" vid="126">
+                            <div class="fader-cap" id="fader-5" style="bottom: 20%;" vid="127"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="128"></button>
+                    </div>
+                    <div class="channel-strip" vid="129">
+                        <span class="label" vid="130">06</span>
+                        <div class="fader-track" id="track-6" vid="131">
+                            <div class="fader-cap" id="fader-6" style="bottom: 0%;" vid="132"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="133"></button>
+                    </div>
+                    <div class="channel-strip" vid="134">
+                        <span class="label" vid="135">07</span>
+                        <div class="fader-track" id="track-7" vid="136">
+                            <div class="fader-cap" id="fader-7" style="bottom: 55%;" vid="137"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn" vid="138"></button>
+                    </div>
+                    <div class="channel-strip" vid="139">
+                        <span class="label" vid="140">08</span>
+                        <div class="fader-track" id="track-8" vid="141">
+                            <div class="fader-cap" id="fader-8" style="bottom: 90%;" vid="142"></div>
+                        </div>
+                        <button class="btn-lozenge black toggle-btn active" vid="143"></button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <script vid="144">
+        
+        let activeDrag = null;
+        let activeElement = null;
+        let startY = 0;
+        let startVal = 0;
+        const faders = document.querySelectorAll('.fader-cap');
+        faders.forEach(fader => {
+            fader.addEventListener('mousedown', (e) => {
+                activeDrag = 'fader';
+                activeElement = fader;
+                startY = e.clientY;
+                
+                startVal = parseFloat(window.getComputedStyle(fader).bottom);
+                e.preventDefault();
+            });
+        });
+        
+        window.addEventListener('mousemove', (e) => {
+            if (activeDrag === 'fader') {
+                const track = activeElement.parentElement;
+                const trackRect = track.getBoundingClientRect();
+                const capHeight = activeElement.offsetHeight;
+                const maxTravel = trackRect.height - capHeight;
+                
+                const deltaY = startY - e.clientY; 
+                let newBottom = startVal + deltaY;
+                
+                if (newBottom < 0) newBottom = 0;
+                if (newBottom > maxTravel) newBottom = maxTravel;
+                
+                activeElement.style.bottom = `${newBottom}px`;
+                
+                const ch = activeElement.id.split('-')[1];
+                const percent = newBottom / maxTravel;
+                document.getElementById('data-readout').innerText = `CH:${ch} VAL:${Math.floor(percent*255)}`;
+            }
+        });
+        
+        window.addEventListener('mouseup', () => {
+            activeDrag = null;
+            activeElement = null;
+        });
+        
+        const joysticks = document.querySelectorAll('.joystick');
+        
+
+        const joyState = {
+            1: { x: 0, y: 0 },
+            2: { x: 0, y: 0 },
+            3: { x: 0, y: 0 },
+            4: { x: 0, y: 0 }
+        };
+        joysticks.forEach(stick => {
+            stick.addEventListener('mousedown', startDragJoystick);
+            stick.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+        });
+        function startDragJoystick(e) {
+            e.preventDefault();
+            const stick = e.target;
+            const id = stick.dataset.id;
+            const socket = stick.parentElement;
+            
+            const socketRect = socket.getBoundingClientRect();
+            const centerX = socketRect.left + socketRect.width / 2;
+            const centerY = socketRect.top + socketRect.height / 2;
+            const maxDist = (socketRect.width / 2) - (stick.offsetWidth / 4); 
+            function onMouseMove(moveEvent) {
+                const dx = moveEvent.clientX - centerX;
+                const dy = moveEvent.clientY - centerY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                let finalX = dx;
+                let finalY = dy;
+                if (distance > maxDist) {
+                    const angle = Math.atan2(dy, dx);
+                    finalX = Math.cos(angle) * maxDist;
+                    finalY = Math.sin(angle) * maxDist;
+                }
+                stick.style.transform = `translate(-50%, -50%) translate(${finalX}px, ${finalY}px)`;
+                
+                
+                joyState[id].x = finalX / maxDist; 
+                joyState[id].y = finalY / maxDist;
+            }
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                
+                
+                stick.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                stick.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+                
+                
+                joyState[id] = { x: 0, y: 0 };
+                setTimeout(() => { stick.style.transition = 'none'; }, 200);
+            }
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+        
+        const ledButtons = document.querySelectorAll('.toggle-btn');
+        ledButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                btn.classList.toggle('active');
+                e.stopPropagation(); 
+            });
+        });
+        
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+            camera.position.z = 5;
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(width, height);
+            container.appendChild(renderer.domElement);
+            
+            const lines = [];
+            const lineCount = 5;
+            const segments = 64;
+            for(let l=0; l<lineCount; l++) {
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(segments * 3);
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                
+                const material = new THREE.LineBasicMaterial({ 
+                    color: l % 2 === 0 ? 0xe84a1b : 0xffffff,
+                    linewidth: 1,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+                lines.push(line);
+            }
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                
+                const speed = 0.05 + (Math.abs(joyState[4].x) * 0.2); 
+                time += speed;
+                const freqBase = 1.5 + (joyState[1].x * 2);
+                const ampBase = 0.5 + (joyState[2].y * -0.3);
+                const separation = 0.2 + (joyState[3].y * 0.3);
+                const noise = Math.abs(joyState[4].x) * 0.2; 
+                lines.forEach((line, lIndex) => {
+                    const positions = line.geometry.attributes.position.array;
+                    
+                    const yOffset = (lIndex - lineCount/2) * separation;
+                    for (let i = 0; i < segments; i++) {
+                        const x = (i / (segments - 1)) * 6 - 3;
+                        
+                        
+                        let y = Math.sin(x * freqBase + time + (lIndex*0.5)) * ampBase;
+                        
+                        
+                        y += Math.sin(x * 3 + time * 1.5) * 0.1;
+                        
+                        y += (Math.random() - 0.5) * noise;
+                        positions[i * 3] = x;
+                        positions[i * 3 + 1] = y + yOffset;
+                        positions[i * 3 + 2] = 0;
+                    }
+                    line.geometry.attributes.position.needsUpdate = true;
+                });
+                renderer.render(scene, camera);
+            }
+            animate();
+        }
+        window.onload = initThree;
+    </script>
+
+    <!-- 配置对话框 -->
+    <div id="config-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>配置 <span id="config-target"></span></h2>
+            <form id="config-form">
+                <label>名称:</label>
+                <input type="text" id="config-name" required>
+
+                <label>描述:</label>
+                <textarea id="config-description"></textarea>
+
+                <label>Shell 命令:</label>
+                <textarea id="config-command" required></textarea>
+
+                <label>
+                    <input type="checkbox" id="config-enabled" checked>
+                    启用此绑定
+                </label>
+
+                <div class="button-group">
+                    <button type="button" id="test-btn">测试（复制）</button>
+                    <button type="submit">保存</button>
+                    <button type="button" id="delete-btn">删除</button>
+                    <button type="button" id="cancel-btn">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 配置管理弹窗 -->
+    <div id="config-manager-modal" class="config-manager-modal hidden">
+        <div class="config-manager-content">
+            <div class="config-manager-header">
+                <h2>Controller 配置管理</h2>
+                <button id="close-manager-btn" class="close-btn">✕ 关闭</button>
+            </div>
+
+            <div class="config-manager-toolbar">
+                <button id="add-config-btn" class="toolbar-btn primary">+ 新增配置</button>
+                <input type="text" id="search-input" placeholder="搜索配置..." class="search-input">
+                <select id="type-filter" class="filter-select">
+                    <option value="">全部类型</option>
+                    <option value="button">按钮</option>
+                    <option value="fader">推子</option>
+                    <option value="knob">旋钮</option>
+                </select>
+                <select id="status-filter" class="filter-select">
+                    <option value="">全部状态</option>
+                    <option value="enabled">已启用</option>
+                    <option value="disabled">已禁用</option>
+                </select>
+            </div>
+
+            <div class="controller-preview-section">
+                <h3>控制器预览</h3>
+                <div id="controller-preview" class="controller-preview"></div>
+            </div>
+
+            <div class="config-list-section">
+                <h3>配置列表</h3>
+                <div id="config-list" class="config-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 配置管理脚本 -->
+    <script src="config.js"></script>
+</body></html>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Terminal, Clock, FolderOpen, X } from 'lucide-react';
 
 interface TmuxRestoreDialogProps {
@@ -33,7 +33,15 @@ export const TmuxRestoreDialog: React.FC<TmuxRestoreDialogProps> = ({
   onRestore,
   onIgnore
 }) => {
+  // 默认全选所有会话
   const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
+
+  // 当 sessions 变化时，默认全选
+  useEffect(() => {
+    if (isOpen && sessions.length > 0) {
+      setSelectedSessions(sessions.map(s => s.sessionName));
+    }
+  }, [isOpen, sessions]);
 
   if (!isOpen || sessions.length === 0) {
     return null;
@@ -50,11 +58,14 @@ export const TmuxRestoreDialog: React.FC<TmuxRestoreDialogProps> = ({
   };
 
   const handleRestoreSelected = () => {
-    const toRestore = selectedSessions.length > 0 ? selectedSessions : sessions.map(s => s.sessionName);
-    onRestore(toRestore);
+    // 只恢复选中的会话（至少选一个）
+    if (selectedSessions.length > 0) {
+      onRestore(selectedSessions);
+    }
   };
 
   const handleIgnoreAll = () => {
+    // 忽略全部：删除所有 tmux 会话
     onIgnore(sessions.map(s => s.sessionName));
   };
 
@@ -128,23 +139,29 @@ export const TmuxRestoreDialog: React.FC<TmuxRestoreDialogProps> = ({
         <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
           <div className="text-sm text-gray-400">
             {selectedSessions.length > 0 ? (
-              <span>已选择 {selectedSessions.length} 个会话</span>
+              <span>已选择 {selectedSessions.length}/{sessions.length} 个会话</span>
             ) : (
-              <span>未选择会话（将恢复全部）</span>
+              <span>请至少选择一个会话</span>
             )}
           </div>
           <div className="flex gap-3">
             <button
               onClick={handleIgnoreAll}
-              className="px-4 py-2 text-sm rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all"
+              className="px-4 py-2 text-sm rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 border border-red-500/20 transition-all"
+              title="删除所有暂离的 tmux 会话"
             >
               忽略全部
             </button>
             <button
               onClick={handleRestoreSelected}
-              className="px-4 py-2 text-sm rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-all"
+              disabled={selectedSessions.length === 0}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${
+                selectedSessions.length > 0
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
             >
-              恢复 {selectedSessions.length > 0 ? `(${selectedSessions.length})` : '全部'}
+              恢复选中 ({selectedSessions.length})
             </button>
           </div>
         </div>
