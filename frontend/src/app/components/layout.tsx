@@ -76,9 +76,11 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
   React.useEffect(() => {
     navItems.forEach(item => {
       if (item.subItems && item.id) {
-        const hasActiveChild = item.subItems.some(sub =>
-          location.pathname === sub.path ||
-          location.pathname.startsWith(sub.path + '/')
+        const hasActiveChild = item.subItems.some(
+          (sub) =>
+            !sub.external &&
+            (location.pathname === sub.path ||
+              (sub.path.length > 1 && location.pathname.startsWith(sub.path + '/')))
         );
 
         if (hasActiveChild && !collapsed) {
@@ -115,6 +117,11 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
           path: "/teams",
           icon: Network,
         },
+        {
+          name: t("projects"),
+          path: "/projects",
+          icon: FolderOpen,
+        },
       ],
     },
     {
@@ -145,26 +152,6 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
       path: "/terminal",
       icon: Terminal,
     },
-    {
-      name: "Projects",
-      path: "/projects",
-      icon: FolderOpen,
-      id: 'projects',
-      subItems: [
-        {
-          name: "Controller",
-          path: "/projects/controller/index.html",
-          icon: Gamepad2,
-          external: true,
-        },
-        {
-          name: "OpenClaw Controller",
-          path: "http://localhost:18789",
-          icon: Network,
-          external: true,
-        },
-      ],
-    },
   ];
 
   return (
@@ -175,9 +162,15 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
 
         // 父菜单三态逻辑
         const isDirectActive = location.pathname === item.path;
-        const hasActiveChild = hasSubItems && item.subItems?.some(sub =>
-          location.pathname === sub.path
-        );
+        const hasActiveChild =
+          hasSubItems &&
+          item.subItems?.some((sub) => {
+            if (sub.external) return false;
+            return (
+              location.pathname === sub.path ||
+              (sub.path.length > 1 && location.pathname.startsWith(sub.path + '/'))
+            );
+          });
 
         // 确定父菜单状态：active（直接激活）、partial（子菜单激活）、inactive（未激活）
         const menuState = isDirectActive ? 'active' : hasActiveChild ? 'partial' : 'inactive';
@@ -438,6 +431,11 @@ const LayoutContent = () => {
       path: "/teams",
       icon: Network,
     },
+    {
+      name: t("projects"),
+      path: "/projects",
+      icon: FolderOpen,
+    },
   ];
 
   const automationMenuItems = [
@@ -458,16 +456,29 @@ const LayoutContent = () => {
     },
   ];
 
-  // 获取当前激活的菜单项
+  // 获取当前激活的菜单项：先精确匹配，再按 path 长度降序做前缀匹配（避免 /workflows 吞掉 /workflows/opp）
   const getActiveMenuItem = (items: typeof libraryMenuItems) => {
-    return items.find(item => item.path === location.pathname);
+    const exact = items.find((item) => location.pathname === item.path);
+    if (exact) return exact;
+    const byLen = [...items].sort((a, b) => b.path.length - a.path.length);
+    return byLen.find(
+      (item) => item.path.length > 1 && location.pathname.startsWith(item.path + '/')
+    );
   };
 
   const activeLibraryItem = getActiveMenuItem(libraryMenuItems);
   const activeAutomationItem = getActiveMenuItem(automationMenuItems);
   // 检查是否在 library 或 automation 分组的任何页面（用于弹出菜单）
-  const isInLibraryGroup = libraryMenuItems.some(item => item.path === location.pathname);
-  const isInAutomationGroup = automationMenuItems.some(item => item.path === location.pathname);
+  const isInLibraryGroup = libraryMenuItems.some(
+    (item) =>
+      item.path === location.pathname ||
+      (item.path.length > 1 && location.pathname.startsWith(item.path + '/'))
+  );
+  const isInAutomationGroup = automationMenuItems.some(
+    (item) =>
+      item.path === location.pathname ||
+      (item.path.length > 1 && location.pathname.startsWith(item.path + '/'))
+  );
 
   // 动态更新浏览器标签栏颜色
   React.useEffect(() => {
@@ -821,13 +832,14 @@ const LayoutContent = () => {
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
         <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse ? '' : isTerminalPage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
           <div className={isTerminalPage || isMicroverse ? 'h-full' : ''}>
-            {/* 游戏模式：始终挂载，通过 CSS 控制显示 */}
-            <div className={`${isMicroverse ? '' : 'hidden'} h-full`}>
-              <Microverse key="microverse-cached" />
-            </div>
-
-            {/* 其他路由：正常渲染 */}
-            {!isMicroverse && <Outlet />}
+            {/* 游戏模式：仅在 /microverse 路由挂载，避免 hidden/0 尺寸导致 WebGL 画布无效 */}
+            {isMicroverse ? (
+              <div className="h-full">
+                <Microverse key="microverse-cached" />
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </div>
         </div>
 

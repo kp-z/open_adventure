@@ -193,6 +193,7 @@ class AgentUpdate(BaseModel):
     skills: Optional[List[str]] = None
     mcp_servers: Optional[list] = None
     hooks: Optional[dict] = None
+    scope: Optional[Literal["user", "project", "plugin"]] = None
     priority: Optional[int] = None
     category: Optional[str] = None
     tags: Optional[List[str]] = None

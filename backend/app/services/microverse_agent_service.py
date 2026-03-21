@@ -3,17 +3,21 @@ Microverse Agent Service
 处理 Microverse 游戏的 Agent 对话请求和角色管理
 """
 import asyncio
-import psutil
+import json
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+
+from anthropic import AsyncAnthropic
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
 
+from app.config.settings import settings
 from app.models.agent import Agent, AgentFramework
-from app.models.task import Task, Execution, ExecutionStatus, ExecutionType
+from app.models.task import Task, TaskStatus, Execution, ExecutionStatus, ExecutionType
 from app.models.microverse import MicroverseCharacter
 from app.repositories.agent_repository import AgentRepository
+from app.services.agent_runtime_service import AgentRuntimeService
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,18 +39,18 @@ class MicroverseAgentService:
         Returns:
             Dict: 对话响应
         """
-        # 1. 查找或创建对应的 Agent
-        agent = await self._get_or_create_agent(
+        # 1. 优先使用已绑定角色的 Agent，否则回退到 microverse_{name} 自动 Agent
+        agent = await self._resolve_chat_agent(
             request.character_name,
             request.api_type,
             request.model
         )
 
-        # 2. 创建 Task 和 Execution
+        # 2. 创建 Task 和 Execution（短生命周期，记录审计）
         task = Task(
             title=f"Microverse Chat: {request.character_name}",
             description=request.prompt,
-            status="running",
+            status=TaskStatus.RUNNING,
             agent_id=agent.id
         )
         self.db.add(task)
@@ -69,12 +73,14 @@ class MicroverseAgentService:
             response_text = await self._call_ai_api(
                 agent,
                 request.prompt,
-                request.context
+                request.context,
+                model_override=request.model,
             )
 
             # 4. 更新 Execution 状态
             execution.status = ExecutionStatus.SUCCEEDED
             execution.test_output = response_text
+            execution.finished_at = datetime.utcnow()
             await self.db.commit()
 
             return {
@@ -127,24 +133,84 @@ class MicroverseAgentService:
         logger.info(f"Created new agent for Microverse character: {character_name}")
         return agent
 
+    async def _resolve_chat_agent(
+        self,
+        character_name: str,
+        api_type: Optional[str],
+        model: Optional[str],
+    ) -> Agent:
+        """若 Microverse 角色已绑定平台 Agent，则使用该 Agent；否则使用 microverse_{name}。"""
+        character = await self.get_character(character_name)
+        if character and character.agent_id:
+            agent_result = await self.db.execute(
+                select(Agent).where(Agent.id == character.agent_id)
+            )
+            bound = agent_result.scalar_one_or_none()
+            if bound:
+                return bound
+        return await self._get_or_create_agent(character_name, api_type, model)
+
+    @staticmethod
+    def _normalize_anthropic_model(model: Optional[str]) -> str:
+        """将简称或旧名映射为 Anthropic API 模型 id。"""
+        if not model:
+            return "claude-sonnet-4-6"
+        m = model.strip()
+        mapping = {
+            "opus": "claude-opus-4-6",
+            "sonnet": "claude-sonnet-4-6",
+            "haiku": "claude-3-5-haiku-20241022",
+            "inherit": "claude-sonnet-4-6",
+            "gpt-4o-mini": "claude-sonnet-4-6",
+        }
+        if m in mapping:
+            return mapping[m]
+        return m
+
     async def _call_ai_api(
         self,
         agent: Agent,
         prompt: str,
-        context: Optional[Dict[str, Any]]
+        context: Optional[Dict[str, Any]],
+        model_override: Optional[str] = None,
     ) -> str:
         """
-        调用 AI API 获取响应
+        通过 Anthropic Messages API 生成回复（与 PromptOptimizer 等共用配置来源）。
 
-        这里需要根据 agent.model 调用对应的 AI API
-        可以复用现有的 API 调用逻辑
+        需在环境变量中配置 ANTHROPIC_API_KEY。
         """
-        # TODO: 实现实际的 AI API 调用
-        # 可以参考 agent_test_service.py 中的实现
+        api_key = settings.anthropic_api_key
+        if not api_key:
+            raise RuntimeError(
+                "ANTHROPIC_API_KEY 未配置，无法为 Microverse 提供对话；请在环境或 .env 中设置。"
+            )
 
-        # 临时模拟响应
-        await asyncio.sleep(1)
-        return f"[{agent.name}] Response to: {prompt[:50]}..."
+        model = self._normalize_anthropic_model(model_override or agent.model)
+        system_parts: List[str] = []
+        if agent.system_prompt:
+            system_parts.append(agent.system_prompt)
+        if context:
+            system_parts.append(
+                "游戏上下文（JSON）:\n" + json.dumps(context, ensure_ascii=False)
+            )
+        system = (
+            "\n\n".join(system_parts)
+            if system_parts
+            else "你是 Microverse 游戏中的角色，请用自然、简洁的语言回复玩家。"
+        )
+
+        async with AsyncAnthropic(api_key=api_key) as client:
+            response = await client.messages.create(
+                model=model,
+                max_tokens=1024,
+                system=system,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+        for block in response.content:
+            if getattr(block, "type", None) == "text":
+                return block.text
+        return ""
 
     # ===== 角色管理方法 =====
 
@@ -303,27 +369,24 @@ class MicroverseAgentService:
         task_description: str,
         project_path: Optional[str] = None
     ) -> Dict[str, Any]:
-        """启动角色工作（后台运行 Agent）"""
-        # 获取角色
+        """启动角色工作：统一委托 AgentRuntimeService（claude --agent + Task/Execution/监控）。"""
+        # 步骤 1：获取角色并校验绑定与工作态
         character = await self.get_character(character_name)
         if not character:
             raise HTTPException(status_code=404, detail=f"Character {character_name} not found")
 
-        # 检查是否已绑定 Agent
         if not character.agent_id:
             raise HTTPException(
                 status_code=400,
                 detail=f"Character {character_name} is not bound to any agent"
             )
 
-        # 检查是否已在工作
         if character.is_working:
             raise HTTPException(
                 status_code=400,
                 detail=f"Character {character_name} is already working"
             )
 
-        # 获取 Agent
         agent_result = await self.db.execute(
             select(Agent).where(Agent.id == character.agent_id)
         )
@@ -331,71 +394,32 @@ class MicroverseAgentService:
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent {character.agent_id} not found")
 
-        # 创建 Execution
-        execution = Execution(
-            execution_type=ExecutionType.AGENT_TEST,
-            agent_id=agent.id,
-            status=ExecutionStatus.RUNNING,
-            test_input=task_description,
-            is_background=True,
-            work_dir=project_path,
-            started_at=datetime.utcnow()
-        )
-        self.db.add(execution)
-        await self.db.flush()
+        # 步骤 2：由 AgentRuntimeService 创建 Task/Execution、启动进程并 commit
+        try:
+            runtime = AgentRuntimeService(self.db)
+            execution = await runtime.start_agent(
+                agent=agent,
+                task_description=task_description,
+                project_path=project_path,
+                background=True,
+            )
+        except Exception as e:
+            logger.error(f"AgentRuntimeService.start_agent failed for {character_name}: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to start Agent Runtime: {e}",
+            ) from e
 
-        # 更新角色状态
+        # 步骤 3：更新角色侧状态（独立 commit，避免与 Runtime 内 commit 争用同事务）
         character.is_working = True
         character.current_execution_id = execution.id
         await self.db.commit()
-        await self.db.refresh(execution)
 
-        # 启动 Agent Runtime（后台进程）
-        try:
-            import subprocess
-            import os
-
-            # 准备日志文件路径
-            log_dir = os.path.join(os.getcwd(), "docs", "logs", "microverse")
-            os.makedirs(log_dir, exist_ok=True)
-            log_file = os.path.join(log_dir, f"character_{character_name}_{execution.id}.log")
-
-            # 构建 Claude Code CLI 命令
-            # 使用 --background 模式运行
-            cmd = [
-                "claude",
-                "--background",
-                "--project", project_path or os.getcwd(),
-                task_description
-            ]
-
-            # 启动后台进程
-            with open(log_file, "w") as f:
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=f,
-                    stderr=subprocess.STDOUT,
-                    cwd=project_path or os.getcwd(),
-                    start_new_session=True  # 创建新会话，避免被父进程终止
-                )
-
-            # 记录进程信息
-            execution.process_pid = process.pid
-            execution.log_file = log_file
-            await self.db.commit()
-
-            logger.info(f"Started Agent Runtime for character {character_name}, pid={process.pid}, execution_id={execution.id}")
-
-        except Exception as e:
-            logger.error(f"Failed to start Agent Runtime for {character_name}: {e}")
-            execution.status = ExecutionStatus.FAILED
-            execution.error_message = str(e)
-            character.is_working = False
-            character.current_execution_id = None
-            await self.db.commit()
-            raise HTTPException(status_code=500, detail=f"Failed to start Agent Runtime: {e}")
-
-        logger.info(f"Started work for character {character_name}, execution_id={execution.id}")
+        logger.info(
+            "Started work for character %s via AgentRuntime, execution_id=%s",
+            character_name,
+            execution.id,
+        )
 
         return {
             "execution_id": execution.id,
@@ -418,27 +442,17 @@ class MicroverseAgentService:
                 detail=f"Character {character_name} is not working"
             )
 
-        # 获取当前执行
         if character.current_execution_id:
-            exec_result = await self.db.execute(
-                select(Execution).where(Execution.id == character.current_execution_id)
-            )
-            execution = exec_result.scalar_one_or_none()
+            runtime = AgentRuntimeService(self.db)
+            try:
+                await runtime.stop_agent(character.current_execution_id)
+            except ValueError:
+                logger.warning(
+                    "stop_agent: execution %s not found for character %s",
+                    character.current_execution_id,
+                    character_name,
+                )
 
-            if execution and execution.process_pid:
-                # TODO: 停止进程
-                # 这里需要调用 AgentRuntimeService 来停止后台进程
-                try:
-                    process = psutil.Process(execution.process_pid)
-                    process.terminate()
-                    process.wait(timeout=5)
-                except (psutil.NoSuchProcess, psutil.TimeoutExpired):
-                    pass
-
-                execution.status = ExecutionStatus.CANCELLED
-                execution.finished_at = datetime.utcnow()
-
-        # 更新角色状态
         character.is_working = False
         character.current_execution_id = None
         await self.db.commit()
@@ -448,13 +462,11 @@ class MicroverseAgentService:
         return {"success": True}
 
     async def get_character_runtime_status(self, character_name: str) -> Dict[str, Any]:
-        """获取角色的 Runtime 状态"""
-        # 获取角色
+        """获取角色的 Runtime 状态（委托 AgentRuntimeService.get_agent_status）。"""
         character = await self.get_character(character_name)
         if not character:
             raise HTTPException(status_code=404, detail=f"Character {character_name} not found")
 
-        # 检查是否在工作
         if not character.is_working or not character.current_execution_id:
             return {
                 "status": "idle",
@@ -464,50 +476,59 @@ class MicroverseAgentService:
                 "memory_mb": None
             }
 
-        # 获取当前执行
         exec_result = await self.db.execute(
             select(Execution).where(Execution.id == character.current_execution_id)
         )
         execution = exec_result.scalar_one_or_none()
-
-        if not execution or not execution.process_pid:
+        if not execution:
+            character.is_working = False
+            character.current_execution_id = None
+            await self.db.commit()
             return {
-                "status": execution.status.value if execution else "unknown",
+                "status": "idle",
                 "pid": None,
-                "started_at": execution.started_at.isoformat() if execution and execution.started_at else None,
+                "started_at": None,
                 "cpu_percent": None,
                 "memory_mb": None
             }
 
-        # 获取进程信息
+        runtime = AgentRuntimeService(self.db)
         try:
-            process = psutil.Process(execution.process_pid)
-            cpu_percent = process.cpu_percent(interval=0.1)
-            memory_info = process.memory_info()
-            memory_mb = memory_info.rss / 1024 / 1024
-
+            st = await runtime.get_agent_status(character.current_execution_id)
+        except ValueError:
+            character.is_working = False
+            character.current_execution_id = None
+            await self.db.commit()
             return {
-                "status": execution.status.value,
-                "pid": execution.process_pid,
-                "started_at": execution.started_at.isoformat() if execution.started_at else None,
-                "cpu_percent": cpu_percent,
-                "memory_mb": memory_mb
+                "status": "idle",
+                "pid": None,
+                "started_at": None,
+                "cpu_percent": None,
+                "memory_mb": None
             }
-        except psutil.NoSuchProcess:
-            # 进程已不存在
+
+        # 进程已退出：同步 DB 与角色状态
+        if st.get("status") == "stopped" and execution.status == ExecutionStatus.RUNNING:
             execution.status = ExecutionStatus.FAILED
             execution.finished_at = datetime.utcnow()
             character.is_working = False
             character.current_execution_id = None
             await self.db.commit()
-
             return {
                 "status": "failed",
                 "pid": None,
-                "started_at": execution.started_at.isoformat() if execution.started_at else None,
+                "started_at": execution.started_at,
                 "cpu_percent": None,
                 "memory_mb": None
             }
+
+        return {
+            "status": execution.status.value,
+            "pid": st.get("pid"),
+            "started_at": execution.started_at,
+            "cpu_percent": st.get("cpu_percent"),
+            "memory_mb": st.get("memory_mb"),
+        }
 
     async def get_character_work_logs(
         self,
@@ -515,42 +536,31 @@ class MicroverseAgentService:
         offset: int = 0,
         limit: int = 50
     ) -> Dict[str, Any]:
-        """获取角色工作日志"""
-        # 获取角色
+        """获取角色工作日志（委托 AgentRuntimeService.get_agent_logs）。"""
         character = await self.get_character(character_name)
         if not character:
             raise HTTPException(status_code=404, detail=f"Character {character_name} not found")
 
-        # 检查是否在工作
-        if not character.is_working or not character.current_execution_id:
+        if not character.current_execution_id:
             return {
                 "logs": [],
                 "total": 0,
                 "has_more": False
             }
 
-        # 获取当前执行
-        exec_result = await self.db.execute(
-            select(Execution).where(Execution.id == character.current_execution_id)
-        )
-        execution = exec_result.scalar_one_or_none()
-
-        if not execution or not execution.log_file:
+        runtime = AgentRuntimeService(self.db)
+        try:
+            return await runtime.get_agent_logs(
+                character.current_execution_id,
+                offset=offset,
+                limit=limit,
+            )
+        except ValueError:
             return {
                 "logs": [],
                 "total": 0,
                 "has_more": False
             }
-
-        # TODO: 读取日志文件
-        # 这里需要实现日志文件读取逻辑
-        # 可以参考 AgentRuntimeService 中的实现
-
-        return {
-            "logs": [],
-            "total": 0,
-            "has_more": False
-        }
 
     # ===== 任务配置管理方法 =====
 

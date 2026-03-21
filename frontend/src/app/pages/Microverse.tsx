@@ -160,7 +160,25 @@ export default function Microverse() {
         return;
       }
 
-      const newVersion: VersionInfo = await response.json();
+      // 读取响应文本用于后续解析
+      const rawText = await response.text();
+
+      // SPA 回退时可能 200 但 body 为 index.html，避免 response.json() 抛错
+      const trimmed = rawText.trimStart();
+      if (trimmed.startsWith('<')) {
+        console.warn('[Microverse] 版本检查返回 HTML 而非 JSON，使用时间戳作为版本');
+        setGameVersion(Date.now().toString());
+        return;
+      }
+
+      let newVersion: VersionInfo;
+      try {
+        newVersion = JSON.parse(rawText) as VersionInfo;
+      } catch {
+        console.warn('[Microverse] 版本 JSON 解析失败，使用时间戳作为版本');
+        setGameVersion(Date.now().toString());
+        return;
+      }
       const cachedVersion = localStorage.getItem(VERSION_KEY);
 
       console.log('[Microverse] 版本检查:', {

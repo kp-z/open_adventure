@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Agent 编辑页面
+ * 从 URL 路径获取 agent ID 并加载 Agent 数据
+ */
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AgentEditor } from '../components/AgentEditor';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -13,31 +17,25 @@ export default function AgentEditPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchAgent = async () => {
-      if (!id) {
-        setError('Agent ID is required');
-        setLoading(false);
-        return;
-      }
+    if (!id) {
+      setError('缺少 Agent ID');
+      setLoading(false);
+      return;
+    }
 
+    const loadAgent = async () => {
       try {
-        const response = await agentsApi.list({ limit: 1000 });
-        const foundAgent = response.items.find(a => a.id.toString() === id);
-
-        if (!foundAgent) {
-          setError('Agent not found');
-        } else {
-          setAgent(foundAgent);
-        }
+        const data = await agentsApi.get(parseInt(id, 10));
+        setAgent(data);
       } catch (err) {
-        console.error('Failed to fetch agent:', err);
-        setError('Failed to load agent');
+        console.error('Failed to load agent:', err);
+        setError(err instanceof Error ? err.message : '加载 Agent 失败');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAgent();
+    loadAgent();
   }, [id]);
 
   const handleSave = () => {
@@ -45,20 +43,19 @@ export default function AgentEditPage() {
   };
 
   if (loading) {
-    return <LoadingSpinner text="加载子代理..." />;
+    return <LoadingSpinner text="加载 Agent 配置..." />;
   }
 
-  if (error || !agent) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-red-400 mb-2">错误</h2>
-          <p className="text-gray-400 mb-4">{error || '未找到子代理'}</p>
+          <p className="text-red-400 mb-4">{error}</p>
           <button
-            onClick={handleBack}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            onClick={() => navigate('/agents')}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold"
           >
-            返回列表
+            返回 Agents 列表
           </button>
         </div>
       </div>

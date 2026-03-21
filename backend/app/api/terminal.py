@@ -838,15 +838,7 @@ async def terminal_websocket(
         logger.info("[Terminal] Sending SESSION_ID: session_id=%s", session_id)
         await websocket.send_text(f"\x1b]0;SESSION_ID:{session_id}\x07")  # 使用 OSC 序列发送 session ID
 
-        # Send tmux session info if using tmux
-        if session.use_tmux and session.tmux_session_name:
-            logger.info("[Terminal] Sending TMUX_SESSION: session_name=%s", session.tmux_session_name)
-            tmux_info = json.dumps({
-                "type": "tmux_created",
-                "session_name": session.tmux_session_name,
-                "message": "tmux session created"
-            })
-            await websocket.send_text(f"\x1b]0;TMUX_INFO:{tmux_info}\x07")
+        # 注意：TMUX_INFO 消息移到 session.start() 之后发送，因为 tmux_session_name 是在 start() 中设置的
 
     try:
         # Start the PTY (only for new sessions)
@@ -855,6 +847,16 @@ async def terminal_websocket(
             print(f"[Terminal] Starting PTY for session {session_id}...")
             session.start()
             print(f"[Terminal] PTY started successfully - PID: {session.pid}, FD: {session.master_fd}")
+
+            # 🔧 修复：在 session.start() 之后发送 TMUX_INFO，此时 tmux_session_name 已经设置
+            if session.use_tmux and session.tmux_session_name:
+                logger.info("[Terminal] Sending TMUX_INFO after session start: session_name=%s", session.tmux_session_name)
+                tmux_info = json.dumps({
+                    "type": "tmux_created",
+                    "session_name": session.tmux_session_name,
+                    "message": "tmux session created"
+                })
+                await websocket.send_text(f"\x1b]0;TMUX_INFO:{tmux_info}\x07")
 
             # 如果设置了 auto_start_claude，等待 shell 启动后自动执行 claude 命令
             if session.auto_start_claude:

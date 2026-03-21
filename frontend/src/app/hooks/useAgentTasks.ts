@@ -3,9 +3,7 @@
  * 获取和管理 Agent 任务，支持 WebSocket 实时更新
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:38080';
-const WS_BASE_URL = API_BASE_URL.replace('http', 'ws');
+import { API_CONFIG } from '../../config/api';
 
 export interface AgentTask {
   id: number;
@@ -34,7 +32,7 @@ export function useAgentTasks(agentId: number) {
   // 获取初始任务列表
   const fetchTasks = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/tasks?agent_id=${agentId}`);
+      const response = await fetch(`${API_CONFIG.BASE_URL}/tasks?agent_id=${agentId}`);
       if (!response.ok) throw new Error('Failed to fetch tasks');
       const data = await response.json();
       setTasks(data.items || []);
@@ -53,7 +51,7 @@ export function useAgentTasks(agentId: number) {
       return;
     }
 
-    const wsUrl = `${WS_BASE_URL}/api/ws/agents/${agentId}/tasks-ws`;
+    const wsUrl = `${API_CONFIG.WS_BASE_URL}/ws/agents/${agentId}/tasks-ws`;
     console.log('[useAgentTasks] Connecting to WebSocket:', wsUrl);
 
     const ws = new WebSocket(wsUrl);

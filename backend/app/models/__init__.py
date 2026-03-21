@@ -14,6 +14,7 @@ from app.models.team_message import TeamMessage
 from app.models.team_task import TeamTask
 from app.models.team_state import TeamState
 from app.models.project_path import ProjectPath
+from app.models.project import Project
 from app.models.plugin import Plugin, PluginStatus
 from app.models.microverse import MicroverseCharacter
 
@@ -46,6 +47,7 @@ __all__ = [
     "TeamTask",
     "TeamState",
     "ProjectPath",
+    "Project",
     "Plugin",
     "PluginStatus",
     "MicroverseCharacter"

@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
 
 from app.core.database import get_db
+from app.core.exceptions import ConflictException, NotFoundException
+from app.core.logging import get_logger
 from app.repositories.agent_repository import AgentRepository
 from app.repositories.executions_repo import ExecutionRepository
 from app.services.agent_service import AgentService
@@ -37,6 +39,7 @@ from app.schemas.agent import (
 )
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+logger = get_logger(__name__)
 
 
 def get_agent_service(db: AsyncSession = Depends(get_db)) -> AgentService:
@@ -429,8 +432,13 @@ async def create_agent(
 
     会在对应作用域目录下创建 Markdown 文件
     """
-    # 创建文件和数据库记录
-    return await service.create_agent(agent_data)
+    try:
+        return await service.create_agent(agent_data)
+    except ConflictException as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to create agent: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get(
@@ -635,7 +643,15 @@ async def update_agent(
     service: AgentService = Depends(get_agent_service)
 ):
     """更新子代理配置"""
-    return await service.update_agent(agent_id, agent_data)
+    try:
+        return await service.update_agent(agent_id, agent_data)
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ConflictException as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update agent {agent_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.put(

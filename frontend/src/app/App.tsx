@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { RouterProvider, createBrowserRouter } from 'react-router';
+import { RouterProvider, createBrowserRouter, useRouteError } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AppProvider } from './contexts/AppContext';
@@ -112,12 +112,20 @@ const router = createBrowserRouter(
         return { Component: Layout };
       },
       HydrateFallback: () => <div>Loading...</div>,
-      ErrorBoundary: () => (
-        <div style={{ padding: '2rem', color: 'white' }}>
-          <h1>Route Error</h1>
-          <button onClick={() => window.location.reload()}>Reload</button>
-        </div>
-      ),
+      ErrorBoundary: () => {
+        const error = useRouteError() as Error | { message?: string; statusText?: string };
+        const errorMessage = error instanceof Error ? error.message : (error as any)?.message || (error as any)?.statusText || JSON.stringify(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        console.error('[RouteErrorBoundary]', error);
+        return (
+          <div style={{ padding: '2rem', color: 'white', backgroundColor: '#0f111a', minHeight: '100vh' }}>
+            <h1 style={{ color: '#ef4444' }}>Route Error</h1>
+            <pre style={{ color: '#9ca3af', fontSize: '12px', whiteSpace: 'pre-wrap', marginTop: '1rem' }}>{errorMessage}</pre>
+            {errorStack && <pre style={{ color: '#6b7280', fontSize: '10px', whiteSpace: 'pre-wrap', marginTop: '0.5rem', maxHeight: '200px', overflow: 'auto' }}>{errorStack}</pre>}
+            <button onClick={() => window.location.reload()} style={{ marginTop: '1rem', padding: '0.5rem 1rem', backgroundColor: '#3b82f6', color: 'white', borderRadius: '0.5rem', border: 'none', cursor: 'pointer' }}>Reload</button>
+          </div>
+        );
+      },
       children: [
         {
           index: true,
@@ -210,7 +218,28 @@ const router = createBrowserRouter(
             return { Component: Microverse.default };
           },
         },
-        // microverse 路由已添加回来
+        {
+          path: 'projects',
+          lazy: async () => {
+            const Projects = await import('./pages/Projects');
+            return { Component: Projects.default };
+          },
+        },
+        {
+          path: 'projects/:id',
+          lazy: async () => {
+            const ProjectDetail = await import('./pages/ProjectDetail');
+            return { Component: ProjectDetail.default };
+          },
+        },
+        {
+          path: 'projects/:id/workspace',
+          lazy: async () => {
+            const ProjectWorkspace = await import('./pages/ProjectWorkspace');
+            return { Component: ProjectWorkspace.default };
+          },
+        },
+        // microverse / projects 路由
       ],
     },
   ],

@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
-import { ArrowUp, ArrowDown, Layers } from 'lucide-react';
+import { Layers } from 'lucide-react';
 
-export type ShortcutType = 'insert' | 'control' | 'command' | 'history';
-export type ShortcutMode = 'basic' | 'advanced' | 'custom';
+// 快捷键类型：char 为普通字符，control 为控制码
+export type ShortcutType = 'char' | 'control';
+
+// 快捷键分组
+export type ShortcutGroup = 'mode' | 'control' | 'nav' | 'command';
+
+// 快捷键模式
+export type ShortcutMode = 'basic' | 'extended' | 'claude';
 
 export interface Shortcut {
   id: string;
-  label: string;
+  label: string;           // 显示文本
   type: ShortcutType;
-  value: string;
-  icon?: React.ReactNode;
-  mode?: ShortcutMode[];
+  value: string;           // 发送到终端的值
+  doubleClickValue?: string; // 双击时发送的值（可选）
+  group: ShortcutGroup;
+  modes: ShortcutMode[];   // 在哪些模式下显示
 }
 
 interface TerminalShortcutBarProps {
@@ -18,44 +25,87 @@ interface TerminalShortcutBarProps {
   className?: string;
 }
 
+// 所有快捷键配置 - 每个模式独立，不重叠
 const allShortcuts: Shortcut[] = [
-  // 历史命令 - 所有模式
-  { id: 'history-up', label: '↑', type: 'history', value: 'up', icon: <ArrowUp className="w-4 h-4" />, mode: ['basic', 'advanced', 'custom'] },
-  { id: 'history-down', label: '↓', type: 'history', value: 'down', icon: <ArrowDown className="w-4 h-4" />, mode: ['basic', 'advanced', 'custom'] },
+  // ===== Basic 模式：最基础、最常用的快捷键 =====
+  // 符号区
+  { id: 'bash', label: '!', type: 'char', value: '!', group: 'mode', modes: ['basic'] },
+  { id: 'cmd', label: '/', type: 'char', value: '/', group: 'mode', modes: ['basic'] },
+  { id: 'file', label: '@', type: 'char', value: '@', group: 'mode', modes: ['basic'] },
+  // 导航区
+  { id: 'up', label: '↑', type: 'control', value: '\x1b[A', group: 'nav', modes: ['basic'] },
+  { id: 'down', label: '↓', type: 'control', value: '\x1b[B', group: 'nav', modes: ['basic'] },
+  { id: 'tab', label: 'Tab', type: 'control', value: '\t', group: 'nav', modes: ['basic'] },
+  { id: 'newline', label: '⏎', type: 'control', value: '\n', group: 'nav', modes: ['basic'] },
+  // 控制区
+  { id: 'ctrl-c', label: '^C', type: 'control', value: '\x03', group: 'control', modes: ['basic'] },
+  { id: 'ctrl-z', label: '^Z', type: 'control', value: '\x1a', group: 'control', modes: ['basic'] },
+  { id: 'esc', label: 'Esc', type: 'control', value: '\x1b', doubleClickValue: '\x1b\x1b', group: 'control', modes: ['basic'] },
 
-  // 基础插入类 - basic + advanced
-  { id: 'pipe', label: '|', type: 'insert', value: ' | ', mode: ['basic', 'advanced'] },
-  { id: 'and', label: '&&', type: 'insert', value: ' && ', mode: ['basic', 'advanced'] },
-  { id: 'redirect', label: '>', type: 'insert', value: ' > ', mode: ['basic', 'advanced'] },
-  { id: 'help', label: '--help', type: 'insert', value: ' --help', mode: ['basic', 'advanced'] },
+  // ===== Extended 模式：扩展快捷键 =====
+  // 符号区
+  { id: 'bg', label: '&', type: 'char', value: '&', group: 'mode', modes: ['extended'] },
+  { id: 'pipe', label: '|', type: 'char', value: '|', group: 'mode', modes: ['extended'] },
+  { id: 'tilde', label: '~', type: 'char', value: '~', group: 'mode', modes: ['extended'] },
+  // 导航区
+  { id: 'left', label: '←', type: 'control', value: '\x1b[D', group: 'nav', modes: ['extended'] },
+  { id: 'right', label: '→', type: 'control', value: '\x1b[C', group: 'nav', modes: ['extended'] },
+  { id: 'shift-tab', label: '⇧⇥', type: 'control', value: '\x1b[Z', group: 'nav', modes: ['extended'] },
+  { id: 'home', label: 'Home', type: 'control', value: '\x1b[H', group: 'nav', modes: ['extended'] },
+  { id: 'end', label: 'End', type: 'control', value: '\x1b[F', group: 'nav', modes: ['extended'] },
+  // 控制区
+  { id: 'ctrl-l', label: '^L', type: 'control', value: '\x0c', group: 'control', modes: ['extended'] },
+  { id: 'ctrl-v', label: '^V', type: 'control', value: '\x16', group: 'control', modes: ['extended'] },
+  { id: 'ctrl-a', label: '^A', type: 'control', value: '\x01', group: 'control', modes: ['extended'] },
+  { id: 'ctrl-e', label: '^E', type: 'control', value: '\x05', group: 'control', modes: ['extended'] },
 
-  // 高级插入类 - advanced only
-  { id: 'or', label: '||', type: 'insert', value: ' || ', mode: ['advanced'] },
-  { id: 'append', label: '>>', type: 'insert', value: ' >> ', mode: ['advanced'] },
-  { id: 'stderr', label: '2>', type: 'insert', value: ' 2> ', mode: ['advanced'] },
-  { id: 'both', label: '&>', type: 'insert', value: ' &> ', mode: ['advanced'] },
-
-  // 基础控制类 - basic + advanced
-  { id: 'tab', label: 'Tab', type: 'control', value: 'tab', mode: ['basic', 'advanced'] },
-  { id: 'ctrl-c', label: 'Ctrl+C', type: 'control', value: 'ctrl-c', mode: ['basic', 'advanced'] },
-
-  // 高级控制类 - advanced only
-  { id: 'ctrl-d', label: 'Ctrl+D', type: 'control', value: 'ctrl-d', mode: ['advanced'] },
-  { id: 'esc', label: 'Esc', type: 'control', value: 'esc', mode: ['advanced'] },
-  { id: 'ctrl-z', label: 'Ctrl+Z', type: 'control', value: 'ctrl-z', mode: ['advanced'] },
-
-  // 基础命令类 - basic + advanced
-  { id: 'ls', label: 'ls', type: 'command', value: 'ls', mode: ['basic', 'advanced'] },
-  { id: 'clear', label: 'clear', type: 'command', value: 'clear', mode: ['basic', 'advanced'] },
-  { id: 'pwd', label: 'pwd', type: 'command', value: 'pwd', mode: ['basic', 'advanced'] },
-
-  // 高级命令类 - advanced only
-  { id: 'cd-up', label: 'cd ..', type: 'command', value: 'cd ..', mode: ['advanced'] },
-  { id: 'history', label: 'history', type: 'command', value: 'history', mode: ['advanced'] },
-  { id: 'grep', label: 'grep', type: 'command', value: 'grep ', mode: ['advanced'] },
+  // ===== Claude 模式：Claude Code 专用快捷键 =====
+  // 控制区
+  { id: 'ctrl-o', label: '^O', type: 'control', value: '\x0f', group: 'control', modes: ['claude'] },
+  { id: 'ctrl-t', label: '^T', type: 'control', value: '\x14', group: 'control', modes: ['claude'] },
+  { id: 'ctrl-s', label: '^S', type: 'control', value: '\x13', group: 'control', modes: ['claude'] },
+  // 命令区
+  { id: 'btw', label: '/btw', type: 'char', value: '/btw ', group: 'command', modes: ['claude'] },
+  { id: 'help', label: '/help', type: 'char', value: '/help\n', group: 'command', modes: ['claude'] },
+  { id: 'clear', label: '/clear', type: 'char', value: '/clear\n', group: 'command', modes: ['claude'] },
+  { id: 'diff', label: '/diff', type: 'char', value: '/diff\n', group: 'command', modes: ['claude'] },
+  { id: 'model', label: '/model', type: 'char', value: '/model\n', group: 'command', modes: ['claude'] },
 ];
 
-const modeOrder: ShortcutMode[] = ['basic', 'advanced', 'custom'];
+// 模式配置
+const modeConfig: Record<ShortcutMode, { label: string; icon: string }> = {
+  basic: { label: '基础', icon: '1' },
+  extended: { label: '扩展', icon: '2' },
+  claude: { label: 'Claude', icon: 'C' },
+};
+
+// 模式顺序
+const modeOrder: ShortcutMode[] = ['basic', 'extended', 'claude'];
+
+// 根据分组获取样式
+const getGroupStyle = (group: ShortcutGroup): string => {
+  switch (group) {
+    case 'mode':
+      // 青色 - 模式/符号区
+      return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/30 active:bg-cyan-500/40';
+    case 'control':
+      // 橙色 - 控制区
+      return 'bg-orange-500/20 text-orange-300 border-orange-500/30 hover:bg-orange-500/30 active:bg-orange-500/40';
+    case 'nav':
+      // 紫色 - 导航区
+      return 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30 active:bg-purple-500/40';
+    case 'command':
+      // 灰色 - 命令区
+      return 'bg-gray-500/20 text-gray-300 border-gray-500/30 hover:bg-gray-500/30 active:bg-gray-500/40';
+    default:
+      return 'bg-gray-500/20 text-gray-300 border-gray-500/30 hover:bg-gray-500/30 active:bg-gray-500/40';
+  }
+};
+
+// 分组分隔符组件
+const GroupSeparator: React.FC = () => (
+  <div className="w-px h-6 bg-white/20 mx-1 flex-shrink-0" />
+);
 
 export const TerminalShortcutBar: React.FC<TerminalShortcutBarProps> = ({
   onShortcutClick,
@@ -63,51 +113,62 @@ export const TerminalShortcutBar: React.FC<TerminalShortcutBarProps> = ({
 }) => {
   const [currentMode, setCurrentMode] = useState<ShortcutMode>('basic');
 
-  const getShortcutStyle = (type: ShortcutType) => {
-    switch (type) {
-      case 'history':
-        return 'bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30 active:bg-purple-500/40';
-      case 'insert':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/30 hover:bg-blue-500/30 active:bg-blue-500/40';
-      case 'control':
-        return 'bg-orange-500/20 text-orange-300 border-orange-500/30 hover:bg-orange-500/30 active:bg-orange-500/40';
-      case 'command':
-        return 'bg-green-500/20 text-green-300 border-green-500/30 hover:bg-green-500/30 active:bg-green-500/40';
-      default:
-        return 'bg-gray-500/20 text-gray-300 border-gray-500/30 hover:bg-gray-500/30 active:bg-gray-500/40';
-    }
-  };
-
-  const getModeIcon = (mode: ShortcutMode) => {
-    switch (mode) {
-      case 'basic': return '1';
-      case 'advanced': return '2';
-      case 'custom': return '3';
-    }
-  };
-
-  const getModeTooltip = (mode: ShortcutMode) => {
-    switch (mode) {
-      case 'basic': return '基础模式';
-      case 'advanced': return '高级模式';
-      case 'custom': return '自定义模式';
-    }
-  };
-
-  const cycleMode = () => {
+  // 切换到下一个模式
+  const handleModeSwitch = (e: React.PointerEvent | React.TouchEvent) => {
+    e.preventDefault();
     const currentIndex = modeOrder.indexOf(currentMode);
     const nextIndex = (currentIndex + 1) % modeOrder.length;
     setCurrentMode(modeOrder[nextIndex]);
   };
 
-  const filteredShortcuts = allShortcuts.filter(
-    shortcut => shortcut.mode?.includes(currentMode)
-  );
+  // 获取当前模式的快捷键
+  const getShortcutsForMode = (mode: ShortcutMode): Shortcut[] => {
+    return allShortcuts.filter(s => s.modes.includes(mode));
+  };
+
+  // 将快捷键按分组排列，并在分组之间插入分隔符
+  const renderShortcuts = () => {
+    const shortcuts = getShortcutsForMode(currentMode);
+    const elements: React.ReactNode[] = [];
+    let lastGroup: ShortcutGroup | null = null;
+
+    shortcuts.forEach((shortcut, index) => {
+      // 在分组变化时插入分隔符
+      if (lastGroup !== null && shortcut.group !== lastGroup) {
+        elements.push(<GroupSeparator key={`sep-${index}`} />);
+      }
+      lastGroup = shortcut.group;
+
+      elements.push(
+        <button
+          key={shortcut.id}
+          type="button"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            onShortcutClick(shortcut);
+          }}
+          onTouchEnd={(e) => e.preventDefault()}
+          className={`
+            flex items-center justify-center px-2.5 py-1.5 rounded-lg
+            text-xs font-medium border
+            transition-colors whitespace-nowrap flex-shrink-0
+            touch-manipulation min-w-[32px]
+            ${getGroupStyle(shortcut.group)}
+          `}
+          title={shortcut.doubleClickValue ? `${shortcut.label} (双击: 清空)` : shortcut.label}
+        >
+          <span>{shortcut.label}</span>
+        </button>
+      );
+    });
+
+    return elements;
+  };
 
   return (
-    <div className={`flex items-center gap-2 p-2 ${className}`}>
+    <div className={`flex items-center gap-1 p-2 ${className}`}>
       {/* 快捷键横向滚动区域 */}
-      <div 
+      <div
         className="flex-1 min-w-0 overflow-x-auto"
         style={{
           scrollbarWidth: 'none',
@@ -119,46 +180,30 @@ export const TerminalShortcutBar: React.FC<TerminalShortcutBarProps> = ({
             display: none;
           }
         `}</style>
-        <div className="shortcut-scroll-container flex gap-1.5 flex-nowrap">
-          {filteredShortcuts.map((shortcut) => (
-            <button
-              key={shortcut.id}
-              onClick={() => onShortcutClick(shortcut)}
-              className={`
-                flex items-center gap-1 px-2.5 py-1.5 rounded-lg
-                text-xs font-medium border
-                transition-colors whitespace-nowrap flex-shrink-0
-                touch-manipulation
-                ${getShortcutStyle(shortcut.type)}
-              `}
-              title={`${shortcut.type}: ${shortcut.value}`}
-            >
-              {shortcut.icon}
-              <span>{shortcut.label}</span>
-            </button>
-          ))}
+        <div className="shortcut-scroll-container flex gap-1 flex-nowrap items-center">
+          {renderShortcuts()}
         </div>
       </div>
 
-      {/* 模式切换按钮 - 固定右侧 */}
+      {/* 分隔线 */}
+      <div className="w-px h-6 bg-white/20 flex-shrink-0" />
+
+      {/* 模式切换按钮 - 固定在右侧 */}
       <button
-        onClick={cycleMode}
+        type="button"
+        onPointerDown={handleModeSwitch}
+        onTouchEnd={(e) => e.preventDefault()}
         className="
-          flex-shrink-0 w-9 h-9 rounded-lg
-          flex items-center justify-center
-          bg-white/10 border border-white/20
-          text-white/80 hover:text-white hover:bg-white/15
-          active:bg-white/20
-          transition-colors touch-manipulation
+          flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg
+          text-xs font-medium border flex-shrink-0
+          bg-blue-500/20 text-blue-300 border-blue-500/30
+          hover:bg-blue-500/30 active:bg-blue-500/40
+          touch-manipulation min-w-[40px]
         "
-        title={getModeTooltip(currentMode)}
+        title={`当前模式: ${modeConfig[currentMode].label}，点击切换`}
       >
-        <div className="relative">
-          <Layers className="w-4 h-4" />
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-blue-500 text-[9px] font-bold flex items-center justify-center">
-            {getModeIcon(currentMode)}
-          </span>
-        </div>
+        <Layers size={12} />
+        <span>{modeConfig[currentMode].icon}</span>
       </button>
     </div>
   );

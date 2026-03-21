@@ -34,7 +34,8 @@
 - `Microverse集成指南.md` - Microverse 游戏化前端集成和使用指南
 
 ### 🔧 technical/
-技术文档和修复记录（49 个文件）
+技术文档和修复记录（50 个文件）
+- `20260321-01-Microverse-AgentRuntime-API.md` - Microverse 与 AgentRuntime API 契约 ⭐ NEW
 - `20260319-20-Controller功能验证报告.md` - Controller 功能验证报告 ⭐ NEW
 - `20260319-19-Controller路由问题修复.md` - Controller 路由问题修复 ⭐ NEW
 - `20260319-18-Controller项目交付清单.md` - Controller 项目交付清单 ⭐ NEW
@@ -143,7 +144,7 @@
 - **日志文件**: 14 个文件
 - **发布包**: 1 个文件
 - **发布说明**: 1 个文件
-- **技术文档**: 42 个文件
+- **技术文档**: 43 个文件
 - **指南文档**: 12 个文件
 - **故障排查**: 3 个文件
 - **计划文档**: 1 个文件

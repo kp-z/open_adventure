@@ -5,12 +5,15 @@ Agent Model - 统一的 AI Agent 数据模型
 作为缓存层用于快速查询和前端展示
 """
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import String, Boolean, Integer, JSON, DateTime, Text, Enum as SQLEnum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.project import Project
 
 
 class AgentFramework(str, enum.Enum):
@@ -134,6 +137,13 @@ class Agent(Base):
     # 向后兼容字段（已弃用）
     capability_ids: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     source: Mapped[str] = mapped_column(String(100), nullable=False, default="user")
+
+    # 关联的 Projects（一个 Agent 可以关联多个 Project）
+    projects: Mapped[List["Project"]] = relationship(
+        "Project",
+        back_populates="agent",
+        foreign_keys="Project.agent_id"
+    )
 
     def __repr__(self) -> str:
         return f"<Agent(id={self.id}, name='{self.name}', framework='{self.framework}', type='{self.agent_type}')>"

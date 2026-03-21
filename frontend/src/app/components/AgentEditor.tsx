@@ -54,7 +54,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { GlassCard } from './ui-shared';
 import { PromptOptimizeButton } from './PromptOptimizeButton';
-import { agentsApi, skillsApi, pluginsApi, projectPathsApi } from '@/lib/api';
+import { agentsApi, skillsApi, pluginsApi, projectPathsApi, projectsApi } from '@/lib/api';
 import type { Agent, AgentUpdate, AgentPermissionMode, AgentModel, AgentScope, Skill, Plugin, ProjectPath } from '@/lib/api';
 
 // 从路径中提取项目名称
@@ -159,20 +159,32 @@ const MEMORY_OPTIONS = [
 interface AgentEditorProps {
   agent: Agent | null;
   onSave: () => void;
+  initialProjectId?: number;      // 从 Project 页面创建时传入
+  initialProjectName?: string;    // 从 Project 页面创建时传入
 }
 
 export const AgentEditor: React.FC<AgentEditorProps> = ({
   agent,
-  onSave
+  onSave,
+  initialProjectId,
+  initialProjectName
 }) => {
   const isCreateMode = agent === null;
+  const isWorkspaceAgentMode = !!initialProjectId;  // 是否是 Workspace Agent 创建模式
 
   // 编辑模式：visual（可视化）或 source（源码）
   const [editMode, setEditMode] = useState<'visual' | 'source'>('visual');
 
   // === 必填字段 ===
-  const [name, setName] = useState(agent?.name || '');
-  const [description, setDescription] = useState(agent?.description || '');
+  // Workspace Agent 模式下预填名称
+  const defaultName = isWorkspaceAgentMode && initialProjectName 
+    ? `${initialProjectName.toLowerCase().replace(/\s+/g, '-')}-workspace` 
+    : '';
+  const defaultDesc = isWorkspaceAgentMode && initialProjectName
+    ? `${initialProjectName} 项目的 Workspace Agent，负责项目配置扫描和工作区管理`
+    : '';
+  const [name, setName] = useState(agent?.name || defaultName);
+  const [description, setDescription] = useState(agent?.description || defaultDesc);
 
   // === 常用字段 ===
   const [systemPrompt, setSystemPrompt] = useState(agent?.system_prompt || '');
@@ -180,7 +192,9 @@ export const AgentEditor: React.FC<AgentEditorProps> = ({
   const [tools, setTools] = useState<string[]>(agent?.tools || []);
   const [skills, setSkills] = useState<string[]>(agent?.skills || []);
   const [excludedSkills, setExcludedSkills] = useState<string[]>(agent?.meta?.exclude_skills || []);
-  const [scope, setScope] = useState<AgentScope>(agent?.scope as AgentScope || 'user');
+  // Workspace Agent 模式下默认 scope 为 project
+  const defaultScope: AgentScope = isWorkspaceAgentMode ? 'project' : (agent?.scope as AgentScope || 'user');
+  const [scope, setScope] = useState<AgentScope>(defaultScope);
 
   // === Scope 相关状态 ===
   const [selectedPlugin, setSelectedPlugin] = useState<string>(agent?.meta?.plugin_name || '');
@@ -558,7 +572,7 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
       }
 
       if (isCreateMode) {
-        await agentsApi.create({
+        const createdAgent = await agentsApi.create({
           name: (editMode === 'source' ? extractNameFromSource() : name).trim(),
           description: (editMode === 'source' ? extractDescFromSource() : description).trim(),
           system_prompt: (editMode === 'source' ? extractBodyFromSource() : systemPrompt).trim() || undefined,
@@ -575,6 +589,18 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
           mcp_servers: mcpServers.length > 0 ? mcpServers : undefined,
           meta,
         });
+        
+        // Workspace Agent 模式：创建成功后绑定到 Project
+        if (isWorkspaceAgentMode && initialProjectId && createdAgent.id) {
+          try {
+            await projectsApi.bindAgent(initialProjectId, createdAgent.id);
+            console.log(`[AgentEditor] Agent ${createdAgent.id} 已绑定到 Project ${initialProjectId}`);
+          } catch (bindErr) {
+            console.error('Failed to bind agent to project:', bindErr);
+            // 绑定失败不阻断流程，但显示警告
+            setError(`Agent 创建成功，但绑定到项目失败: ${bindErr instanceof Error ? bindErr.message : '未知错误'}`);
+          }
+        }
       } else {
         if (editMode === 'source') {
           await agentsApi.updateContent(agent!.id, {
@@ -756,6 +782,49 @@ ${systemPrompt || 'You are a specialized agent. Write your system prompt here.'}
             <button onClick={() => setError(null)} className="ml-auto text-gray-400 hover:text-white">×</button>
           </div>
         </div>
+      )}
+
+      {/* Workspace Agent 模式说明 */}
+      {isWorkspaceAgentMode && initialProjectName && (
+        <GlassCard className="p-6 border-2 border-green-500/30 mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center">
+              <FolderOpen className="text-green-400" size={20} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-green-400">创建 Workspace Agent</h3>
+              <p className="text-xs text-gray-400">
+                为 "{initialProjectName}" 项目创建专属 Workspace Agent
+              </p>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/20 mb-4">
+            <h4 className="font-bold text-sm mb-2 text-green-300">Workspace Agent 职责</h4>
+            <ul className="text-sm text-gray-300 space-y-1">
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <span>首次使用 Workspace 时自动扫描项目结构</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <span>识别前端入口目录（web/、frontend/ 等）</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <span>检测框架类型和启动命令</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-green-400 mt-1">•</span>
+                <span>配置写入 .claude/config.json</span>
+              </li>
+            </ul>
+          </div>
+          
+          <p className="text-xs text-gray-500">
+            创建后，Agent 将自动绑定到项目。您可以在下方自定义 Agent 的配置。
+          </p>
+        </GlassCard>
       )}
 
       {/* AI 助手区域 - 两种模式都显示 */}

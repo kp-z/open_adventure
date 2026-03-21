@@ -36,13 +36,17 @@ function preloadMicroverse() {
 
   console.log('[Preload] 开始预加载 Microverse...');
 
-  // 创建隐藏的 iframe
+  // 创建离屏 iframe：避免 0×0 尺寸导致 WebGL 帧缓冲无效（仍保持对用户不可见）
   const iframe = document.createElement('iframe');
   iframe.src = '/microverse/index.html';
-  iframe.style.display = 'none';
-  iframe.style.position = 'absolute';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
+  iframe.style.position = 'fixed';
+  iframe.style.left = '-9999px';
+  iframe.style.top = '0';
+  iframe.style.width = '1px';
+  iframe.style.height = '1px';
+  iframe.style.opacity = '0';
+  iframe.style.pointerEvents = 'none';
+  iframe.setAttribute('aria-hidden', 'true');
 
   // 监听游戏加载完成消息
   const handleMessage = (event: MessageEvent) => {

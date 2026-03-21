@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 
-import { Terminal as TerminalIcon, X, Plus, RefreshCw, FolderOpen, Send, ChevronDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Terminal as TerminalIcon, X, Plus, RefreshCw, FolderOpen, Send, ChevronDown, Maximize2, Minimize2, Loader2 } from 'lucide-react';
 import { ActionButton } from '../components/ui-shared';
 import { useTerminalContext, TerminalInstance } from '../contexts/TerminalContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -23,10 +23,17 @@ interface ClaudeConversationOption {
   source_file?: string;
 }
 
+interface TmuxSessionOption {
+  sessionName: string;
+  projectPath?: string;
+}
+
 const TerminalPane: React.FC<{
   terminal: TerminalInstance;
   onActivate?: () => boolean | void;
-}> = ({ terminal, onActivate }) => {
+  isInputMode?: boolean;
+  onToggleInputMode?: () => void;
+}> = ({ terminal, onActivate, isInputMode, onToggleInputMode }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef<boolean>(false);
   const restoreReadySentRef = useRef<boolean>(false);
@@ -234,11 +241,13 @@ const TerminalPane: React.FC<{
         className="z-10"
       />
 
-      {/* 移动端滚动按钮 */}
+      {/* 移动端滚动按钮 + 键盘控制按钮 */}
       <MobileScrollButtons
         terminal={terminal.term}
         containerRef={terminalRef}
         className="z-20"
+        isInputMode={isInputMode}
+        onToggleInputMode={onToggleInputMode}
       />
     </div>
   );
@@ -264,6 +273,7 @@ const Terminal = () => {
     detachTerminal,
     getTmuxSettings,
     killTmuxSession,
+    restoreTmuxSession,
     showRestoreDialog,
     detachedSessions,
     handleRestoreSessions,
@@ -275,6 +285,7 @@ const Terminal = () => {
   const [showConversationSelector, setShowConversationSelector] = useState(false);
   const [syncingConversations, setSyncingConversations] = useState(false);
   const [conversationOptions, setConversationOptions] = useState<ClaudeConversationOption[]>([]);
+  const [tmuxSessions, setTmuxSessions] = useState<TmuxSessionOption[]>([]);
   const [projectPaths, setProjectPaths] = useState<Array<{ id: number; path: string; alias: string }>>([]);
   const [isCreatingTerminal, setIsCreatingTerminal] = useState(false);
   const [hasShownInitialSelector, setHasShownInitialSelector] = useState(false);
@@ -286,6 +297,7 @@ const Terminal = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [isFullscreenInput, setIsFullscreenInput] = useState(false);
   const [debugExpanded, setDebugExpanded] = useState(false);
+  const [isInputModeManual, setIsInputModeManual] = useState(false); // 手动控制的输入模式（通过键盘按钮切换）
 
   // 历史命令管理
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
@@ -297,6 +309,10 @@ const Terminal = () => {
   const viewportRafRef = useRef<number | null>(null);
   const viewportBaselineRef = useRef<number>(0);
   const keyboardLockTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 双击检测：记录每个快捷键的最后点击时间
+  const DOUBLE_CLICK_THRESHOLD = 300; // ms
+  const lastClickTimeRef = useRef<Record<string, number>>({});
   const showDebugInfo = import.meta.env.DEV && typeof window !== 'undefined' && window.localStorage.getItem('terminal_debug') === '1';
   const preserveInputFocusOnPress = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
@@ -502,14 +518,84 @@ const Terminal = () => {
     }
   }, [createTerminal, isRestoring, notifyRestoreInProgress, addNotification, isCreatingTerminal]);
 
+  // 获取 tmux 会话列表
+  const fetchTmuxSessions = useCallback(async (): Promise<TmuxSessionOption[]> => {
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/tmux/sessions`);
+      if (!response.ok) {
+        console.error('[Terminal] Failed to fetch tmux sessions:', response.status);
+        return [];
+      }
+      const data = await response.json();
+      if (data.success && Array.isArray(data.sessions)) {
+        // 将会话名称转换为 TmuxSessionOption 格式
+        return data.sessions.map((sessionName: string) => ({
+          sessionName,
+          projectPath: undefined, // 后端 API 目前不返回 projectPath，可以后续扩展
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('[Terminal] Error fetching tmux sessions:', error);
+      return [];
+    }
+  }, []);
+
   const handleSyncConversations = useCallback(async () => {
     setIsMobileInputFocused(false);
     setSyncingConversations(true);
-    const items = await syncClaudeConversations();
-    setConversationOptions(items);
+    
+    // 并行获取 tmux 会话和 Claude 对话
+    const [tmuxItems, claudeItems] = await Promise.all([
+      fetchTmuxSessions(),
+      syncClaudeConversations(),
+    ]);
+    
+    setTmuxSessions(tmuxItems);
+    setConversationOptions(claudeItems);
     setShowConversationSelector(true);
     setSyncingConversations(false);
-  }, [syncClaudeConversations]);
+  }, [fetchTmuxSessions, syncClaudeConversations]);
+
+  // 附加到 tmux 会话
+  const handleAttachTmuxSession = useCallback(async (sessionName: string) => {
+    setIsMobileInputFocused(false);
+    await restoreTmuxSession(sessionName);
+    setShowConversationSelector(false);
+    addNotification({
+      type: 'success',
+      title: 'tmux 会话已恢复',
+      message: `已附加到 tmux 会话: ${sessionName}`,
+    });
+  }, [restoreTmuxSession, addNotification]);
+
+  // 终止 tmux 会话
+  const handleKillTmuxSession = useCallback(async (sessionName: string, event: React.MouseEvent) => {
+    // 阻止事件冒泡，防止触发 attach 操作
+    event.stopPropagation();
+    
+    const confirmed = window.confirm(`确定要终止 tmux 会话 "${sessionName}" 吗？`);
+    if (!confirmed) {
+      return;
+    }
+    
+    const success = await killTmuxSession(sessionName);
+    if (success) {
+      // 从列表中移除已终止的会话
+      setTmuxSessions(prev => prev.filter(s => s.sessionName !== sessionName));
+      addNotification({
+        type: 'success',
+        title: 'tmux 会话已终止',
+        message: `已终止 tmux 会话: ${sessionName}`,
+      });
+    } else {
+      addNotification({
+        type: 'error',
+        title: 'tmux 会话终止失败',
+        message: `无法终止 tmux 会话: ${sessionName}`,
+      });
+    }
+  }, [killTmuxSession, addNotification]);
 
   const handleRestoreConversation = useCallback(async (sessionId: string) => {
     setIsMobileInputFocused(false);
@@ -563,6 +649,12 @@ const Terminal = () => {
       return;
     }
 
+    // 如果 tmux 恢复弹窗已显示，不自动弹出项目选择器
+    if (showRestoreDialog) {
+      console.log('[Terminal] Skipping project selector - restore dialog is open');
+      return;
+    }
+
     if (terminals.length > 0) {
       // 有终端时，标记已经完成初始化
       setHasShownInitialSelector(true);
@@ -573,7 +665,7 @@ const Terminal = () => {
     console.log('[Terminal] No terminals found on initial load, showing project selector');
     setShowProjectSelector(true);
     setHasShownInitialSelector(true);
-  }, [restoreSettled, isRestoring, terminals.length, hasShownInitialSelector]);
+  }, [restoreSettled, isRestoring, terminals.length, hasShownInitialSelector, showRestoreDialog]);
 
   // 监听虚拟键盘事件
   useEffect(() => {
@@ -742,8 +834,29 @@ const Terminal = () => {
   const MOBILE_DOCK_HEIGHT = 64;
   const MOBILE_DOCK_BOTTOM_GAP = 16;
   const SAFE_AREA_BOTTOM = 20; // 底部安全区域高度（适配 iOS 刘海屏和 Android 手势导航）
-  const isMobileInputMode = isMobile && (isKeyboardVisible || isMobileInputFocused);
+  // 移动端输入模式：手动控制（键盘按钮）或自动检测（键盘可见/输入框聚焦）
+  const isMobileInputMode = isMobile && (isInputModeManual || isKeyboardVisible || isMobileInputFocused);
   const mobileToolbarOffset = isMobileInputMode ? QUICK_TOOLBAR_HEIGHT + 12 : 0;
+
+  // 切换输入模式（键盘控制按钮）
+  const handleToggleInputMode = useCallback(() => {
+    if (isInputModeManual) {
+      // 收起输入模式
+      setIsInputModeManual(false);
+      inputRef.current?.blur();
+    } else {
+      // 展开输入模式
+      setIsInputModeManual(true);
+      // 聚焦输入框，自动弹出键盘
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      // 自动滚动终端到底部
+      if (activeTerminal) {
+        activeTerminal.term.scrollToBottom();
+      }
+    }
+  }, [isInputModeManual, activeTerminal]);
   const keyboardOffset = isMobile && isKeyboardVisible ? Math.max(0, keyboardHeight) : 0;
   const mobileDockOffset = isMobile ? MOBILE_DOCK_HEIGHT + MOBILE_DOCK_BOTTOM_GAP + SAFE_AREA_BOTTOM : 0;
   // 内容区域需要为底部 dock、键盘和工具栏预留空间
@@ -908,49 +1021,28 @@ const Terminal = () => {
     triggerHaptic();
   }, [historyIndex, commandHistory, inputValue, currentDraft]);
 
-  // 处理快捷键点击
+  // 处理快捷键点击 - 统一直接发送模式
   const handleShortcutClick = useCallback((shortcut: Shortcut) => {
+    const terminal = terminals.find(t => t.id === activeTabId);
+    if (!terminal) return;
+
     triggerHaptic();
 
-    switch (shortcut.type) {
-      case 'history':
-        // 历史命令导航
-        navigateHistory(shortcut.value as 'up' | 'down');
-        break;
+    // 双击检测
+    const now = Date.now();
+    const lastTime = lastClickTimeRef.current[shortcut.id] || 0;
+    const isDoubleClick = now - lastTime < DOUBLE_CLICK_THRESHOLD;
 
-      case 'insert':
-        // 插入类：插入到光标处
-        insertTextIntoInput(shortcut.value);
-        break;
+    lastClickTimeRef.current[shortcut.id] = now;
 
-      case 'control':
-        // 控制类：发送控制事件
-        if (shortcut.value === 'tab') {
-          sendKeyToTerminal('Tab');
-        } else if (shortcut.value === 'ctrl-c') {
-          sendKeyToTerminal('Ctrl+C');
-        } else if (shortcut.value === 'ctrl-d') {
-          const terminal = terminals.find(t => t.id === activeTabId);
-          if (terminal) {
-            sendInput(terminal.id, '\x04'); // Ctrl+D
-          }
-        } else if (shortcut.value === 'esc') {
-          const terminal = terminals.find(t => t.id === activeTabId);
-          if (terminal) {
-            sendInput(terminal.id, '\x1b'); // Esc
-          }
-        }
-        break;
+    // 确定要发送的值：双击时使用 doubleClickValue（如果有）
+    const valueToSend = isDoubleClick && shortcut.doubleClickValue
+      ? shortcut.doubleClickValue
+      : shortcut.value;
 
-      case 'command':
-        // 命令类：写入输入框并执行
-        setInputValue(shortcut.value);
-        setTimeout(() => {
-          handleSendInput();
-        }, 100);
-        break;
-    }
-  }, [navigateHistory, insertTextIntoInput, sendKeyToTerminal, terminals, activeTabId, sendInput, handleSendInput]);
+    // 统一直接发送到终端
+    sendInput(terminal.id, valueToSend);
+  }, [terminals, activeTabId, sendInput]);
 
   // 处理 Copy 按钮
   const handleCopy = async () => {
@@ -1130,42 +1222,98 @@ const Terminal = () => {
                 <div className={`
                   ${isMobile
                     ? 'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-md'
-                    : 'absolute top-full right-0 mt-2 w-80'
+                    : 'absolute top-full right-0 mt-2 w-96'
                   }
                   bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl z-50 overflow-hidden
                 `}>
-                  <div className="p-3 border-b border-white/10">
-                    <p className="text-sm font-medium text-white">选择 Claude 会话恢复</p>
+                  {/* 标题栏 */}
+                  <div className="p-3 border-b border-white/10 flex items-center justify-between">
+                    <p className="text-sm font-medium text-white">会话恢复</p>
+                    <button
+                      onClick={() => setShowConversationSelector(false)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                  <div className={`${isMobile ? 'max-h-[60vh]' : 'max-h-80'} overflow-y-auto`}>
-                    {conversationOptions.length > 0 ? (
-                      conversationOptions.map((item) => (
-                        <button
-                          key={item.session_id}
-                          onClick={() => handleRestoreConversation(item.session_id)}
-                          className="w-full text-left px-4 py-3 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5 last:border-b-0"
-                        >
-                          <p className="text-sm font-medium text-white truncate">{item.title || item.session_id}</p>
-                          <p className="text-xs text-gray-400 truncate mt-1 font-mono">{item.session_id}</p>
-                          <div className="flex items-center gap-2 mt-1.5 text-[10px] text-gray-500">
-                            <span className="truncate">{item.project_hint || 'unknown project'}</span>
-                            {item.last_updated && (
-                              <>
-                                <span>·</span>
-                                <span className="shrink-0">{new Date(item.last_updated).toLocaleString('zh-CN', {
-                                  month: 'numeric',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}</span>
-                              </>
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-6 text-center text-sm text-gray-500">未发现可恢复会话</div>
-                    )}
+                  
+                  <div className={`${isMobile ? 'max-h-[60vh]' : 'max-h-96'} overflow-y-auto`}>
+                    {/* tmux 会话区域 */}
+                    <div className="border-b border-white/10">
+                      <div className="px-3 py-2 bg-blue-500/10 border-b border-blue-500/20">
+                        <p className="text-xs font-medium text-blue-400 flex items-center gap-2">
+                          <TerminalIcon size={12} />
+                          tmux 会话 (Attach)
+                        </p>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {tmuxSessions.length > 0 ? (
+                          tmuxSessions.map((session) => (
+                            <div
+                              key={session.sessionName}
+                              onClick={() => handleAttachTmuxSession(session.sessionName)}
+                              className="w-full text-left px-3 py-2 hover:bg-blue-500/10 active:bg-blue-500/20 transition-colors border-b border-white/5 last:border-b-0 cursor-pointer flex items-center justify-between group"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-mono text-white truncate">{session.sessionName}</p>
+                                {session.projectPath && (
+                                  <p className="text-[10px] text-gray-500 truncate mt-0.5">{session.projectPath}</p>
+                                )}
+                              </div>
+                              <button
+                                onClick={(e) => handleKillTmuxSession(session.sessionName, e)}
+                                className="ml-2 p-1.5 rounded bg-red-500/10 hover:bg-red-500/30 text-red-400 hover:text-red-300 transition-colors opacity-0 group-hover:opacity-100"
+                                title="终止此 tmux 会话"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center text-xs text-gray-500">无可用的 tmux 会话</div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Claude 对话区域 */}
+                    <div>
+                      <div className="px-3 py-2 bg-green-500/10 border-b border-green-500/20">
+                        <p className="text-xs font-medium text-green-400 flex items-center gap-2">
+                          <RefreshCw size={12} />
+                          Claude 对话 (Resume)
+                        </p>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto">
+                        {conversationOptions.length > 0 ? (
+                          conversationOptions.map((item) => (
+                            <button
+                              key={item.session_id}
+                              onClick={() => handleRestoreConversation(item.session_id)}
+                              className="w-full text-left px-3 py-2 hover:bg-green-500/10 active:bg-green-500/20 transition-colors border-b border-white/5 last:border-b-0"
+                            >
+                              <p className="text-sm font-medium text-white truncate">{item.title || item.session_id}</p>
+                              <p className="text-xs text-gray-400 truncate mt-0.5 font-mono">{item.session_id}</p>
+                              <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
+                                <span className="truncate">{item.project_hint || 'unknown project'}</span>
+                                {item.last_updated && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="shrink-0">{new Date(item.last_updated).toLocaleString('zh-CN', {
+                                      month: 'numeric',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}</span>
+                                  </>
+                                )}
+                              </div>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-4 text-center text-xs text-gray-500">无可用的 Claude 对话</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>
@@ -1207,8 +1355,8 @@ const Terminal = () => {
           transition: 'padding-bottom 0.3s ease-out'
         } : undefined}
       >
-        {/* Tabs - 移动端在上方，桌面端在右侧 */}
-        {terminals.length > 1 && (
+        {/* Tabs - 移动端在上方，桌面端在右侧，始终显示（即使只有一个 terminal） */}
+        {terminals.length >= 1 && (
           <div className={`
             ${isMobile
               ? 'flex shrink-0 flex-row gap-2 overflow-x-auto'
@@ -1216,10 +1364,29 @@ const Terminal = () => {
             }
           `}>
             {terminals.map(terminal => {
+              // 判断连接状态
+              const isConnecting = !terminal.tmuxSessionName && 
+                ['init', 'ws_connecting'].includes(terminal.lifecycle);
+              const isCreatingSession = !terminal.tmuxSessionName && 
+                terminal.lifecycle === 'opened';
+              const isReconnecting = terminal.reconnecting;
+              const isLoading = isConnecting || isCreatingSession || isReconnecting;
+
+              // 获取状态文本
+              const getStatusText = () => {
+                if (isReconnecting) return '重连中...';
+                if (isConnecting) return '连接中...';
+                if (isCreatingSession) return '创建会话...';
+                return terminal.tmuxSessionName || terminal.title || '终端';
+              };
+
               // 构建 tooltip 内容
               const tooltipLines = [];
               if (terminal.projectName) {
                 tooltipLines.push(`项目: ${terminal.projectName}`);
+              }
+              if (terminal.tmuxSessionName) {
+                tooltipLines.push(`tmux: ${terminal.tmuxSessionName}`);
               }
               if (terminal.claudeCodeId) {
                 tooltipLines.push(`Claude Code ID: ${terminal.claudeCodeId}`);
@@ -1227,7 +1394,8 @@ const Terminal = () => {
               if (terminal.sessionId) {
                 tooltipLines.push(`Session ID: ${terminal.sessionId}`);
               }
-              const tooltipText = tooltipLines.length > 0 ? tooltipLines.join('\n') : terminal.title;
+              tooltipLines.push(`状态: ${terminal.lifecycle}`);
+              const tooltipText = tooltipLines.join('\n');
 
               return (
                 <button
@@ -1236,16 +1404,19 @@ const Terminal = () => {
                   onClick={() => handleActivateTerminal(terminal.id)}
                   title={tooltipText}
                   className={`
-                    flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-mono transition-colors
+                    flex items-center justify-between gap-2 px-3 py-2 rounded-md text-sm font-mono transition-all duration-300
                     ${isMobile ? 'whitespace-nowrap' : ''}
+                    ${isLoading ? 'opacity-80' : ''}
                     ${activeTabId === terminal.id
                       ? 'bg-green-500/20 text-green-400 border border-green-500/30'
                       : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                     }
                   `}
                 >
-                  <span className="truncate text-xs sm:text-sm flex items-center gap-1">
-                    {terminal.useTmux && terminal.tmuxSessionName && (
+                  <span className="truncate text-xs sm:text-sm flex items-center gap-1.5">
+                    {isLoading ? (
+                      <Loader2 size={12} className="animate-spin shrink-0 text-blue-400" />
+                    ) : terminal.useTmux && terminal.tmuxSessionName ? (
                       <span
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1256,8 +1427,10 @@ const Terminal = () => {
                       >
                         <RefreshCw size={10} />
                       </span>
-                    )}
-                    {terminal.title}
+                    ) : null}
+                    <span className={isLoading ? 'text-blue-400' : ''}>
+                      {getStatusText()}
+                    </span>
                   </span>
                   <span
                     onClick={(e) => {
@@ -1283,6 +1456,8 @@ const Terminal = () => {
                 key={activeTerminal.id}
                 terminal={activeTerminal}
                 onActivate={() => handleActivateTerminal(activeTerminal.id)}
+                isInputMode={isInputModeManual}
+                onToggleInputMode={handleToggleInputMode}
               />
 
             </div>
@@ -1352,7 +1527,11 @@ const Terminal = () => {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleInputKeyDown}
                     onFocus={() => setIsMobileInputFocused(true)}
-                    onBlur={() => setIsMobileInputFocused(false)}
+                    onBlur={() => {
+                      setIsMobileInputFocused(false);
+                      // 当键盘收起时，也重置手动输入模式
+                      setIsInputModeManual(false);
+                    }}
                     rows={1}
                     className="w-full pl-3 pr-24 py-2.5 bg-white/8 border border-white/16 rounded-xl text-white placeholder-gray-400 transition-colors focus:outline-none focus:border-blue-400/70 focus:bg-white/10 resize-none overflow-hidden"
                     placeholder="输入 prompt..."

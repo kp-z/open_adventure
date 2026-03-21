@@ -211,32 +211,10 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       return tmuxSessionName;
     }
 
-    // 降级：使用原有逻辑
-    let projectName = '';
-    if (projectPath) {
-      const pathParts = projectPath.split('/').filter((p) => p);
-      projectName = pathParts[pathParts.length - 1] || '';
-      console.log('[TerminalContext] Extracted project name:', projectName, 'from path:', projectPath);
-    }
-
-    if (!projectName) {
-      projectName = `Terminal ${terminalCounterRef.current++}`;
-      console.log('[TerminalContext] Using default terminal name:', projectName);
-    }
-
-    // 添加序号前缀
-    let titleWithIndex = projectName;
-    if (terminalIndex !== undefined && terminalIndex >= 0) {
-      titleWithIndex = `${terminalIndex + 1}. ${projectName}`;
-    }
-
-    // 如果有 Claude Code ID，使用 "序号. project_name(claude_code_id)" 格式
-    if (claudeCodeId) {
-      const shortId = claudeCodeId.slice(0, 8);
-      return `${titleWithIndex}(${shortId})`;
-    }
-
-    return titleWithIndex;
+    // 没有 tmux session name 时，返回空字符串
+    // UI 层会根据空字符串和 lifecycle 状态显示 loading 状态
+    console.log('[TerminalContext] No tmux session name yet, returning empty string for loading state');
+    return '';
   };
 
   const collectSavedSessions = () => {
@@ -559,7 +537,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       heartbeatInterval: undefined,
       lastHeartbeat: Date.now(),
       useTmux: useTmux ?? true,
-      tmuxSessionName: undefined,
+      tmuxSessionName,
       tmuxAlive: false,
     };
 
@@ -743,8 +721,12 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
                   createdAt: Date.now()
                 }));
                 console.log(`[TerminalContext] tmux session created: ${tmuxInfo.session_name}, title updated`);
-                // 触发 terminals 状态更新
-                setTerminals((prev) => [...prev]);
+                // 使用 map 创建新对象引用，确保 React 检测到变化并重新渲染
+                setTerminals((prev) => prev.map(t => 
+                  t.id === id 
+                    ? { ...t, title: tmuxInfo.session_name, tmuxSessionName: tmuxInfo.session_name, tmuxAlive: true }
+                    : t
+                ));
               }
             }
           } catch (error) {
@@ -1364,7 +1346,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       const settings = getTmuxSettings();
 
       // 找出所有 detached 状态的会话
-      const detached = Object.entries(tmuxSessions)
+      const detachedFromStorage = Object.entries(tmuxSessions)
         .filter(([_, info]) => info.state === 'detached')
         .map(([sessionName, info]) => ({
           sessionName,
@@ -1372,20 +1354,51 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
           lastDetachTime: info.lastDetachTime
         }));
 
-      console.log('[TerminalContext] Found detached tmux sessions:', detached);
+      console.log('[TerminalContext] Found detached tmux sessions in localStorage:', detachedFromStorage);
 
-      // 如果有 detached 会话
-      if (detached.length > 0) {
+      // 🔧 关键修复：验证这些 detached 会话是否真的还在 tmux 中运行
+      let validDetached: typeof detachedFromStorage = [];
+      if (detachedFromStorage.length > 0) {
+        try {
+          const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/tmux/sessions`);
+          if (response.ok) {
+            const data = await response.json();
+            const runningTmuxSessions = new Set<string>(data.sessions || []);
+            console.log('[TerminalContext] Running tmux sessions from backend:', Array.from(runningTmuxSessions));
+
+            // 过滤出真正还在运行的会话
+            validDetached = detachedFromStorage.filter(session => {
+              const isRunning = runningTmuxSessions.has(session.sessionName);
+              if (!isRunning) {
+                // 会话已不存在，从 localStorage 中清理
+                console.log(`[TerminalContext] Removing stale tmux session from localStorage: ${session.sessionName}`);
+                removeTmuxSessionState(session.sessionName);
+              }
+              return isRunning;
+            });
+            console.log('[TerminalContext] Validated detached sessions:', validDetached);
+          } else {
+            console.warn('[TerminalContext] Failed to fetch tmux sessions, using localStorage data');
+            validDetached = detachedFromStorage;
+          }
+        } catch (error) {
+          console.error('[TerminalContext] Error validating tmux sessions:', error);
+          validDetached = detachedFromStorage;
+        }
+      }
+
+      // 如果有有效的 detached 会话
+      if (validDetached.length > 0) {
         if (settings.autoRestoreOnRefresh) {
           // 自动恢复所有 detached 会话
           console.log('[TerminalContext] Auto-restoring detached sessions');
-          detached.forEach(session => {
+          validDetached.forEach(session => {
             restoreTmuxSession(session.sessionName);
           });
         } else {
           // 显示恢复对话框
           console.log('[TerminalContext] Showing restore dialog');
-          setDetachedSessions(detached);
+          setDetachedSessions(validDetached);
           setShowRestoreDialog(true);
         }
       }
@@ -1411,18 +1424,42 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         return;
       }
 
-      let pendingConnections = backendSessions.length;
+      // 🔧 关键修复：按 tmuxSessionName 去重，避免同一个 tmux session 创建多个 tab
+      const seenTmuxSessions = new Set<string>();
+      const deduplicatedSessions = backendSessions.filter(session => {
+        // 如果没有 tmuxSessionName，直接保留（非 tmux session）
+        if (!session.tmuxSessionName) {
+          return true;
+        }
+        // 如果已经见过这个 tmuxSessionName，跳过
+        if (seenTmuxSessions.has(session.tmuxSessionName)) {
+          console.log(`[TerminalContext] Skipping duplicate tmux session: ${session.tmuxSessionName} (sessionId: ${session.sessionId})`);
+          return false;
+        }
+        seenTmuxSessions.add(session.tmuxSessionName);
+        return true;
+      });
+
+      let pendingConnections = deduplicatedSessions.length;
       const markConnectionSettled = (sessionId: string, state: 'open' | 'error' | 'close') => {
         pendingConnections = Math.max(0, pendingConnections - 1);
         console.log(`[TerminalContext] Restore connection settled: session=${sessionId}, state=${state}, pending=${pendingConnections}`);
         if (pendingConnections === 0) {
           settleRestore('all-connections-settled');
           // 所有连接恢复完成后，自动检测并恢复 Claude 会话
-          autoRestoreClaudeSessions(backendSessions);
+          autoRestoreClaudeSessions(deduplicatedSessions);
         }
       };
 
-      backendSessions.forEach(({ id, sessionId, title, useTmux, tmuxSessionName }) => {
+      deduplicatedSessions.forEach(({ id, sessionId, title, useTmux, tmuxSessionName }) => {
+        // 🔧 关键修复：如果这个 session 的 tmuxSessionName 在 validDetached 中，跳过自动恢复
+        // 让用户通过对话框选择恢复
+        if (tmuxSessionName && validDetached.some(d => d.sessionName === tmuxSessionName)) {
+          console.log(`[TerminalContext] Skipping auto-restore for ${tmuxSessionName} - waiting for user selection in dialog`);
+          markConnectionSettled(sessionId, 'close'); // 标记为已处理，避免超时
+          return;
+        }
+
         try {
           // 从 localStorage 读取 tmux 信息作为 fallback
           let finalUseTmux = useTmux || false;
@@ -1562,6 +1599,14 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
     tmuxSessionName?: string  // 🔧 新增：tmux session 名称参数
   ): TerminalInstance | null => {
     console.log('[TerminalContext] createTerminal called', { projectPath, autoStartClaude, tmuxSessionName, restoreSettled, isRestoring });
+
+    // 🔧 关键修复：如果指定了 tmuxSessionName 且已存在同名的 tab，直接返回 null
+    const existingTmux = tmuxSessionName ? terminals.find(t => t.tmuxSessionName === tmuxSessionName) : null;
+    if (existingTmux) {
+      console.log(`[TerminalContext] createTerminal: tmux session ${tmuxSessionName} already exists in tab ${existingTmux.id}, skipping creation`);
+      setActiveTabId(existingTmux.id);
+      return null;
+    }
 
     if (!restoreSettled || isRestoring) {
       console.log('[TerminalContext] Skip createTerminal - restore not settled', { isRestoring, restoreSettled });
@@ -1719,6 +1764,22 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
   const restoreTmuxSession = useCallback(async (sessionName: string): Promise<void> => {
     console.log('[TerminalContext] Restoring tmux session:', sessionName);
 
+    // 🔧 关键修复：检查是否已存在同名的 tmux session tab
+    // 使用 Promise 来获取最新的 terminals 状态
+    const existingTerminal = await new Promise<TerminalInstance | undefined>((resolve) => {
+      setTerminals((prev) => {
+        const found = prev.find(t => t.tmuxSessionName === sessionName);
+        resolve(found);
+        return prev; // 不修改状态
+      });
+    });
+
+    if (existingTerminal) {
+      console.log(`[TerminalContext] tmux session ${sessionName} already exists in tab ${existingTerminal.id}, activating it`);
+      setActiveTabId(existingTerminal.id);
+      return;
+    }
+
     try {
       // 1. 检查 tmux 会话是否存在
       const response = await fetch(`${API_CONFIG.BASE_URL}/terminal/tmux/check/${sessionName}`);
@@ -1726,19 +1787,31 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         throw new Error('tmux session not found');
       }
 
-      // 2. 创建新的终端实例，连接到现有 tmux 会话
+      // 2. 获取会话信息
       const sessions = getTmuxSessionsFromStorage();
       const sessionInfo = sessions[sessionName];
+      const projectPath = sessionInfo?.projectPath;
 
-      // 🔧 关键修复：传递 tmux session 名称给 createTerminal
-      const terminal = createTerminal(
-        sessionInfo?.projectPath,
-        false,  // autoStartClaude = false，因为 Claude 已经在 tmux session 中运行
-        sessionName  // 🔧 新增：传递 tmux session 名称
-      );
-      if (!terminal) {
-        throw new Error('Failed to create terminal instance');
-      }
+      // 🔧 关键修复：直接创建终端，不通过 createTerminal（因为 createTerminal 有 restoreSettled 检查会阻止恢复）
+      const id = `terminal-restored-${sessionName.replace('oa_', '')}-${Date.now()}`;
+      // 获取当前 terminals 数量作为 index
+      const terminalIndex = await new Promise<number>((resolve) => {
+        setTerminals((prev) => {
+          resolve(prev.length);
+          return prev; // 不修改状态
+        });
+      });
+      const title = getTerminalTitle(projectPath, undefined, terminalIndex, sessionName);
+
+      console.log('[TerminalContext] Creating terminal for tmux restore', { id, title, projectPath, sessionName, terminalIndex });
+      // 🔧 修复：使用 mode: 'create' 而不是 'restore'，因为我们是创建新的 WebSocket 连接到现有 tmux session
+      const terminal = initTerminal({ id, title, projectPath, autoStartClaude: false, tmuxSessionName: sessionName, mode: 'create' });
+
+      setTerminals((prev) => {
+        console.log('[TerminalContext] Adding restored terminal to state', { currentCount: prev.length, newId: id });
+        return [...prev, terminal];
+      });
+      setActiveTabId(id);
 
       // 3. 更新会话状态为 attached
       saveTmuxSessionState(sessionName, {
@@ -1760,10 +1833,10 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         message: `无法恢复 tmux 会话 ${sessionName}，会话可能已被终止`
       });
     }
-  }, [createTerminal, addNotification]);
+  }, [initTerminal, addNotification]);
 
   const handleRestoreSessions = useCallback((sessionNames: string[]) => {
-    console.log('[TerminalContext] Restoring sessions:', sessionNames);
+    console.log('[TerminalContext] handleRestoreSessions ENTERED with:', sessionNames);
 
     // 关闭对话框
     setShowRestoreDialog(false);
@@ -1775,7 +1848,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
 
     // 清空 detachedSessions
     setDetachedSessions([]);
-  }, [restoreTmuxSession]);
+  }, [restoreTmuxSession, detachedSessions]);
 
   const handleIgnoreSessions = useCallback(async (sessionNames: string[]) => {
     console.log('[TerminalContext] Ignoring and killing sessions:', sessionNames);
