@@ -43,20 +43,9 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
   const location = useLocation();
   const navigate = useNavigate();
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
-  const [collapsedMenuOpen, setCollapsedMenuOpen] = React.useState<string | null>(null);
 
   const toggleMenu = (menuId: string) => {
-    // 如果是折叠状态，先展开侧边栏，然后展开该菜单
-    if (collapsed && onExpandSidebar) {
-      onExpandSidebar();
-      // 展开侧边栏后，自动展开该菜单
-      setTimeout(() => {
-        setExpandedMenus(prev => new Set(prev).add(menuId));
-      }, 50);
-      return;
-    }
-
-    // 正常展开/折叠菜单
+    // 统一的展开/折叠菜单逻辑（折叠和展开状态都使用内联展开）
     setExpandedMenus(prev => {
       const next = new Set(prev);
       if (next.has(menuId)) {
@@ -66,10 +55,6 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
       }
       return next;
     });
-  };
-
-  const toggleCollapsedMenu = (menuId: string) => {
-    setCollapsedMenuOpen(prev => prev === menuId ? null : menuId);
   };
 
   // 自动展开逻辑
@@ -215,7 +200,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                       animate={{ height: 'auto', opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
-                      className="overflow-hidden ml-4 mt-1 space-y-1"
+                      className="overflow-hidden ml-4 mt-1 bg-white/[0.03] rounded-xl p-1.5 flex flex-col gap-1"
                     >
                       {item.subItems?.map((subItem) => {
                         // 如果是外部链接，使用 <a> 标签在新标签页打开
@@ -226,7 +211,7 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                               href={subItem.path}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-gray-400 hover:bg-white/5 hover:text-white"
+                              className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all text-gray-400 hover:bg-white/10 hover:text-white"
                             >
                               <subItem.icon size={18} />
                               <span className="font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis flex-1">
@@ -246,8 +231,8 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                               flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all
                               ${
                                 isActive
-                                  ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                                  : "text-gray-400 hover:bg-white/5 hover:text-white"
+                                  ? "bg-blue-600/30 text-blue-400 border border-blue-500/50"
+                                  : "text-gray-400 hover:bg-white/10 hover:text-white"
                               }
                             `}
                           >
@@ -262,112 +247,97 @@ const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolea
                   )}
                 </AnimatePresence>
               </>
-            ) : (
-              // 普通菜单项或折叠状态
-              <div className="relative">
-                {hasSubItems && collapsed ? (
-                  // 折叠状态下有子菜单的项目
-                  <>
-                    <button
-                      onClick={() => toggleCollapsedMenu(item.id!)}
-                      title={item.name}
-                      className={`
-                        w-full flex items-center justify-center py-3 rounded-xl transition-all
-                        ${
-                          hasActiveChild
-                            ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                            : "text-gray-400 hover:bg-white/5 hover:text-white"
-                        }
-                      `}
-                    >
-                      <item.icon size={20} />
-                    </button>
+            ) : hasSubItems && collapsed ? (
+              // 折叠状态下有子菜单的项目 - 使用内联展开
+              <>
+                <button
+                  onClick={() => toggleMenu(item.id!)}
+                  title={item.name}
+                  className={`
+                    w-full flex items-center justify-center py-3 rounded-xl transition-all
+                    ${
+                      menuState === 'active'
+                        ? "bg-blue-600/30 text-blue-300 border border-blue-500/50"
+                        : menuState === 'partial'
+                        ? "bg-blue-600/10 text-blue-400 border border-blue-500/20"
+                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    }
+                  `}
+                >
+                  <item.icon size={20} />
+                </button>
 
-                    {/* 浮动子菜单 */}
-                    <AnimatePresence>
-                      {collapsedMenuOpen === item.id && (
-                        <motion.div
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute left-full top-0 ml-2 min-w-[200px] bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden"
-                          onMouseLeave={() => setCollapsedMenuOpen(null)}
-                        >
-                          <div className="p-2 space-y-1">
-                            <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-white/10">
-                              {item.name}
-                            </div>
-                            {item.subItems?.map((subItem) => {
-                              // 如果是外部链接，使用 <a> 标签在新标签页打开
-                              if (subItem.external) {
-                                return (
-                                  <a
-                                    key={subItem.path}
-                                    href={subItem.path}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => setCollapsedMenuOpen(null)}
-                                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all text-gray-400 hover:bg-white/5 hover:text-white"
-                                  >
-                                    <subItem.icon size={18} />
-                                    <span className="font-medium text-sm whitespace-nowrap flex-1">
-                                      {subItem.name}
-                                    </span>
-                                    <ExternalLink size={14} className="opacity-50" />
-                                  </a>
-                                );
+                {/* 内联子菜单 - 仅显示图标 */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden mt-1 bg-white/[0.03] rounded-xl p-1.5 flex flex-col gap-1"
+                    >
+                      {item.subItems?.map((subItem) => {
+                        // 如果是外部链接，使用 <a> 标签在新标签页打开
+                        if (subItem.external) {
+                          return (
+                            <a
+                              key={subItem.path}
+                              href={subItem.path}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={subItem.name}
+                              className="flex items-center justify-center py-2.5 rounded-xl transition-all text-gray-400 hover:bg-white/10 hover:text-white"
+                            >
+                              <subItem.icon size={18} />
+                            </a>
+                          );
+                        }
+                        // 普通内部链接
+                        return (
+                          <NavLink
+                            key={subItem.path}
+                            to={subItem.path}
+                            title={subItem.name}
+                            end={subItem.path === '/workflows'}
+                            className={({ isActive }) => `
+                              flex items-center justify-center py-2.5 rounded-xl transition-all
+                              ${
+                                isActive
+                                  ? "bg-blue-600/30 text-blue-400 border border-blue-500/50"
+                                  : "text-gray-400 hover:bg-white/10 hover:text-white"
                               }
-                              // 普通内部链接
-                              return (
-                                <NavLink
-                                  key={subItem.path}
-                                  to={subItem.path}
-                                  onClick={() => setCollapsedMenuOpen(null)}
-                                  className={({ isActive }) => `
-                                    flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all
-                                    ${
-                                      isActive
-                                        ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                                        : "text-gray-400 hover:bg-white/5 hover:text-white"
-                                    }
-                                  `}
-                                >
-                                  <subItem.icon size={18} />
-                                  <span className="font-medium text-sm whitespace-nowrap">
-                                    {subItem.name}
-                                  </span>
-                                </NavLink>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </>
-                ) : (
-                  // 普通菜单项（无子菜单）
-                  <NavLink
-                    to={item.path}
-                    title={collapsed ? item.name : undefined}
-                    className={({ isActive }) => `
-                      flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
-                      ${
-                        isActive
-                          ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
-                          : "text-gray-400 hover:bg-white/5 hover:text-white"
-                      }
-                    `}
-                  >
-                    <item.icon size={20} />
-                    {!collapsed && (
-                      <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                        {item.name}
-                      </span>
-                    )}
-                  </NavLink>
+                            `}
+                          >
+                            <subItem.icon size={18} />
+                          </NavLink>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            ) : (
+              // 普通菜单项（无子菜单）
+              <NavLink
+                to={item.path}
+                title={collapsed ? item.name : undefined}
+                className={({ isActive }) => `
+                  flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl transition-all
+                  ${
+                    isActive
+                      ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }
+                `}
+              >
+                <item.icon size={20} />
+                {!collapsed && (
+                  <span className="font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                    {item.name}
+                  </span>
                 )}
-              </div>
+              </NavLink>
             )}
           </div>
         );
@@ -511,6 +481,9 @@ const LayoutContent = () => {
 
   // 检查是否是 Terminal 页面
   const isTerminalPage = location.pathname === '/terminal';
+  
+  // 检查是否是 Workspace 页面
+  const isWorkspacePage = location.pathname.includes('/workspace');
 
   // 点击外部关闭搜索框
   React.useEffect(() => {
@@ -830,16 +803,15 @@ const LayoutContent = () => {
         )}
 
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
-        <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse ? '' : isTerminalPage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
-          <div className={isTerminalPage || isMicroverse ? 'h-full' : ''}>
-            {/* 游戏模式：仅在 /microverse 路由挂载，避免 hidden/0 尺寸导致 WebGL 画布无效 */}
-            {isMicroverse ? (
-              <div className="h-full">
-                <Microverse key="microverse-cached" />
-              </div>
-            ) : (
-              <Outlet />
-            )}
+        <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse || isTerminalPage || isWorkspacePage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
+          <div className={isTerminalPage || isMicroverse || isWorkspacePage ? 'h-full' : ''}>
+            {/* 游戏模式：始终挂载，通过 CSS 控制显示，避免 hidden/0 尺寸导致 WebGL 画布重新初始化 */}
+            <div className={`${isMicroverse ? '' : 'hidden'} h-full`}>
+              <Microverse key="microverse-cached" />
+            </div>
+
+            {/* 其他路由：正常渲染 */}
+            {!isMicroverse && <Outlet />}
           </div>
         </div>
 

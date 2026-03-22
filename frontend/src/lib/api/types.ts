@@ -238,6 +238,7 @@ export interface Agent {
 
   // 模型配置
   model: AgentModel;
+  resolved_model?: string;  // 实际使用的模型（inherit 时解析后的值）
 
   // 工具控制
   tools: string[];                      // 允许的工具列表

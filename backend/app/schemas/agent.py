@@ -206,6 +206,7 @@ class AgentResponse(AgentBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    resolved_model: Optional[str] = Field(None, description="实际使用的模型（inherit 时解析后的值）")
 
     model_config = ConfigDict(from_attributes=True)
 

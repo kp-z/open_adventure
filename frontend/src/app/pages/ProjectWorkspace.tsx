@@ -2,12 +2,12 @@
  * Workspace：iframe 预览、启停、底栏 Tab、Agent 侧栏、日志占位。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router";
+import { Link, useParams, useSearchParams, useNavigate } from "react-router";
+import { getAgentAvatarUrl } from "../../imports/avatars";
 import {
   ArrowLeft,
   ExternalLink,
   PanelRightOpen,
-  PanelRightClose,
   Play,
   Square,
   RotateCcw,
@@ -17,12 +17,21 @@ import {
   Users,
   RefreshCw,
   Camera,
+  Bot,
+  Loader2,
+  Sparkles,
+  Tag,
 } from "lucide-react";
 import { Led, MechButton } from "../components/ui/SkeuoUI";
 import { useNotifications } from "../contexts/NotificationContext";
 import { useProjectWorkspaceStatus } from "../hooks/useProjectWorkspaceStatus";
 import * as projectsApi from "../../lib/api/services/projects";
 import type { ProjectRecord } from "../../lib/api/services/projects";
+import { agentsApi } from "../../lib/api/services/agents";
+import type { Agent } from "../../lib/api/types";
+import { MessageBubble } from "../components/agent-test/MessageBubble";
+import type { ChatMessage } from "../components/agent-test/types";
+import '../../styles/markdown.css';
 
 type FrameTab = "local" | "remote";
 
@@ -30,6 +39,7 @@ export default function ProjectWorkspace() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const { addNotification } = useNotifications();
+  const navigate = useNavigate();
 
   const numericId = id ? parseInt(id, 10) : NaN;
   const generate = searchParams.get("generate") === "1";
@@ -52,7 +62,203 @@ export default function ProjectWorkspace() {
     scanned?: boolean;
   } | null>(null);
 
+  const [iframeBlocked, setIframeBlocked] = useState(false);
+  const iframeBlockedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const iframeLoadedRef = useRef(false);
+  const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const genInitRef = useRef(false);
+
+  // 对话状态
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Agent 详情状态
+  const [agentDetail, setAgentDetail] = useState<Agent | null>(null);
+  const [loadingAgent, setLoadingAgent] = useState(false);
+
+  // 处理发送消息
+  const handleSendMessage = useCallback(async () => {
+    if (!inputMessage.trim() || !project?.agent_id || isStreaming) return;
+    
+    const userMessage = inputMessage.trim();
+    setInputMessage("");
+    setMessages(prev => [...prev, {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date().toISOString(),
+    }]);
+    setIsStreaming(true);
+
+    // 添加一个占位 agent 消息用于流式更新
+    setMessages(prev => [...prev, {
+      id: `agent-${Date.now()}`,
+      role: 'agent',
+      content: '⏳ 正在连接...',
+      timestamp: new Date().toISOString(),
+      status: 'sending',
+    }]);
+    
+    try {
+      const response = await fetch(
+        `/api/agents/${project.agent_id}/test-stream?prompt=${encodeURIComponent(userMessage)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Accept': 'text/event-stream',
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      if (!reader) {
+        throw new Error('无法读取响应流');
+      }
+      
+      let buffer = '';
+      let assistantContent = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'chunk' && data.text) {
+                // 流式更新 agent 消息
+                assistantContent += data.text;
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const last = newMessages[newMessages.length - 1];
+                  newMessages[newMessages.length - 1] = { ...last, content: assistantContent };
+                  return newMessages;
+                });
+              } else if (data.type === 'log' && data.message) {
+                // 进度日志：累积追加，MessageBubble 自动折叠超过 5 行的内容
+                if (!assistantContent) {
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const last = newMessages[newMessages.length - 1];
+                    const newContent = last.content === '⏳ 正在连接...'
+                      ? data.message
+                      : last.content + '\n' + data.message;
+                    newMessages[newMessages.length - 1] = { ...last, content: newContent };
+                    return newMessages;
+                  });
+                }
+              } else if (data.type === 'complete') {
+                // 完成：读取 AI 最终输出并渲染 Markdown
+                if (data.data?.output) {
+                  assistantContent = data.data.output;
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const last = newMessages[newMessages.length - 1];
+                    newMessages[newMessages.length - 1] = {
+                      ...last,
+                      content: assistantContent,
+                      status: 'success',
+                    };
+                    return newMessages;
+                  });
+                } else if (data.data?.success === false) {
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const last = newMessages[newMessages.length - 1];
+                    newMessages[newMessages.length - 1] = {
+                      ...last,
+                      content: `执行失败: ${data.data?.output || '未知错误'}`,
+                      status: 'error',
+                    };
+                    return newMessages;
+                  });
+                }
+                console.log('Stream complete:', data.data);
+              } else if (data.type === 'error') {
+                // 错误
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const last = newMessages[newMessages.length - 1];
+                  newMessages[newMessages.length - 1] = {
+                    ...last,
+                    content: `错误: ${data.message}`,
+                    status: 'error',
+                  };
+                  return newMessages;
+                });
+              }
+            } catch (e) {
+              console.error('解析 SSE 消息失败:', e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('发送消息失败:', error);
+      addNotification({
+        type: 'error',
+        title: '对话失败',
+        message: error instanceof Error ? error.message : String(error),
+      });
+      
+      // 移除失败的 assistant 消息
+      setMessages(prev => prev.slice(0, -1));
+    } finally {
+      setIsStreaming(false);
+    }
+  }, [inputMessage, project?.agent_id, isStreaming, addNotification]);
+
+  // 获取 Agent 详情
+  useEffect(() => {
+    if (project?.agent_id) {
+      setLoadingAgent(true);
+      agentsApi.get(project.agent_id)
+        .then(setAgentDetail)
+        .catch(err => {
+          console.error('Failed to load agent:', err);
+          setAgentDetail(null);
+        })
+        .finally(() => setLoadingAgent(false));
+    } else {
+      setAgentDetail(null);
+    }
+  }, [project?.agent_id]);
+
+  // 自动滚动到消息底部
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // iframeSrc 变化时重置阻断状态，并启动超时检测
+  useEffect(() => {
+    setIframeBlocked(false);
+    iframeLoadedRef.current = false;
+    if (iframeBlockedTimerRef.current) clearTimeout(iframeBlockedTimerRef.current);
+    if (iframeSrc) {
+      iframeBlockedTimerRef.current = setTimeout(() => {
+        // 只有 onLoad 从未触发过才显示阻断提示
+        if (!iframeLoadedRef.current) setIframeBlocked(true);
+      }, 5000);
+    }
+    return () => {
+      if (iframeBlockedTimerRef.current) clearTimeout(iframeBlockedTimerRef.current);
+    };
+  }, [iframeSrc]);
 
   useEffect(() => {
     genInitRef.current = false;
@@ -161,12 +367,25 @@ export default function ProjectWorkspace() {
     })();
   }, [collabOpen, numericId]);
 
-  const iframeSrc =
+  const metaWorkspaceUrl = project?.meta?.workspace_url as string | undefined;
+  // file:// URL 转换为后端 localfs 代理地址，使 iframe 可以加载本地文件
+  const resolvedMetaUrl = metaWorkspaceUrl?.startsWith("file://")
+    ? `/api/localfs${metaWorkspaceUrl.slice("file://".length)}`
+    : metaWorkspaceUrl;
+
+  const computedIframeSrc =
     frameTab === "remote" && remoteUrl
       ? remoteUrl
-      : status?.url && status.running
-        ? status.url
-        : null;
+      : resolvedMetaUrl
+        ? resolvedMetaUrl
+        : status?.url && status.running
+          ? status.url
+          : null;
+
+  // 用 state 稳定 iframeSrc，避免 status 轮询导致值频繁变化重启计时器
+  useEffect(() => {
+    setIframeSrc((prev) => (prev === computedIframeSrc ? prev : computedIframeSrc));
+  }, [computedIframeSrc]);
 
   const ledStatus =
     status?.phase === "error" || status?.health === "unhealthy"
@@ -329,8 +548,27 @@ export default function ProjectWorkspace() {
     return <div className="p-6 text-red-400 text-sm font-mono">无效的项目 ID</div>;
   }
 
+  // Agent 头像组件
+  const AgentAvatar = ({ agent }: { agent: Agent | null }) => {
+    const name = agent?.name || 'Workspace Agent';
+    const agentId = agent?.id || 0;
+    
+    return (
+      <div
+        className="w-6 h-6 rounded-lg overflow-hidden flex-shrink-0 cursor-help border border-white/10"
+        title={name}
+      >
+        <img
+          src={getAgentAvatarUrl(agentId, name)}
+          alt={name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+    );
+  };
+
   return (
-    <div className="h-full flex flex-col bg-[#0f111a] -m-4 md:-m-8">
+    <div className="h-full flex flex-col bg-[#0f111a]">
       {/* 顶部状态栏 */}
       <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#0f111a]/95 backdrop-blur-sm">
         {/* 左侧：项目信息 */}
@@ -356,9 +594,9 @@ export default function ProjectWorkspace() {
               {workspaceConfig.frontend_entry || "根目录"}/
             </span>
           )}
-          {iframeSrc && (
+          {(iframeSrc || metaWorkspaceUrl) && (
             <a
-              href={iframeSrc}
+              href={metaWorkspaceUrl || iframeSrc}
               target="_blank"
               rel="noreferrer"
               className="text-indigo-400 hover:text-indigo-300 shrink-0"
@@ -424,11 +662,28 @@ export default function ProjectWorkspace() {
           )}
           <button
             type="button"
-            className="p-1.5 rounded-md border border-white/10 text-gray-400 hover:text-indigo-400 hover:border-indigo-500/50 transition-colors"
-            onClick={() => setCollabOpen((v) => !v)}
-            title="Agent"
+            className={`p-1.5 rounded-md border transition-colors ${
+              project?.agent_id
+                ? collabOpen
+                  ? 'border-indigo-500 bg-indigo-500/10 text-indigo-400'
+                  : 'border-indigo-500/50 text-indigo-400 hover:border-indigo-500 hover:bg-indigo-500/5'
+                : 'border-white/10 text-gray-400 opacity-50 cursor-not-allowed'
+            }`}
+            onClick={() => {
+              if (project?.agent_id) {
+                setCollabOpen(v => !v);
+              } else {
+                addNotification({
+                  type: "warning",
+                  title: "未绑定 Agent",
+                  message: "该项目尚未绑定 Workspace Agent",
+                });
+              }
+            }}
+            title={project?.agent_id ? (collabOpen ? "关闭 Agent 对话" : "打开 Agent 对话") : "未绑定 Agent"}
+            disabled={!project?.agent_id}
           >
-            {collabOpen ? <PanelRightClose className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+            <Bot className="w-4 h-4" />
           </button>
           <Link
             to={`/projects/${numericId}`}
@@ -449,7 +704,42 @@ export default function ProjectWorkspace() {
               加载项目…
             </div>
           ) : iframeSrc ? (
-            <iframe title="workspace" src={iframeSrc} className="w-full h-full border-0" />
+            <>
+              <iframe
+                key={iframeSrc}
+                title="workspace"
+                src={iframeSrc}
+                className="w-full h-full border-0"
+                onLoad={() => {
+                  iframeLoadedRef.current = true;
+                  if (iframeBlockedTimerRef.current) clearTimeout(iframeBlockedTimerRef.current);
+                  setIframeBlocked(false);
+                }}
+              />
+              {/* iframe 被安全策略阻止时才显示提示 */}
+              {iframeBlocked && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/80 backdrop-blur-sm p-8 rounded-xl border border-white/10 pointer-events-auto max-w-md">
+                  <div className="text-center space-y-4">
+                    <div className="text-yellow-400 text-sm font-mono">
+                      ⚠️ 目标服务器配置了安全策略，禁止 iframe 嵌入
+                    </div>
+                    <div className="text-gray-400 text-xs font-mono">
+                      服务器响应头包含 X-Frame-Options: DENY
+                    </div>
+                    <MechButton
+                      variant="primary"
+                      className="w-full"
+                      onClick={() => window.open(iframeSrc, '_blank')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      在新窗口打开
+                    </MechButton>
+                  </div>
+                </div>
+              </div>
+              )}
+            </>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-500 text-sm font-mono px-6 text-center gap-3">
               <p>
@@ -465,30 +755,112 @@ export default function ProjectWorkspace() {
         </div>
 
         {/* Agent 侧边栏 */}
-        {collabOpen && (
-          <div className="w-80 shrink-0 border-l border-white/10 bg-[#0f111a] flex flex-col">
-            <div className="px-4 py-3 border-b border-white/10">
-              <div className="text-xs text-gray-400 font-mono uppercase tracking-wider">
-                Agent · agent.md
+        {collabOpen && project?.agent_id && (
+          <div className="w-96 shrink-0 border-l border-white/10 bg-[#0f111a] flex flex-col">
+            {/* 头部 */}
+            {loadingAgent ? (
+              <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center bg-indigo-500/20 flex-shrink-0">
+                  <Loader2 className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
+                </div>
+                <div className="text-xs text-gray-400">加载中...</div>
               </div>
+            ) : (
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-2">
+                {/* 左侧：Agent头像 + 信息（紧凑显示） */}
+                <div className="flex items-center gap-2 min-w-0">
+                  {/* Agent 头像（hover 显示名称） */}
+                  <AgentAvatar agent={agentDetail} />
+                  
+                  {/* 模型信息（紧凑显示） */}
+                  <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
+                    <Sparkles className="w-3 h-3" />
+                    <span>
+                      {(() => {
+                        const model = agentDetail?.resolved_model || agentDetail?.model || 'sonnet';
+                        return model === 'opus' ? 'Opus' :
+                               model === 'sonnet' ? 'Sonnet' : 
+                               model === 'haiku' ? 'Haiku' : 
+                               model.charAt(0).toUpperCase() + model.slice(1);
+                      })()}
+                    </span>
+                  </div>
+                  
+                  {/* 分隔符 */}
+                  <div className="w-px h-3 bg-white/10 flex-shrink-0" />
+                  
+                  {/* 作用域信息（紧凑显示） */}
+                  <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
+                    <Tag className="w-3 h-3" />
+                    <span>
+                      {agentDetail?.scope === 'project' ? '项目' :
+                       agentDetail?.scope === 'user' ? '用户' :
+                       agentDetail?.scope === 'builtin' ? '内置' :
+                       agentDetail?.scope === 'plugin' ? '插件' : '-'}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* 右侧：编辑按钮 */}
+                <button
+                  onClick={() => navigate(`/agents/${project?.agent_id}`)}
+                  className="p-1 rounded hover:bg-white/5 text-gray-400 hover:text-gray-200 flex-shrink-0"
+                  title="编辑 Agent"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+            
+            {/* 消息列表 */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-gray-500 text-sm text-center">
+                  <div>
+                    <Bot className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>开始与 Workspace Agent 对话</p>
+                    <p className="text-xs mt-1">输入指令来操作项目</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {messages.map((msg) => (
+                    <MessageBubble key={msg.id} message={msg} />
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
             </div>
-            <textarea
-              className="flex-1 bg-transparent text-gray-200 text-xs font-mono p-4 focus:outline-none resize-none"
-              value={agentDraft}
-              onChange={(e) => setAgentDraft(e.target.value)}
-              disabled={agentBusy}
-              spellCheck={false}
-              placeholder="输入 Agent 配置..."
-            />
+            
+            {/* 输入框 */}
             <div className="p-3 border-t border-white/10">
-              <MechButton
-                variant="primary"
-                className="text-xs w-full"
-                disabled={agentBusy}
-                onClick={() => void onSaveAgent()}
-              >
-                {agentBusy ? "保存中…" : "保存"}
-              </MechButton>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-indigo-500/50"
+                  placeholder={isStreaming ? "AI 正在回复..." : "输入消息..."}
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void handleSendMessage();
+                    }
+                  }}
+                  disabled={isStreaming}
+                />
+                <MechButton
+                  variant="primary"
+                  className="px-3 py-2"
+                  disabled={!inputMessage.trim() || isStreaming}
+                  onClick={() => void handleSendMessage()}
+                >
+                  {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : "发送"}
+                </MechButton>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                按 Enter 发送，Shift+Enter 换行
+              </div>
             </div>
           </div>
         )}
@@ -513,30 +885,26 @@ export default function ProjectWorkspace() {
       )}
 
       {/* 底部项目切换 Tab */}
-      <div className="shrink-0 h-11 flex items-end px-4 gap-1 bg-[#0f111a] border-t border-white/10 overflow-x-auto">
-        {allProjects.slice(0, 6).map((p) => {
-          const isActive = p.id === numericId;
-          return (
-            <Link
-              key={p.id}
-              to={`/projects/${p.id}/workspace`}
-              className={`px-4 py-2 rounded-t-lg text-xs font-bold truncate max-w-[160px] transition-colors ${
-                isActive
-                  ? "bg-[#1a1d2e] border-x border-t border-indigo-500/50 text-white"
-                  : "border-x border-t border-white/10 text-gray-500 hover:text-white hover:bg-[#1a1d2e]"
-              }`}
-            >
-              {p.name}
-            </Link>
-          );
-        })}
-        <Link
-          to="/projects"
-          className="px-3 py-2 text-gray-500 hover:text-indigo-400 text-xs font-mono transition-colors"
-          title="返回项目列表"
-        >
-          ← 列表
-        </Link>
+      <div className="shrink-0 h-11 flex items-end px-4 gap-1 bg-transparent border-t border-white/10 overflow-x-auto">
+        {allProjects
+          .filter((p) => p.meta?.workspace_url || p.has_workspace)
+          .slice(0, 6)
+          .map((p) => {
+            const isActive = p.id === numericId;
+            return (
+              <Link
+                key={p.id}
+                to={`/projects/${p.id}/workspace`}
+                className={`px-4 py-2 rounded-t-lg border-x border-t border-b-0 text-xs font-bold truncate max-w-[160px] transition-colors ${
+                  isActive
+                    ? "bg-[#1a1d2e] border-indigo-500/50 text-white"
+                    : "border-white/10 text-gray-500 hover:text-white hover:bg-[#1a1d2e]"
+                }`}
+              >
+                {p.name}
+              </Link>
+            );
+          })}
       </div>
     </div>
   );

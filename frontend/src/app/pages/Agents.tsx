@@ -323,6 +323,11 @@ const Agents = () => {
   // 过滤和排序 agents
   const filteredAgents = agents
     .filter(agent => {
+      // 隐藏已覆盖的 agent（当 showOverridden 为 false 时）
+      if (!showOverridden && agent.is_overridden) {
+        return false;
+      }
+
       // 当选择 'all' 时，默认不显示 builtin agents
       if (selectedCategory === 'all' && agent.scope === 'builtin') {
         return false;
@@ -587,8 +592,8 @@ const Agents = () => {
                   {/* Model */}
                   <div className="p-2 bg-white/5 rounded-xl">
                     <p className="text-[10px] text-gray-500 uppercase font-black mb-1">Model</p>
-                    <p className={`text-xs font-bold ${modelColors[agent.model || 'inherit']}`}>
-                      {(agent.model || 'inherit').toUpperCase()}
+                    <p className={`text-xs font-bold ${modelColors[agent.resolved_model || agent.model || 'sonnet']}`}>
+                      {(agent.resolved_model || agent.model || 'sonnet').toUpperCase()}
                     </p>
                   </div>
 

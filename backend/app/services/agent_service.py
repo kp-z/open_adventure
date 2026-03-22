@@ -133,12 +133,39 @@ class AgentService:
         system_prompt = agent_data.system_prompt or ""
         return f"---\n{yaml_content}---\n\n{system_prompt}"
 
+    def _resolve_inherit_model(self, agent_model: Optional[str]) -> str:
+        """
+        解析 inherit 模型为实际模型
+        
+        从 Claude settings 读取全局配置，或使用默认值
+        """
+        if agent_model and agent_model != "inherit":
+            return agent_model
+        
+        # 尝试读取 Claude settings.json
+        try:
+            config_file = settings.claude_config_dir / "settings.json"
+            if config_file.exists():
+                import json
+                config = json.loads(config_file.read_text(encoding="utf-8"))
+                configured_model = config.get("model")
+                if configured_model:
+                    return configured_model
+        except Exception as e:
+            logger.debug(f"Failed to read Claude settings: {e}")
+        
+        # 默认使用 sonnet
+        return "sonnet"
+
     async def get_agent(self, agent_id: int) -> AgentResponse:
         """获取子代理详情"""
         agent = await self.repository.get_by_id(agent_id)
         if not agent:
             raise NotFoundException(f"Agent with id {agent_id} not found")
-        return AgentResponse.model_validate(agent)
+        
+        response = AgentResponse.model_validate(agent)
+        response.resolved_model = self._resolve_inherit_model(agent.model)
+        return response
 
     async def get_agent_by_name(self, name: str) -> AgentResponse:
         """通过名称获取子代理"""
@@ -165,9 +192,16 @@ class AgentService:
         # 获取各作用域统计
         scope_counts = await self.repository.get_scope_counts()
 
+        # 为每个 agent 解析 resolved_model
+        items = []
+        for agent in agents:
+            response = AgentResponse.model_validate(agent)
+            response.resolved_model = self._resolve_inherit_model(agent.model)
+            items.append(response)
+
         return AgentListResponse(
             total=total,
-            items=[AgentResponse.model_validate(agent) for agent in agents],
+            items=items,
             builtin_count=scope_counts.get("builtin", 0),
             user_count=scope_counts.get("user", 0),
             project_count=scope_counts.get("project", 0),

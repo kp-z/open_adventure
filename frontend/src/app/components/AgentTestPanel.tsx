@@ -623,7 +623,7 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
 Agent 名称: ${agent.name}
 Agent 描述: ${agent.description}
 可用工具: ${agent.tools.length > 0 ? agent.tools.join(', ') : '继承全部工具'}
-模型: ${agent.model || 'inherit'}
+模型: ${agent.resolved_model || agent.model || 'sonnet'}
 权限模式: ${agent.permission_mode || 'default'}
 技能: ${agent.skills?.join(', ') || '无'}
 系统提示: ${agent.system_prompt || '无'}
