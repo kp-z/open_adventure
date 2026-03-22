@@ -312,6 +312,60 @@ EOF
     fi
 fi
 
+# ============ 互联网访问配置 ============
+if [ "$NON_INTERACTIVE" = false ]; then
+    echo "🌐 Internet Access Configuration"
+    echo "   Enable this if you're exposing the app via frp/ngrok/cloudflare tunnel."
+    echo ""
+    echo "  [y] Enable access password protection (recommended for internet exposure)"
+    echo "  [n] Skip, local network only"
+    echo ""
+
+    while true; do
+        read -r -p "Enable password protection? [y/n]: " _ia_choice
+        case "$_ia_choice" in
+            y|Y)
+                # 读取现有密码，避免每次重启都生成新密码
+                _EXISTING_PWD=$(grep '^ACCESS_PASSWORD=' "$SCRIPT_DIR/.env" 2>/dev/null | cut -d'=' -f2-)
+                if [ -n "$_EXISTING_PWD" ]; then
+                    echo "✅ Using existing password (found in .env)"
+                else
+                    # 生成随机 16 位密码
+                    _EXISTING_PWD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16 2>/dev/null || openssl rand -hex 8)
+                    echo "✅ Generated new access password: $_EXISTING_PWD"
+                    echo "   (Saved to .env — share it with anyone who needs access)"
+                fi
+                # 写入或更新 .env
+                if [ -f "$SCRIPT_DIR/.env" ]; then
+                    if grep -q '^ACCESS_PASSWORD=' "$SCRIPT_DIR/.env"; then
+                        sed -i.bak "s|^ACCESS_PASSWORD=.*|ACCESS_PASSWORD=$_EXISTING_PWD|" "$SCRIPT_DIR/.env"
+                        rm -f "$SCRIPT_DIR/.env.bak"
+                    else
+                        echo "ACCESS_PASSWORD=$_EXISTING_PWD" >> "$SCRIPT_DIR/.env"
+                    fi
+                else
+                    echo "ACCESS_PASSWORD=$_EXISTING_PWD" > "$SCRIPT_DIR/.env"
+                fi
+                echo ""
+                break
+                ;;
+            n|N)
+                # 清空密码（禁用保护）
+                if [ -f "$SCRIPT_DIR/.env" ] && grep -q '^ACCESS_PASSWORD=' "$SCRIPT_DIR/.env"; then
+                    sed -i.bak "s|^ACCESS_PASSWORD=.*|ACCESS_PASSWORD=|" "$SCRIPT_DIR/.env"
+                    rm -f "$SCRIPT_DIR/.env.bak"
+                fi
+                echo "⏭️  Skipping password protection (local network only)"
+                echo ""
+                break
+                ;;
+            *)
+                echo "Please enter y or n."
+                ;;
+        esac
+    done
+fi
+
 # 检查后端目录
 if [ ! -d "backend" ]; then
     echo "❌ backend directory not found"

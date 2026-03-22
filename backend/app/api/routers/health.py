@@ -26,6 +26,7 @@ async def health_check() -> dict:
         "status": "healthy",
         "app_name": settings.app_name,
         "version": settings.app_version,
+        "access_password_required": settings.internet_access_enabled,
     }
 
 

@@ -48,6 +48,7 @@ import { GlassCard } from './ui-shared';
 import { PromptOptimizeButton } from './PromptOptimizeButton';
 import { useNotifications } from '../contexts/NotificationContext';
 import { ChatView } from './agent-test/ChatView';
+import { looksLikeMarkdown } from '@/lib/markdownDetect';
 import { TasksCard } from './agent-test/TasksCard';
 import { useAgentTasks } from '../hooks/useAgentTasks';
 import { TerminalView } from './agent-test/TerminalView';
@@ -575,25 +576,9 @@ export const AgentTestPanel: React.FC<AgentTestPanelProps> = ({
     }
   };
 
-  // 检测输出是否为 Markdown 格式
-  const isMarkdownContent = (text: string): boolean => {
-    if (!text) return false;
-
-    // 检测常见的 Markdown 语法
-    const markdownPatterns = [
-      /^#{1,6}\s+.+$/m,           // 标题
-      /\*\*.+\*\*/,                // 粗体
-      /\*.+\*/,                    // 斜体
-      /\[.+\]\(.+\)/,              // 链接
-      /```[\s\S]*?```/,            // 代码块
-      /^\s*[-*+]\s+/m,             // 无序列表
-      /^\s*\d+\.\s+/m,             // 有序列表
-      /^\s*>\s+/m,                 // 引用
-      /^\s*\|.+\|.+\|$/m,          // 表格
-    ];
-
-    return markdownPatterns.some(pattern => pattern.test(text));
-  };
+  // 检测输出是否为 Markdown 格式（使用共享工具函数）
+  // 注：此函数保留为兼容性别名，实际使用 looksLikeMarkdown
+  const isMarkdownContent = looksLikeMarkdown;
 
   // 建议的测试提示 - 根据 agent 类型动态生成
   const getSuggestedTests = () => {

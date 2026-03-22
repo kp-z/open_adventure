@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     secret_key: str = "your-secret-key-here-change-in-production"
     access_token_expire_minutes: int = 30
 
+    # Internet access password (empty = disabled, set via ACCESS_PASSWORD env var)
+    access_password: str = ""
+
+    @property
+    def internet_access_enabled(self) -> bool:
+        return bool(self.access_password)
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./open_adventure.db"
 

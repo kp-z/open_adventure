@@ -92,9 +92,11 @@ class ApiClient {
       ...fetchConfig.headers,
     };
 
-    // 添加认证 token
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // 添加认证 token（access_token 优先于 auth_token）
+    const accessToken = localStorage.getItem('access_token');
+    const effectiveToken = accessToken || this.token;
+    if (effectiveToken) {
+      headers['Authorization'] = `Bearer ${effectiveToken}`;
     }
 
     try {

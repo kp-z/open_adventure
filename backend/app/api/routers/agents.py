@@ -37,6 +37,7 @@ from app.schemas.agent import (
     AgentGenerateResponse,
     AgentFileContent
 )
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 logger = get_logger(__name__)
@@ -952,13 +953,41 @@ Please respond according to your role and capabilities."""
                 execution = await execution_repo.get(execution_id)
 
                 if result_data["success"]:
+                    # 检测内容类型
+                    def detect_content_type(output: str) -> str:
+                        """检测输出内容类型：plan, report, 或 conversation"""
+                        first_line = output.strip().split('\n')[0].upper() if output.strip() else ''
+                        
+                        # 检测标记
+                        if '[PLAN]' in first_line:
+                            return 'plan'
+                        elif '[REPORT]' in first_line:
+                            return 'report'
+                        
+                        # 兜底：检测结构特征
+                        output_lower = output.lower()
+                        
+                        # Plan 特征：步骤、计划、TODO、编号列表
+                        plan_keywords = ['## 步骤', '## 计划', '- [ ]', 'todo', '### 步骤', '## 实施步骤']
+                        if any(kw in output_lower for kw in plan_keywords):
+                            return 'plan'
+                        
+                        # Report 特征：总结、结果、完成情况
+                        report_keywords = ['## 总结', '## 结果', '完成情况', '### 总结', '## 执行结果']
+                        if any(kw in output_lower for kw in report_keywords):
+                            return 'report'
+                        
+                        return 'conversation'
+                    
+                    content_type = detect_content_type(result_data['output'])
+                    
                     # 更新为成功状态
                     execution.status = ExecutionStatus.SUCCEEDED
                     execution.test_output = result_data['output']
                     execution.finished_at = datetime.utcnow()
                     await db.commit()
 
-                    yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': result_data['output'], 'duration': result_data['duration'], 'model': model_name}})}\n\n"
+                    yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': result_data['output'], 'duration': result_data['duration'], 'model': model_name, 'content_type': content_type}})}\n\n"
                 else:
                     # 更新为失败状态
                     error_msg = f"Agent 执行失败: {result_data['error']}"
@@ -2119,3 +2148,145 @@ async def get_running_executions(
             for e in executions
         ]
     }
+
+
+# Session 管理 API
+
+class ForkSessionRequest(BaseModel):
+    """分叉 Session 请求"""
+    source_session_id: str
+    fork_point_index: Optional[int] = None
+
+
+@router.get("/{agent_id}/sessions")
+async def list_agent_sessions(
+    agent_id: int,
+    limit: int = Query(default=20, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取指定 Agent 的 session 列表
+    
+    Args:
+        agent_id: Agent ID
+        limit: 返回记录数（最大 100）
+    
+    Returns:
+        Session 列表
+    """
+    import json
+    
+    repo = ExecutionRepository(db)
+    sessions = await repo.list_agent_sessions(agent_id, limit)
+    
+    return [
+        {
+            "session_id": s.session_id,
+            "execution_id": s.id,
+            "last_activity": s.last_activity_at.isoformat() if s.last_activity_at else None,
+            "message_count": len(json.loads(s.chat_history)) if s.chat_history else 0,
+            "created_at": s.created_at.isoformat() if s.created_at else None
+        }
+        for s in sessions
+    ]
+
+
+@router.post("/{agent_id}/sessions/fork")
+async def fork_session(
+    agent_id: int,
+    request: ForkSessionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    从现有 session 分叉创建新 session
+    
+    Args:
+        agent_id: Agent ID
+        request: 分叉请求（包含源 session_id 和可选的分叉点索引）
+    
+    Returns:
+        新 session 的信息
+    """
+    import json
+    import uuid
+    from app.models.task import Task, TaskStatus
+    from app.services.agent_session_service_async import AgentSessionServiceAsync
+    
+    repo = ExecutionRepository(db)
+    source = await repo.get_by_session_id(request.source_session_id)
+    
+    if not source or source.agent_id != agent_id:
+        raise HTTPException(status_code=404, detail="Source session not found")
+    
+    # 创建新 session
+    new_session_id = str(uuid.uuid4())
+    history = json.loads(source.chat_history) if source.chat_history else []
+    
+    # 截取到分叉点
+    if request.fork_point_index is not None:
+        history = history[:request.fork_point_index + 1]
+    
+    # 创建虚拟 Task
+    task = Task(
+        title=f"Agent Test Session - {agent_id} (Forked)",
+        description=f"Forked agent test session for agent {agent_id}",
+        status=TaskStatus.RUNNING
+    )
+    db.add(task)
+    await db.flush()
+    
+    # 创建新 Execution
+    new_execution = Execution(
+        task_id=task.id,
+        workflow_id=1,
+        execution_type=ExecutionType.AGENT_TEST,
+        agent_id=agent_id,
+        status=ExecutionStatus.RUNNING,
+        session_id=new_session_id,
+        last_activity_at=datetime.utcnow(),
+        is_background=True,
+        started_at=datetime.utcnow(),
+        chat_history=json.dumps(history)
+    )
+    
+    db.add(new_execution)
+    await db.commit()
+    await db.refresh(new_execution)
+    
+    return {
+        "session_id": new_session_id,
+        "execution_id": new_execution.id,
+        "message_count": len(history),
+        "created_at": new_execution.created_at.isoformat() if new_execution.created_at else None
+    }
+
+
+@router.delete("/{agent_id}/sessions/{session_id}")
+async def clear_session(
+    agent_id: int,
+    session_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    清空指定 session 的对话历史
+    
+    Args:
+        agent_id: Agent ID
+        session_id: Session ID
+    
+    Returns:
+        成功状态
+    """
+    repo = ExecutionRepository(db)
+    execution = await repo.get_by_session_id(session_id)
+    
+    if not execution or execution.agent_id != agent_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # 清空历史并标记为完成
+    execution.chat_history = '[]'
+    execution.status = ExecutionStatus.COMPLETED
+    execution.finished_at = datetime.utcnow()
+    await db.commit()
+    
+    return {"success": True, "session_id": session_id}

@@ -145,6 +145,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Internet access guard (only active when ACCESS_PASSWORD is set)
+if settings.internet_access_enabled:
+    from app.middleware.access_guard import AccessGuardMiddleware
+    app.add_middleware(AccessGuardMiddleware, password=settings.access_password)
+
 # Include routers
 app.include_router(auth.router, prefix=f"{settings.api_prefix}")
 app.include_router(health.router, prefix=f"{settings.api_prefix}/system")

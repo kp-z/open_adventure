@@ -267,3 +267,31 @@ class ExecutionRepository(BaseRepository[Execution]):
         await self.db.refresh(execution)
 
         return execution
+
+    async def list_agent_sessions(self, agent_id: int, limit: int = 20) -> List[Execution]:
+        """
+        获取指定 Agent 的 session 列表
+
+        Args:
+            agent_id: Agent ID
+            limit: 返回记录数
+
+        Returns:
+            List[Execution]: session 列表
+        """
+        from app.models.task import ExecutionType
+        from sqlalchemy import and_
+
+        result = await self.db.execute(
+            select(Execution)
+            .where(
+                and_(
+                    Execution.agent_id == agent_id,
+                    Execution.execution_type == ExecutionType.AGENT_TEST,
+                    Execution.is_background == True
+                )
+            )
+            .order_by(Execution.last_activity_at.desc())
+            .limit(limit)
+        )
+        return result.scalars().all()

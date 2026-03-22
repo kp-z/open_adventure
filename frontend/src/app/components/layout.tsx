@@ -36,6 +36,7 @@ import { useNotifications } from "../contexts/NotificationContext";
 import { useNavigation, NavigationProvider } from "../contexts/NavigationContext";
 import { useInitialization } from "../contexts/InitializationContext";
 import { InitializationScreen } from "./InitializationScreen";
+import { AccessPasswordGate } from "./AccessPasswordGate";
 import Microverse from "../pages/Microverse";
 
 const Navigation = ({ collapsed = false, onExpandSidebar }: { collapsed?: boolean; onExpandSidebar?: () => void }) => {
@@ -373,6 +374,38 @@ const LayoutContent = () => {
   const { canGoBack, canGoForward, goBack, goForward } = useNavigation();
   const { isInitialized, isLoading } = useInitialization();
 
+  // ── 访问密码门控 ─────────────────────────────────────────────────────────────
+  // 检查后端是否要求访问密码，若要求且本地无有效 token 则显示密码界面
+  const [accessChecked, setAccessChecked] = React.useState(false);
+  const [accessRequired, setAccessRequired] = React.useState(false);
+  const [accessGranted, setAccessGranted] = React.useState(false);
+
+  React.useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const res = await fetch('/api/system/health');
+        if (res.status === 401) {
+          // 中间件拦截说明密码已启用且本次无 token
+          const hasToken = Boolean(localStorage.getItem('access_token'));
+          setAccessRequired(true);
+          setAccessGranted(hasToken);
+        } else if (res.ok) {
+          const data = await res.json();
+          if (data.access_password_required) {
+            const hasToken = Boolean(localStorage.getItem('access_token'));
+            setAccessRequired(true);
+            setAccessGranted(hasToken);
+          }
+        }
+      } catch {
+        // 网络错误时不阻塞加载
+      } finally {
+        setAccessChecked(true);
+      }
+    };
+    checkAccess();
+  }, []);
+
   // 检测是否为移动端，移动端默认隐藏侧边栏
   const [isMobile, setIsMobile] = React.useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -511,6 +544,11 @@ const LayoutContent = () => {
   // 如果未初始化或正在加载，显示初始化界面
   if (!isInitialized || isLoading) {
     return <InitializationScreen />;
+  }
+
+  // 如果需要访问密码且尚未验证（等待检查完成后再判断，避免闪烁）
+  if (accessChecked && accessRequired && !accessGranted) {
+    return <AccessPasswordGate onSuccess={() => setAccessGranted(true)} />;
   }
 
   return (

@@ -3,6 +3,8 @@ Authentication API endpoints
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 from datetime import timedelta
 from typing import Optional
 
@@ -11,11 +13,12 @@ try:
 except ImportError:
     from typing_extensions import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
+from app.config.settings import settings
 from app.core.database import get_db
 from app.core.security import (
     authenticate_user,
@@ -160,3 +163,24 @@ async def update_user_me(
     await db.refresh(current_user)
 
     return current_user
+
+
+# ── Internet access password endpoint ─────────────────────────────────────────
+
+class AccessTokenRequest(BaseModel):
+    password: str
+
+
+@router.post("/access-token", response_model=Token)
+async def get_access_token(body: AccessTokenRequest):
+    """Exchange the global access password for a Bearer token.
+
+    Used when the app is exposed to the internet via frp/ngrok/cloudflare tunnel.
+    Returns 404 when ACCESS_PASSWORD is not configured (feature disabled).
+    """
+    if not settings.internet_access_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Access password not enabled")
+    if not hmac.compare_digest(body.password, settings.access_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
+    token = hashlib.sha256(settings.access_password.encode("utf-8")).hexdigest()[:32]
+    return {"access_token": token, "token_type": "access"}

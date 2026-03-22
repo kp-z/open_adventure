@@ -4,6 +4,7 @@ Microverse Agent Service
 """
 import asyncio
 import json
+import os
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
@@ -176,16 +177,30 @@ class MicroverseAgentService:
         chat_history: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
-        通过 Anthropic Messages API 生成回复（与 PromptOptimizer 等共用配置来源）。
-
-        需在环境变量中配置 ANTHROPIC_API_KEY。
+        生成 AI 回复。优先使用 Anthropic API（更快），
+        无 API Key 时回退到 claude -p CLI（利用 ~/.claude/ 认证）。
         """
         api_key = settings.anthropic_api_key
-        if not api_key:
-            raise RuntimeError(
-                "ANTHROPIC_API_KEY 未配置，无法为 Microverse 提供对话；请在环境或 .env 中设置。"
+        if api_key:
+            return await self._call_anthropic_api(
+                agent, prompt, context, api_key, model_override, chat_history
+            )
+        else:
+            logger.info("No ANTHROPIC_API_KEY, falling back to claude CLI")
+            return await self._call_claude_cli(
+                agent, prompt, context, model_override
             )
 
+    async def _call_anthropic_api(
+        self,
+        agent: Agent,
+        prompt: str,
+        context: Optional[Dict[str, Any]],
+        api_key: str,
+        model_override: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> str:
+        """通过 Anthropic Messages API 直接调用。"""
         model = self._normalize_anthropic_model(model_override or agent.model)
         system_parts: List[str] = []
         if agent.system_prompt:
@@ -200,7 +215,6 @@ class MicroverseAgentService:
             else "你是 Microverse 游戏中的角色，请用自然、简洁的语言回复玩家。"
         )
 
-        # 构建消息列表：包含历史对话 + 当前消息
         messages = []
         if chat_history:
             for msg in chat_history:
@@ -222,6 +236,67 @@ class MicroverseAgentService:
             if getattr(block, "type", None) == "text":
                 return block.text
         return ""
+
+    async def _call_claude_cli(
+        self,
+        agent: Agent,
+        prompt: str,
+        context: Optional[Dict[str, Any]],
+        model_override: Optional[str] = None,
+    ) -> str:
+        """通过 claude -p 非交互式调用 Claude CLI（利用 ~/.claude/ 认证）。"""
+        cmd = [settings.claude_cli_path, "-p"]
+
+        # 绑定的 project agent -> 使用 --agent 参数
+        if agent.name and not agent.name.startswith("microverse_"):
+            cmd.extend(["--agent", agent.name])
+
+        # system prompt
+        system_parts: List[str] = []
+        if agent.system_prompt:
+            system_parts.append(agent.system_prompt)
+        if context:
+            system_parts.append(
+                "游戏上下文:\n" + json.dumps(context, ensure_ascii=False)
+            )
+        if system_parts:
+            cmd.extend(["--system-prompt", "\n\n".join(system_parts)])
+
+        # model
+        model = model_override or agent.model
+        if model and model not in ("inherit", "gpt-4o-mini", ""):
+            cmd.extend(["--model", self._normalize_anthropic_model(model)])
+
+        # prompt 作为最后一个参数
+        cmd.append(prompt)
+
+        env = os.environ.copy()
+        env["CLAUDECODE"] = ""  # 避免嵌套检测
+
+        logger.info(f"CLI command: {cmd[0]} -p --agent {agent.name} ...")
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(), timeout=60
+            )
+        except asyncio.TimeoutError:
+            process.kill()
+            raise RuntimeError("Claude CLI timeout (60s)")
+
+        if process.returncode != 0:
+            error_msg = stderr.decode("utf-8", errors="ignore").strip()
+            raise RuntimeError(
+                f"Claude CLI failed (rc={process.returncode}): {error_msg}"
+            )
+
+        return stdout.decode("utf-8", errors="ignore").strip()
 
     # ===== 角色管理方法 =====
 

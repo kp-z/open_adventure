@@ -6,6 +6,8 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   status?: 'sending' | 'success' | 'error';
+  content_type?: 'plan' | 'report' | 'conversation';
+  streaming_logs?: string[];
 }
 
 export interface TerminalSession {

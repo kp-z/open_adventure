@@ -21,6 +21,8 @@ import {
   Loader2,
   Sparkles,
   Tag,
+  Trash2,
+  Plus,
 } from "lucide-react";
 import { Led, MechButton } from "../components/ui/SkeuoUI";
 import { useNotifications } from "../contexts/NotificationContext";
@@ -31,6 +33,7 @@ import { agentsApi } from "../../lib/api/services/agents";
 import type { Agent } from "../../lib/api/types";
 import { MessageBubble } from "../components/agent-test/MessageBubble";
 import type { ChatMessage } from "../components/agent-test/types";
+import { useAgentSessions } from "../hooks/useAgentSessions";
 import '../../styles/markdown.css';
 
 type FrameTab = "local" | "remote";
@@ -78,6 +81,17 @@ export default function ProjectWorkspace() {
   const [agentDetail, setAgentDetail] = useState<Agent | null>(null);
   const [loadingAgent, setLoadingAgent] = useState(false);
 
+  // Session 管理
+  const {
+    sessions,
+    activeSessionId,
+    setActiveSessionId,
+    createSession,
+    forkSession,
+    clearSession,
+    refreshSessions
+  } = useAgentSessions(project?.agent_id || null);
+
   // 处理发送消息
   const handleSendMessage = useCallback(async () => {
     if (!inputMessage.trim() || !project?.agent_id || isStreaming) return;
@@ -96,9 +110,10 @@ export default function ProjectWorkspace() {
     setMessages(prev => [...prev, {
       id: `agent-${Date.now()}`,
       role: 'agent',
-      content: '⏳ 正在连接...',
+      content: '',
       timestamp: new Date().toISOString(),
       status: 'sending',
+      streaming_logs: [],
     }]);
     
     try {
@@ -140,28 +155,31 @@ export default function ProjectWorkspace() {
             try {
               const data = JSON.parse(line.slice(6));
               
-              if (data.type === 'chunk' && data.text) {
-                // 流式更新 agent 消息
+              if (data.type === 'log' && data.message) {
+                // 流式日志：累积到 streaming_logs
+                setMessages(prev => {
+                  const newMessages = [...prev];
+                  const last = newMessages[newMessages.length - 1];
+                  const logs = last.streaming_logs || [];
+                  newMessages[newMessages.length - 1] = {
+                    ...last,
+                    streaming_logs: [...logs, data.message]
+                  };
+                  return newMessages;
+                });
+              } else if (data.type === 'chunk' && data.text) {
+                // AI 开始回复，清空日志
                 assistantContent += data.text;
                 setMessages(prev => {
                   const newMessages = [...prev];
                   const last = newMessages[newMessages.length - 1];
-                  newMessages[newMessages.length - 1] = { ...last, content: assistantContent };
+                  newMessages[newMessages.length - 1] = {
+                    ...last,
+                    content: assistantContent,
+                    streaming_logs: [] // 清空日志
+                  };
                   return newMessages;
                 });
-              } else if (data.type === 'log' && data.message) {
-                // 进度日志：累积追加，MessageBubble 自动折叠超过 5 行的内容
-                if (!assistantContent) {
-                  setMessages(prev => {
-                    const newMessages = [...prev];
-                    const last = newMessages[newMessages.length - 1];
-                    const newContent = last.content === '⏳ 正在连接...'
-                      ? data.message
-                      : last.content + '\n' + data.message;
-                    newMessages[newMessages.length - 1] = { ...last, content: newContent };
-                    return newMessages;
-                  });
-                }
               } else if (data.type === 'complete') {
                 // 完成：读取 AI 最终输出并渲染 Markdown
                 if (data.data?.output) {
@@ -173,6 +191,8 @@ export default function ProjectWorkspace() {
                       ...last,
                       content: assistantContent,
                       status: 'success',
+                      content_type: data.data.content_type || 'conversation',
+                      streaming_logs: undefined,
                     };
                     return newMessages;
                   });
@@ -184,6 +204,7 @@ export default function ProjectWorkspace() {
                       ...last,
                       content: `执行失败: ${data.data?.output || '未知错误'}`,
                       status: 'error',
+                      streaming_logs: undefined,
                     };
                     return newMessages;
                   });
@@ -198,6 +219,7 @@ export default function ProjectWorkspace() {
                     ...last,
                     content: `错误: ${data.message}`,
                     status: 'error',
+                    streaming_logs: undefined,
                   };
                   return newMessages;
                 });
@@ -243,6 +265,58 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 保存消息到 localStorage（每条消息后）
+  useEffect(() => {
+    if (activeSessionId && messages.length > 0 && project?.agent_id) {
+      const cacheKey = `agent-chat-${project.agent_id}-${activeSessionId}`;
+      localStorage.setItem(cacheKey, JSON.stringify({
+        messages,
+        timestamp: Date.now()
+      }));
+    }
+  }, [messages, activeSessionId, project?.agent_id]);
+
+  // 从 localStorage 或 API 恢复消息（组件挂载或切换 session）
+  useEffect(() => {
+    const loadChatHistory = async (sessionId: string) => {
+      try {
+        const res = await fetch(`/api/executions/session/${sessionId}`);
+        const execution = await res.json();
+        if (execution.chat_history) {
+          setMessages(JSON.parse(execution.chat_history));
+        } else {
+          setMessages([]);
+        }
+      } catch (err) {
+        console.error('Failed to load chat history:', err);
+        setMessages([]);
+      }
+    };
+
+    if (activeSessionId && project?.agent_id) {
+      const cacheKey = `agent-chat-${project.agent_id}-${activeSessionId}`;
+      const cached = localStorage.getItem(cacheKey);
+      
+      if (cached) {
+        try {
+          const { messages: cachedMessages, timestamp } = JSON.parse(cached);
+          // 5分钟内优先用缓存
+          if (Date.now() - timestamp < 5 * 60 * 1000) {
+            setMessages(cachedMessages);
+            return;
+          }
+        } catch (err) {
+          console.error('Failed to parse cached messages:', err);
+        }
+      }
+      
+      // 否则从 API 加载
+      void loadChatHistory(activeSessionId);
+    } else {
+      setMessages([]);
+    }
+  }, [activeSessionId, project?.agent_id]);
 
   // iframeSrc 变化时重置阻断状态，并启动超时检测
   useEffect(() => {
@@ -757,6 +831,33 @@ export default function ProjectWorkspace() {
         {/* Agent 侧边栏 */}
         {collabOpen && project?.agent_id && (
           <div className="w-96 shrink-0 border-l border-white/10 bg-[#0f111a] flex flex-col">
+            {/* Session Tabs */}
+            <div className="flex items-center gap-1 px-2 py-1 border-b border-white/10 overflow-x-auto">
+              {sessions.map((s, idx) => (
+                <button
+                  key={s.session_id}
+                  onClick={() => setActiveSessionId(s.session_id)}
+                  className={`px-3 py-1 text-xs rounded-t transition-colors flex-shrink-0 ${
+                    s.session_id === activeSessionId
+                      ? 'bg-indigo-500/20 text-indigo-300 border-b-2 border-indigo-500'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                  title={`Session ${idx + 1} - ${s.message_count} 条消息`}
+                >
+                  Session {idx + 1}
+                  {s.message_count > 0 && ` (${s.message_count})`}
+                </button>
+              ))}
+              <button
+                onClick={() => void createSession()}
+                className="px-2 py-1 text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                title="新建 Session"
+              >
+                <Plus className="w-3 h-3" />
+                新建
+              </button>
+            </div>
+            
             {/* 头部 */}
             {loadingAgent ? (
               <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
@@ -792,7 +893,19 @@ export default function ProjectWorkspace() {
                   {/* 作用域信息（紧凑显示） */}
                   <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
                     <Tag className="w-3 h-3" />
-                    <span>
+                    <span
+                      title={
+                        agentDetail?.scope === 'project'
+                          ? project?.path || agentDetail?.meta?.path || '项目作用域'
+                          : agentDetail?.scope === 'user'
+                          ? agentDetail?.meta?.path || '用户作用域'
+                          : agentDetail?.scope === 'plugin'
+                          ? `插件: ${agentDetail?.meta?.plugin_name || '-'}`
+                          : agentDetail?.scope === 'builtin'
+                          ? '内置 Agent'
+                          : undefined
+                      }
+                    >
                       {agentDetail?.scope === 'project' ? '项目' :
                        agentDetail?.scope === 'user' ? '用户' :
                        agentDetail?.scope === 'builtin' ? '内置' :
@@ -803,9 +916,24 @@ export default function ProjectWorkspace() {
                 
                 {/* 右侧：编辑按钮 */}
                 <button
-                  onClick={() => navigate(`/agents/${project?.agent_id}`)}
-                  className="p-1 rounded hover:bg-white/5 text-gray-400 hover:text-gray-200 flex-shrink-0"
-                  title="编辑 Agent"
+                  onClick={() => {
+                    if (project?.agent_id && !agentDetail?.is_builtin) {
+                      navigate(`/agents/${project.agent_id}/edit`);
+                    }
+                  }}
+                  disabled={!project?.agent_id || agentDetail?.is_builtin}
+                  className={`p-1 rounded flex-shrink-0 transition-colors ${
+                    agentDetail?.is_builtin
+                      ? 'text-gray-600 cursor-not-allowed'
+                      : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'
+                  }`}
+                  title={
+                    agentDetail?.is_builtin
+                      ? '内置 Agent 不可编辑'
+                      : project?.agent_id
+                      ? '编辑 Agent'
+                      : '未绑定 Agent'
+                  }
                 >
                   <Settings className="w-3.5 h-3.5" />
                 </button>
@@ -849,6 +977,18 @@ export default function ProjectWorkspace() {
                   }}
                   disabled={isStreaming}
                 />
+                <button
+                  onClick={() => {
+                    if (activeSessionId && confirm('确定清空当前对话？这将清除所有历史消息。')) {
+                      void clearSession(activeSessionId);
+                    }
+                  }}
+                  disabled={!activeSessionId || messages.length === 0}
+                  className="p-2 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="清空对话"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 <MechButton
                   variant="primary"
                   className="px-3 py-2"

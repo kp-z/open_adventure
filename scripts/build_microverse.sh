@@ -103,6 +103,11 @@ if [ "$VERIFY_FAIL" -eq 1 ]; then
 fi
 echo "  All files synced and verified."
 
+# Patch index.html: canvas needs 100% width/height for iframe embedding
+sed -i.bak 's/#canvas {/#canvas {\n\twidth: 100%;\n\theight: 100vh;/' "$TARGET_DIR/index.html"
+rm -f "$TARGET_DIR/index.html.bak"
+echo "  Patched index.html canvas CSS."
+
 # ============ Phase 4: Verify ============
 echo ""
 echo "=== Phase 4: Verify ==="
