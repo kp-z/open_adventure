@@ -67,6 +67,14 @@ marketplace/            # 内置 Claude Code Plugins
 
 scripts/
 └── install_plugins.sh  # 插件自动安装脚本
+└── build_microverse.sh # Microverse 一键构建
+└── sync_microverse.sh  # Microverse 文件同步
+
+microverse/               # Godot 游戏项目（独立 Git 仓库）
+├── script/               # GDScript 源文件
+├── scene/                # 场景文件
+├── asset/                # 资源文件
+└── export/               # Web 导出产物（.gitignore 忽略）
 ```
 
 ## 开发阶段
@@ -183,6 +191,58 @@ scripts/
 - 创建文件前必须检查上述"文件组织规范"，将文件放到正确的目录
 - 生成截图、日志、文档时，自动使用规范的目录路径
 - 如发现根目录有不符合规范的文件，应立即移动到正确位置
+
+### Microverse 游戏模式开发规范
+
+#### 架构概述
+
+Microverse 是内嵌的 Godot 4.x Web 游戏，通过 iframe 加载到前端页面中。
+
+```
+microverse/               ← 独立 Git 仓库（Godot 项目源码）
+  ├── script/             ← GDScript 源文件
+  ├── scene/              ← 场景文件 (.tscn)
+  ├── asset/              ← 图片、字体等资源
+  ├── export/             ← Godot Web 导出产物（被 .gitignore 忽略）
+  ├── export.sh           ← Godot 导出脚本
+  └── project.godot       ← Godot 项目配置
+
+scripts/
+  ├── build_microverse.sh ← 一键构建（检查→导出→同步→验证）
+  └── sync_microverse.sh  ← 文件同步到前端
+
+frontend/public/microverse/ ← Web 运行时文件（pck + wasm + js + html）
+```
+
+#### 强制规则
+
+1. **禁止手动复制单个文件**：必须使用 `./scripts/build_microverse.sh` 完成完整的导出和同步流程。绝对不能只复制 `.pck` 而不同步 `.wasm`、`.js`、`.html`，否则版本不匹配会导致游戏回退或崩溃。
+
+2. **禁止在 GDScript 中使用全角字符作为代码符号**：全角引号 `""''` 在 Godot 编辑器中不会报错，但 headless 导出时会导致 Parse Error，引发整条依赖链编译失败。中文字符串内容可以使用中文，但引号、括号等符号必须是半角（ASCII）。
+
+3. **CharacterBody2D 不能使用 Control 属性**：如 `clip_contents`、`mouse_filter` 等属性属于 Control 节点，在 CharacterBody2D 上赋值会导致 headless 模式解析失败。
+
+4. **修改 GDScript 后必须重新导出**：任何对 `microverse/script/` 或 `microverse/scene/` 的修改，都需要运行 `./scripts/build_microverse.sh` 重新导出才能生效。`frontend/public/microverse/` 中的文件是编译后的产物，不能直接编辑。
+
+5. **导出后必须检查错误日志**：导出日志中出现 `SCRIPT ERROR` 或 `Parse Error` 表示导出不完整，即使 pck 文件生成了也不能使用。
+
+#### 构建命令
+
+```bash
+# 修改 Godot 代码后，一键完成全部工作
+./scripts/build_microverse.sh
+
+# 流程：Pre-check（全角引号检测）→ Export（Godot headless）→ Sync（复制到前端）→ Verify（md5校验+大小检查）
+```
+
+#### 常见错误与排查
+
+| 现象 | 原因 | 解决方法 |
+|------|------|----------|
+| 游戏回退到初始版本 | pck 和 wasm 版本不匹配 | 运行 `build_microverse.sh` 完整同步 |
+| `Could not resolve class "X"` | GDScript 中有全角引号或依赖脚本编译失败 | 检查报错脚本中的全角字符 |
+| pck 异常缩小 | 脚本编译错误导致场景未打包 | 检查导出日志中的 SCRIPT ERROR |
+| `Parse Error: Invalid character` | 全角引号混入代码 | 用 `build_microverse.sh` Pre-check 自动检测 |
 
 ### 同步 Figma 前端修改
 当用户说"同步 Figma 前端修改"或类似指令时，指的是：

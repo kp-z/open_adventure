@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 import asyncio
 import json
 
-from app.core.database import get_db
+from app.core.database import get_db, AsyncSessionLocal
 from app.repositories.agent_repository import AgentRepository
 from app.services.microverse_agent_service import MicroverseAgentService
 from app.schemas.microverse import (
@@ -255,8 +255,8 @@ async def character_work_websocket(
     await websocket.accept()
 
     try:
-        # 获取数据库会话
-        async for db in get_db():
+        # 使用 async with 手动管理 session（WebSocket 不支持 Depends）
+        async with AsyncSessionLocal() as db:
             service = MicroverseAgentService(db)
 
             # 检查角色是否存在
@@ -296,8 +296,6 @@ async def character_work_websocket(
                         "message": str(e)
                     })
                     await asyncio.sleep(1)
-
-            break  # 退出数据库会话循环
 
     except WebSocketDisconnect:
         pass
@@ -559,7 +557,7 @@ async def retry_execution(
     重新执行失败的任务。
     """
     from app.repositories.executions_repo import ExecutionRepository
-    from app.models.task import ExecutionStatus
+    from app.models.task import Execution, ExecutionStatus
     from datetime import datetime
 
     repo = ExecutionRepository(db)

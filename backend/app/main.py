@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, projects, token_usage, plugins, processes, config, microverse, tasks_ws, testing, logs
+from app.api.routers import health, skills, agents, agent_teams, workflows, tasks, claude, executions, workflow_templates, stats, team_messages, team_tasks, team_state, skills_stream, websocket, project_paths, projects, token_usage, plugins, processes, config, microverse, tasks_ws, testing, logs, localfs
 from app.api.routers import settings as settings_router
 from app.api import dashboard, auth, terminal
 from app.config.settings import settings
@@ -175,6 +175,7 @@ app.include_router(websocket.router, prefix=f"{settings.api_prefix}/ws")
 app.include_router(tasks_ws.router, prefix=f"{settings.api_prefix}/ws")
 app.include_router(testing.router)
 app.include_router(logs.router)
+app.include_router(localfs.router, prefix=f"{settings.api_prefix}")
 
 
 # 静态文件服务配置 - 先定义目录路径

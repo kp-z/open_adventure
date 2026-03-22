@@ -6,7 +6,7 @@ import { apiClient } from '../client';
 export interface ProjectRecord {
   id: number;
   name: string;
-  path: string;
+  path: string | null;
   description: string | null;
   has_agent: boolean;
   has_workspace: boolean;
@@ -18,6 +18,7 @@ export interface ProjectRecord {
   last_sync_at: string | null;
   meta: Record<string, unknown> | null;
   agent_id: number | null;  // 关联的 Project Agent ID
+  is_pinned: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -55,8 +56,9 @@ export interface ProjectListResponse {
 
 export interface ProjectCreate {
   name: string;
-  path: string;
+  path?: string | null;
   description?: string | null;
+  meta?: Record<string, unknown> | null;
 }
 
 export interface ProjectCreateFromPath {
@@ -70,6 +72,7 @@ export interface ProjectUpdate {
   description?: string | null;
   workspace_port?: number | null;
   meta?: Record<string, unknown> | null;
+  is_pinned?: boolean;
 }
 
 export interface WorkspaceStatus {

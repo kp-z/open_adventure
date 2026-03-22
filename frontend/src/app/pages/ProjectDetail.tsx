@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, RefreshCw, TerminalSquare, Bot, LayoutDashboard } from "lucide-react";
+import { RefreshCw, TerminalSquare, Bot, LayoutDashboard } from "lucide-react";
 import { MetalPanel, Led, MechButton } from "../components/ui/SkeuoUI";
 import { useNotifications } from "../contexts/NotificationContext";
 import { useTerminalContext } from "../contexts/TerminalContext";
@@ -25,6 +25,13 @@ export default function ProjectDetail() {
   const [agentDraft, setAgentDraft] = useState("");
   const [agentLoading, setAgentLoading] = useState(false);
   const [savingAgent, setSavingAgent] = useState(false);
+  
+  // 配置编辑状态
+  const [configDraft, setConfigDraft] = useState({
+    workspace_url: "",
+    start_command: "",
+  });
+  const [savingConfig, setSavingConfig] = useState(false);
 
   const loadProject = useCallback(async () => {
     if (Number.isNaN(numericId)) return;
@@ -64,6 +71,16 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (tab === "agent") void loadAgent();
   }, [tab, loadAgent]);
+
+  // 加载配置
+  useEffect(() => {
+    if (project?.meta) {
+      setConfigDraft({
+        workspace_url: (project.meta.workspace_url as string) || "",
+        start_command: (project.meta.start_command as string) || "",
+      });
+    }
+  }, [project]);
 
   const onSync = async () => {
     if (Number.isNaN(numericId)) return;
@@ -134,6 +151,25 @@ export default function ProjectDetail() {
     navigate("/terminal");
   };
 
+  const onSaveConfig = async () => {
+    if (Number.isNaN(numericId)) return;
+    setSavingConfig(true);
+    try {
+      const meta = { ...project?.meta, ...configDraft };
+      await projectsApi.updateProject(numericId, { meta });
+      addNotification({ type: "success", title: "配置", message: "已保存" });
+      await loadProject();
+    } catch (e) {
+      addNotification({
+        type: "error",
+        title: "保存失败",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
   if (Number.isNaN(numericId)) {
     return (
       <div className="p-6 text-red-400 text-sm font-mono">无效的项目 ID</div>
@@ -141,16 +177,9 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <Link
-        to="/projects"
-        className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        返回项目列表
-      </Link>
-
-      <MetalPanel className="p-6">
+    <div className="min-h-full flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl space-y-6">
+        <MetalPanel className="p-6">
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <Led status={project?.has_workspace && project?.has_agent ? "green" : project?.has_workspace ? "yellow" : "gray"} />
           <h1 className="text-xl font-bold text-[#eee] tracking-wide font-mono flex-1 min-w-0 truncate">
@@ -191,10 +220,50 @@ export default function ProjectDetail() {
           <div className="space-y-4 text-sm text-[#aaa] font-sans">
             {project && (
               <>
+                {/* 项目配置区域 */}
+                <div className="border border-[#333] rounded-lg p-4 bg-[#0a0a0a]/50 mt-6">
+                  <h3 className="text-sm font-bold text-[#ccc] mb-3">项目配置</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-[#888] mb-1.5">Web URL</label>
+                      <input
+                        type="url"
+                        value={configDraft.workspace_url}
+                        onChange={(e) => setConfigDraft({ ...configDraft, workspace_url: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded text-sm text-[#ddd] focus:outline-none focus:border-[#00d8ff]/50"
+                        placeholder="http://localhost:3000"
+                      />
+                      <p className="text-xs text-[#666] mt-1">用于 iframe 预览的 Web 地址</p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs text-[#888] mb-1.5">启动命令</label>
+                      <input
+                        type="text"
+                        value={configDraft.start_command}
+                        onChange={(e) => setConfigDraft({ ...configDraft, start_command: e.target.value })}
+                        className="w-full px-3 py-2 bg-[#1a1a1a] border border-[#333] rounded text-sm text-[#ddd] focus:outline-none focus:border-[#00d8ff]/50"
+                        placeholder="npm run dev"
+                      />
+                      <p className="text-xs text-[#666] mt-1">项目启动命令（仅作参考）</p>
+                    </div>
+                    
+                    <MechButton 
+                      variant="primary" 
+                      className="text-xs" 
+                      onClick={onSaveConfig}
+                      disabled={savingConfig}
+                    >
+                      {savingConfig ? "保存中..." : "保存配置"}
+                    </MechButton>
+                  </div>
+                </div>
+                
+                {/* 原有的项目信息 */}
                 <p>
                   <span className="text-[#666]">路径</span>
                   <br />
-                  <code className="text-[#ccc] break-all text-xs">{project.path}</code>
+                  <code className="text-[#ccc] break-all text-xs">{project.path || "（轻量级项目）"}</code>
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
                   <p>
@@ -214,20 +283,27 @@ export default function ProjectDetail() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <MechButton variant="secondary" className="text-xs gap-2" onClick={() => void onSync()}>
-                    <RefreshCw className="w-3 h-3" />
-                    同步磁盘
-                  </MechButton>
-                  <MechButton variant="secondary" className="text-xs" onClick={() => void onInitClaude()}>
-                    初始化 .claude
-                  </MechButton>
-                  <MechButton variant="secondary" className="text-xs" onClick={() => void onInitWorkspace()}>
-                    生成 web/ 骨架
-                  </MechButton>
-                  <MechButton variant="primary" className="text-xs gap-2" onClick={openTerminalHere}>
-                    <TerminalSquare className="w-3 h-3" />
-                    终端
-                  </MechButton>
+                  {project.path && (
+                    <>
+                      <MechButton variant="secondary" className="text-xs gap-2" onClick={() => void onSync()}>
+                        <RefreshCw className="w-3 h-3" />
+                        同步磁盘
+                      </MechButton>
+                      <MechButton variant="secondary" className="text-xs" onClick={() => void onInitClaude()}>
+                        初始化 .claude
+                      </MechButton>
+                      <MechButton variant="secondary" className="text-xs" onClick={() => void onInitWorkspace()}>
+                        生成 web/ 骨架
+                      </MechButton>
+                      <MechButton variant="primary" className="text-xs gap-2" onClick={openTerminalHere}>
+                        <TerminalSquare className="w-3 h-3" />
+                        终端
+                      </MechButton>
+                    </>
+                  )}
+                  {!project.path && (
+                    <p className="text-xs text-[#888]">轻量级项目，无本地路径</p>
+                  )}
                 </div>
               </>
             )}
@@ -256,6 +332,7 @@ export default function ProjectDetail() {
           </div>
         )}
       </MetalPanel>
+      </div>
     </div>
   );
 }

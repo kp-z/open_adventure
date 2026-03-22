@@ -46,7 +46,7 @@ class MicroverseAgentService:
             request.model
         )
 
-        # 2. 创建 Task 和 Execution（短生命周期，记录审计）
+        # 2. 创建 Task 和 Execution（短生命周期审计记录，直接设为 RUNNING 跳过 PENDING）
         task = Task(
             title=f"Microverse Chat: {request.character_name}",
             description=request.prompt,
@@ -91,12 +91,12 @@ class MicroverseAgentService:
             }
 
         except Exception as e:
-            logger.error(f"Chat failed for {request.character_name}: {e}")
+            logger.error(f"Chat failed for {request.character_name}: {e}", exc_info=True)
             execution.status = ExecutionStatus.FAILED
             execution.error_message = str(e)
             await self.db.commit()
 
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="AI 服务暂时不可用，请稍后重试")
 
     async def _get_or_create_agent(
         self,
@@ -173,6 +173,7 @@ class MicroverseAgentService:
         prompt: str,
         context: Optional[Dict[str, Any]],
         model_override: Optional[str] = None,
+        chat_history: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """
         通过 Anthropic Messages API 生成回复（与 PromptOptimizer 等共用配置来源）。
@@ -199,12 +200,22 @@ class MicroverseAgentService:
             else "你是 Microverse 游戏中的角色，请用自然、简洁的语言回复玩家。"
         )
 
+        # 构建消息列表：包含历史对话 + 当前消息
+        messages = []
+        if chat_history:
+            for msg in chat_history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role in ("user", "assistant") and content:
+                    messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": prompt})
+
         async with AsyncAnthropic(api_key=api_key) as client:
             response = await client.messages.create(
                 model=model,
                 max_tokens=1024,
                 system=system,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
             )
 
         for block in response.content:
@@ -410,10 +421,22 @@ class MicroverseAgentService:
                 detail=f"Failed to start Agent Runtime: {e}",
             ) from e
 
-        # 步骤 3：更新角色侧状态（独立 commit，避免与 Runtime 内 commit 争用同事务）
-        character.is_working = True
-        character.current_execution_id = execution.id
-        await self.db.commit()
+        # 步骤 3：更新角色侧状态（独立 commit，失败时回滚并清理进程避免幽灵进程）
+        try:
+            character.is_working = True
+            character.current_execution_id = execution.id
+            await self.db.commit()
+        except Exception as e:
+            logger.error(f"Failed to update character state for {character_name}, cleaning up: {e}")
+            # 回滚角色状态并尝试停止已启动的进程
+            try:
+                await runtime.stop_agent(execution.id)
+            except Exception:
+                logger.warning(f"Failed to cleanup agent process for execution {execution.id}")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update character state",
+            ) from e
 
         logger.info(
             "Started work for character %s via AgentRuntime, execution_id=%s",
@@ -582,8 +605,9 @@ class MicroverseAgentService:
         if "tasks" not in character.meta:
             character.meta["tasks"] = []
 
-        # 生成任务 ID
-        task_id = len(character.meta["tasks"]) + 1
+        # 生成任务 ID（使用 max 避免删除后 ID 重复）
+        existing_tasks = character.meta["tasks"]
+        task_id = max((t["id"] for t in existing_tasks), default=0) + 1
 
         # 添加任务
         task = {
@@ -744,9 +768,9 @@ class MicroverseAgentService:
         }
         chat_history.append(user_message)
 
-        # 调用 AI API 获取响应
+        # 调用 AI API 获取响应（传入对话历史以支持多轮对话）
         try:
-            response_text = await self._call_ai_api(agent, message, context)
+            response_text = await self._call_ai_api(agent, message, context, chat_history=chat_history)
 
             # 添加助手消息
             assistant_message = {

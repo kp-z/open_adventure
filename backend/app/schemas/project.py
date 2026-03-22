@@ -9,12 +9,13 @@ from pydantic import BaseModel, Field
 
 class ProjectBase(BaseModel):
     name: str = Field(..., max_length=200)
-    path: str = Field(..., max_length=1024)
+    path: Optional[str] = Field(None, max_length=1024)
     description: Optional[str] = Field(None, max_length=500)
 
 
 class ProjectCreate(ProjectBase):
-    """创建索引；可选跳过磁盘初始化"""
+    """创建索引；path 可选表示轻量级项目"""
+    meta: Optional[dict[str, Any]] = None
 
 
 class ProjectCreateFromPath(BaseModel):
@@ -30,12 +31,13 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     workspace_port: Optional[int] = None
     meta: Optional[dict[str, Any]] = None
+    is_pinned: Optional[bool] = None
 
 
 class ProjectResponse(BaseModel):
     id: int
     name: str
-    path: str
+    path: Optional[str]
     description: Optional[str]
     has_agent: bool
     has_workspace: bool = Field(
@@ -52,6 +54,7 @@ class ProjectResponse(BaseModel):
     last_sync_at: Optional[datetime]
     meta: Optional[dict[str, Any]]
     agent_id: Optional[int] = None  # 关联的 Project Agent ID
+    is_pinned: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -1,0 +1,10 @@
+{
+  "workspace": {
+    "scanned": true,
+    "scanned_at": "2026-03-21T15:07:19.720264",
+    "enabled": false,
+    "port": 5173,
+    "auto_start": false,
+    "package_manager": "npm"
+  }
+}

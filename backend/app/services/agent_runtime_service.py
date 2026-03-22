@@ -181,7 +181,11 @@ class AgentRuntimeService:
 
         if execution.log_file and Path(execution.log_file).exists():
             log_file = Path(execution.log_file)
-            output_lines = sum(1 for _ in open(log_file, encoding="utf-8", errors="ignore"))
+            loop = asyncio.get_event_loop()
+            output_lines = await loop.run_in_executor(
+                None,
+                lambda: sum(1 for _ in open(log_file, encoding="utf-8", errors="ignore"))
+            )
             last_activity = datetime.fromtimestamp(log_file.stat().st_mtime)
 
         return {
@@ -258,10 +262,14 @@ class AgentRuntimeService:
             process = psutil.Process(execution.process_pid)
             process.terminate()
 
-            # 等待进程结束
+            # 等待进程结束（使用 run_in_executor 避免阻塞事件循环）
+            loop = asyncio.get_event_loop()
             try:
-                process.wait(timeout=10)
-            except psutil.TimeoutExpired:
+                await asyncio.wait_for(
+                    loop.run_in_executor(None, process.wait),
+                    timeout=10
+                )
+            except (asyncio.TimeoutError, psutil.TimeoutExpired):
                 process.kill()
 
             # 更新 Execution 状态

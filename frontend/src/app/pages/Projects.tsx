@@ -3,13 +3,13 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Settings, Maximize2, Activity, FolderPlus, Radar, Bot, Sparkles, Loader2 } from "lucide-react";
+import { Settings, Maximize2, Activity, FolderPlus, Radar, Bot, Sparkles, Loader2, Pin, Play, RefreshCw } from "lucide-react";
 import { MechButton, MetalPanel, Rivet, Led, type LedStatus } from "../components/ui/SkeuoUI";
 import MetaballCanvas from "../components/MetaballCanvas";
 import { useNotifications } from "../contexts/NotificationContext";
 import * as projectsApi from "../../lib/api/services/projects";
 import { agentsApi } from "../../lib/api";
-import type { ProjectRecord } from "../../lib/api/services/projects";
+import type { ProjectRecord, WorkspaceStatus } from "../../lib/api/services/projects";
 
 // Workspace Agent 默认 System Prompt
 const WORKSPACE_AGENT_PROMPT = `你是 {projectName} 项目的 Workspace Agent。
@@ -40,6 +40,8 @@ const WORKSPACE_AGENT_PROMPT = `你是 {projectName} 项目的 Workspace Agent�
 首次使用时，请先扫描项目结构并输出检测结果。`;
 
 function cardLed(p: ProjectRecord): LedStatus {
+  // 如果配置了 workspace_url，显示黄色（可用但未完全配置）
+  if (p.meta?.workspace_url) return "yellow";
   // 未关联 Agent 时显示红色
   if (!p.agent_id) return "red";
   // 已绑定但未扫描 config：与「需点 Init」状态一致
@@ -50,6 +52,8 @@ function cardLed(p: ProjectRecord): LedStatus {
 }
 
 function cardAction(p: ProjectRecord): string {
+  // 如果配置了 workspace_url，可以直接进入 Workspace
+  if (p.meta?.workspace_url) return "ENTER WORKSPACE";
   // 未关联 Agent 时显示"创建 Agent"
   if (!p.agent_id) return "创建 AGENT";
   // 以 config 扫描为准；仅有 web/ 不算已 Init
@@ -70,6 +74,15 @@ export default function Projects() {
   
   // Init Workspace 状态
   const [initializingProjects, setInitializingProjects] = useState<Set<number>>(new Set());
+  
+  // 添加项目弹窗状态
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+  const [adding, setAdding] = useState(false);
+
+  // 运行状态缓存
+  const [runningStatus, setRunningStatus] = useState<Map<number, WorkspaceStatus>>(new Map());
+  const [statusLoading, setStatusLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +96,24 @@ export default function Projects() {
       // 再加载项目列表
       const res = await projectsApi.listProjects({ limit: 200 });
       setItems(res.items);
+
+      // 批量获取运行状态
+      if (res.items.length > 0) {
+        setStatusLoading(true);
+        const statusMap = new Map<number, WorkspaceStatus>();
+        await Promise.allSettled(
+          res.items.map(async (project) => {
+            try {
+              const status = await projectsApi.getWorkspaceStatus(project.id);
+              statusMap.set(project.id, status);
+            } catch (e) {
+              // 忽略单个项目的错误
+            }
+          })
+        );
+        setRunningStatus(statusMap);
+        setStatusLoading(false);
+      }
     } catch (e) {
       addNotification({
         type: "error",
@@ -101,6 +132,83 @@ export default function Projects() {
   const openWorkspace = (id: number, generate?: boolean) => {
     const q = generate ? "?generate=1" : "";
     navigate(`/projects/${id}/workspace${q}`);
+  };
+
+  const handleStopWorkspace = async (project: ProjectRecord) => {
+    try {
+      addNotification({
+        type: "info",
+        title: "停止服务",
+        message: `正在停止 ${project.name} 的 Web 服务...`,
+      });
+      
+      await projectsApi.stopWorkspace(project.id);
+      
+      // 更新缓存状态
+      const status = await projectsApi.getWorkspaceStatus(project.id);
+      setRunningStatus(prev => new Map(prev).set(project.id, status));
+      
+      addNotification({
+        type: "success",
+        title: "停止成功",
+        message: `${project.name} 的 Web 服务已停止`,
+      });
+    } catch (e) {
+      addNotification({
+        type: "error",
+        title: "停止失败",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
+
+  const handleStartWorkspace = async (projectId: number) => {
+    try {
+      const project = items.find(p => p.id === projectId);
+      if (!project) return;
+      
+      addNotification({
+        type: "info",
+        title: "启动服务",
+        message: `正在启动 ${project.name} 的 Web 服务...`,
+      });
+      
+      const status = await projectsApi.startWorkspace(projectId);
+      setRunningStatus(prev => new Map(prev).set(projectId, status));
+      
+      addNotification({
+        type: "success",
+        title: "启动成功",
+        message: `${project.name} 的 Web 服务已启动`,
+      });
+      
+      // 启动成功后自动打开
+      navigate(`/projects/${projectId}/workspace`);
+    } catch (e) {
+      addNotification({
+        type: "error",
+        title: "启动失败",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  };
+
+  const handleTogglePin = async (project: ProjectRecord) => {
+    const newPinned = !project.is_pinned;
+    try {
+      await projectsApi.updateProject(project.id, { is_pinned: newPinned });
+      setItems((prev) =>
+        [...prev]
+          .map((p) => (p.id === project.id ? { ...p, is_pinned: newPinned } : p))
+          .sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0))
+      );
+    } catch (e) {
+      addNotification({
+        type: "error",
+        title: "置顶操作失败",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
   };
 
   const onAddFromPath = () => {
@@ -246,17 +354,68 @@ export default function Projects() {
     }
   };
 
+  // 添加项目
+  const onAddProject = () => {
+    setNewProjectName("");
+    setShowAddModal(true);
+  };
+
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim()) {
+      addNotification({ type: "error", title: "添加失败", message: "项目名称不能为空" });
+      return;
+    }
+    
+    setAdding(true);
+    try {
+      await projectsApi.createProject({ 
+        name: newProjectName.trim(),
+        meta: { project_type: 'lightweight' }
+      });
+      addNotification({ type: "success", title: "项目", message: `已添加：${newProjectName}` });
+      setShowAddModal(false);
+      setNewProjectName("");
+      await load();
+    } catch (e) {
+      addNotification({ 
+        type: "error", 
+        title: "添加失败", 
+        message: e instanceof Error ? e.message : String(e) 
+      });
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <div className="flex-1 p-4 md:p-8 lg:p-10 flex flex-col gap-8 min-h-full overflow-y-auto font-mono bg-[#0f111a] -m-4 md:-m-8 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-bold text-[#ccc] tracking-[0.2em] uppercase">Projects</h1>
         <div className="flex gap-2">
-          <MechButton variant="secondary" className="text-xs px-3 py-2" onClick={() => void load()} disabled={loading}>
-            {loading ? <Activity className="w-3 h-3 animate-spin" /> : "刷新"}
+          <MechButton 
+            variant="secondary" 
+            className="p-2" 
+            onClick={() => void load()} 
+            disabled={loading}
+            title="刷新"
+          >
+            <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </MechButton>
-          <MechButton variant="secondary" className="text-xs px-3 py-2 gap-1" onClick={onScan}>
-            <Radar className="w-3 h-3" />
-            扫描
+          <MechButton 
+            variant="primary" 
+            className="p-2" 
+            onClick={onAddProject}
+            title="添加项目"
+          >
+            <FolderPlus className="w-4 h-4" />
+          </MechButton>
+          <MechButton 
+            variant="secondary" 
+            className="p-2" 
+            onClick={onScan}
+            title="扫描"
+          >
+            <Radar className="w-4 h-4" />
           </MechButton>
         </div>
       </div>
@@ -277,16 +436,21 @@ export default function Projects() {
             const led = cardLed(project);
             const action = cardAction(project);
             const hasAgent = !!project.agent_id;
+            const hasWebUrl = !!project.meta?.workspace_url;
             const thumbnailUrl = hasAgent ? projectsApi.getThumbnailUrl(project.id) : null;
             
             return (
               <MetalPanel
                 key={project.id}
-                className="p-4 flex flex-col gap-4 group hover:border-[#555] transition-colors relative"
+                className={`p-4 flex flex-col gap-4 group hover:border-[#555] transition-colors relative ${
+                  project.is_pinned ? "border-[#f59e0b]/60" : ""
+                }`}
               >
+                {project.is_pinned && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#f59e0b] to-transparent rounded-t-lg" />
+                )}
                 <Rivet className="absolute top-2 left-2 z-10" />
                 <Rivet className="absolute top-2 right-2 z-10" />
-                <Rivet className="absolute bottom-2 left-2 z-10" />
                 <Rivet className="absolute bottom-2 right-2 z-10" />
 
                 <div className="w-full h-40 bg-[#0a0a0a] rounded-lg border-2 border-[#111] shadow-[inset_0_4px_8px_rgba(0,0,0,0.8)] overflow-hidden relative group-hover:shadow-[inset_0_4px_12px_rgba(99,102,241,0.15)] transition-shadow">
@@ -332,64 +496,182 @@ export default function Projects() {
                 </div>
 
                 <div className="flex items-center gap-2 mt-auto pt-2 border-t border-[#333]/50">
+                  <button
+                    type="button"
+                    className={`shrink-0 p-2 bg-[#222] rounded-md border transition shadow-[0_2px_4px_rgba(0,0,0,0.5)] ${
+                      project.is_pinned
+                        ? 'border-[#f59e0b]/50 hover:bg-[#333] text-[#f59e0b]'
+                        : 'border-[#333] hover:bg-[#333] text-[#aaa]'
+                    }`}
+                    title={project.is_pinned ? "取消置顶" : "置顶"}
+                    onClick={() => void handleTogglePin(project)}
+                  >
+                    <Pin className={`w-4 h-4 ${project.is_pinned ? "fill-current" : ""}`} />
+                  </button>
                   <Link
                     to={`/projects/${project.id}`}
-                    className={`shrink-0 p-2 bg-[#222] rounded-md border border-[#333] transition shadow-[0_2px_4px_rgba(0,0,0,0.5)] ${
-                      hasAgent ? 'hover:bg-[#333]' : 'opacity-50 cursor-not-allowed pointer-events-none'
-                    }`}
+                    className="shrink-0 p-2 bg-[#222] rounded-md border border-[#333] hover:bg-[#333] transition shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
                     title="设置"
-                    onClick={(e) => !hasAgent && e.preventDefault()}
                   >
                     <Settings className="w-4 h-4 text-[#aaa]" />
                   </Link>
                   <button
                     type="button"
                     className={`shrink-0 p-2 bg-[#222] rounded-md border border-[#333] transition shadow-[0_2px_4px_rgba(0,0,0,0.5)] ${
-                      hasAgent ? 'hover:bg-[#333]' : 'opacity-50 cursor-not-allowed'
+                      hasWebUrl ? 'hover:bg-[#333]' : 'opacity-50 cursor-not-allowed'
                     }`}
-                    title="放大"
-                    onClick={() => hasAgent && openWorkspace(project.id)}
-                    disabled={!hasAgent}
+                    title="打开 Workspace"
+                    onClick={() => hasWebUrl && openWorkspace(project.id)}
+                    disabled={!hasWebUrl}
                   >
                     <Maximize2 className="w-4 h-4 text-[#aaa]" />
                   </button>
 
                   {hasAgent ? (
-                    <MechButton
-                      className="flex-1 text-xs py-2 h-full"
-                      variant={led === "green" ? "primary" : "secondary"}
+                    <button
+                      type="button"
+                      className={`shrink-0 p-2 bg-[#222] rounded-md border transition shadow-[0_2px_4px_rgba(0,0,0,0.5)] ${
+                        initializingProjects.has(project.id)
+                          ? 'border-[#00d8ff]/50 cursor-wait'
+                          : runningStatus.get(project.id)?.running
+                          ? 'border-green-500/50 hover:bg-[#333] text-green-500'
+                          : led === "green"
+                          ? 'border-[#00d8ff]/50 hover:bg-[#333] text-[#00d8ff]'
+                          : 'border-[#333] hover:bg-[#333] text-[#aaa]'
+                      }`}
+                      title={
+                        initializingProjects.has(project.id)
+                          ? "初始化中..."
+                          : runningStatus.get(project.id)?.running
+                          ? "停止服务"
+                          : !project.workspace_scanned
+                          ? "初始化 Workspace"
+                          : "进入 Workspace"
+                      }
                       disabled={initializingProjects.has(project.id)}
                       onClick={() => {
-                        if (project.workspace_scanned) {
-                          openWorkspace(project.id, false);
-                        } else {
-                          handleInitWorkspace(project);
+                        // 初始化中，不响应
+                        if (initializingProjects.has(project.id)) return;
+                        
+                        // 服务正在运行，点击停止
+                        if (runningStatus.get(project.id)?.running) {
+                          void handleStopWorkspace(project);
+                          return;
                         }
+                        
+                        // 未初始化，先初始化
+                        if (!project.workspace_scanned) {
+                          void handleInitWorkspace(project);
+                          return;
+                        }
+                        
+                        // 已初始化但未运行，启动并进入
+                        void handleStartWorkspace(project.id);
                       }}
                     >
                       {initializingProjects.has(project.id) ? (
-                        <><Loader2 className="w-3 h-3 animate-spin mr-1" />初始化中...</>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : runningStatus.get(project.id)?.running ? (
+                        <Play className="w-4 h-4" />
+                      ) : project.workspace_scanned ? (
+                        <Play className="w-4 h-4" />
                       ) : (
-                        action
+                        <RefreshCw className="w-4 h-4" />
                       )}
-                    </MechButton>
+                    </button>
+                  ) : hasWebUrl ? (
+                    // 配置了 workspace_url 但没有 Agent，可以直接进入
+                    <button
+                      type="button"
+                      className={`shrink-0 p-2 bg-[#222] rounded-md border transition shadow-[0_2px_4px_rgba(0,0,0,0.5)] ${
+                        runningStatus.get(project.id)?.running
+                          ? 'border-green-500/50 hover:bg-[#333] text-green-500'
+                          : 'border-[#333] hover:bg-[#333] text-[#aaa]'
+                      }`}
+                      title={runningStatus.get(project.id)?.running ? "停止服务" : "进入 Workspace"}
+                      onClick={() => {
+                        if (runningStatus.get(project.id)?.running) {
+                          void handleStopWorkspace(project);
+                        } else {
+                          void handleStartWorkspace(project.id);
+                        }
+                      }}
+                    >
+                      <Play className="w-4 h-4" />
+                    </button>
                   ) : (
-                    <MechButton
-                      className="flex-1 text-xs py-2 h-full gap-1"
-                      variant="primary"
+                    <button
+                      type="button"
+                      className="shrink-0 p-2 bg-[#222] rounded-md border border-[#00d8ff]/50 hover:bg-[#333] transition shadow-[0_2px_4px_rgba(0,0,0,0.5)] text-[#00d8ff]"
+                      title={action}
                       onClick={() => {
                         setGenAgentTarget(project);
                         setShowGenAgentModal(true);
                       }}
                     >
-                      <Sparkles className="w-3 h-3" />
-                      Gen Agent
-                    </MechButton>
+                      <Sparkles className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
               </MetalPanel>
             );
           })}
+        </div>
+      )}
+
+      {/* 添加项目弹窗 */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#1a1b26] border border-[#333] rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-[#eee]">
+              <FolderPlus className="w-5 h-5 text-blue-400" />
+              添加
+            </h3>
+            
+            <p className="text-gray-300 mb-4 text-sm">
+              创建一个轻量级项目，仅需要项目名称。可在设置中配置 Web URL 和启动命令。
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm text-gray-400 mb-2">项目名称 *</label>
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !adding && handleCreateProject()}
+                placeholder="输入项目名称"
+                className="w-full px-3 py-2 bg-[#0a0a0a] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setNewProjectName("");
+                }}
+                disabled={adding}
+                className="flex-1 px-4 py-2.5 bg-[#222] hover:bg-[#333] border border-[#444] rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateProject}
+                disabled={adding || !newProjectName.trim()}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {adding ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    创建中...
+                  </>
+                ) : (
+                  '确认添加'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

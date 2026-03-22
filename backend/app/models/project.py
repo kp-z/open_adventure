@@ -22,7 +22,7 @@ class Project(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    path: Mapped[str] = mapped_column(String(1024), unique=True, nullable=False, index=True)
+    path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True, index=True)
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     has_agent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -34,6 +34,8 @@ class Project(Base):
 
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     meta: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+
+    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # 关联的 Project Agent（一对一关系）
     agent_id: Mapped[Optional[int]] = mapped_column(

@@ -43,7 +43,8 @@ class ProjectService:
         all_projects, _ = await self.repo.list_all(skip=0, limit=10000)
 
         if include_disabled_paths:
-            # 不过滤，直接分页返回
+            # 不过滤，直接分页返回（置顶项目排在前）
+            all_projects.sort(key=lambda p: (0 if p.is_pinned else 1))
             total = len(all_projects)
             return all_projects[skip:skip + limit], total
 
@@ -53,19 +54,25 @@ class ProjectService:
 
         # 边界情况：如果没有配置任何 ProjectPath，则显示所有项目
         if not enabled_paths:
+            all_projects.sort(key=lambda p: (0 if p.is_pinned else 1))
             total = len(all_projects)
             return all_projects[skip:skip + limit], total
 
         enabled_path_strs = [p.path for p in enabled_paths]
 
-        # 过滤：Project.path 必须以某个 enabled path 开头
+        # 过滤：Project.path 必须以某个 enabled path 开头，或者是轻量级项目（无 path）
         def is_under_enabled_path(project: Project) -> bool:
+            if not project.path:
+                # 轻量级项目，始终显示
+                return True
             for ep in enabled_path_strs:
                 if project.path.startswith(ep):
                     return True
             return False
 
         filtered = [p for p in all_projects if is_under_enabled_path(p)]
+        # 置顶项目排在前，其余保持原顺序
+        filtered.sort(key=lambda p: (0 if p.is_pinned else 1))
         total = len(filtered)
         return filtered[skip:skip + limit], total
 
@@ -73,13 +80,27 @@ class ProjectService:
         return await self.repo.get(project_id)
 
     async def create(self, data: ProjectCreate) -> Project:
-        path = str(Path(data.path).expanduser().resolve())
-        existing = await self.repo.get_by_path(path)
-        if existing:
-            raise ValueError(f"路径已存在索引: id={existing.id}")
-
-        probe = pfs.probe_project_directory(path)
+        path = str(Path(data.path).expanduser().resolve()) if data.path else ""
+        if path:
+            existing = await self.repo.get_by_path(path)
+            if existing:
+                raise ValueError(f"路径已存在索引: id={existing.id}")
+            probe = pfs.probe_project_directory(path)
+        else:
+            # 轻量级项目，无路径
+            probe = {
+                "has_agent": False,
+                "has_workspace": False,
+                "workspace_port": None,
+                "git_remote": None,
+                "git_branch": None,
+            }
+        
         now = datetime.utcnow()
+        meta = data.meta or {}
+        if not path:
+            meta['project_type'] = 'lightweight'
+        
         p = Project(
             name=data.name,
             path=path,
@@ -89,8 +110,8 @@ class ProjectService:
             workspace_port=probe.get("workspace_port"),
             git_remote=probe.get("git_remote"),
             git_branch=probe.get("git_branch"),
-            last_sync_at=now,
-            meta={},
+            last_sync_at=now if path else None,
+            meta=meta,
             created_at=now,
             updated_at=now,
         )
@@ -115,6 +136,8 @@ class ProjectService:
             p.workspace_port = data.workspace_port
         if data.meta is not None:
             p.meta = data.meta
+        if data.is_pinned is not None:
+            p.is_pinned = data.is_pinned
         p.updated_at = datetime.utcnow()
         await self.session.commit()
         await self.session.refresh(p)
@@ -136,6 +159,9 @@ class ProjectService:
         p = await self.repo.get(project_id)
         if not p:
             return None
+        if not p.path:
+            # 轻量级项目，无需同步
+            return p
         probe = pfs.probe_project_directory(p.path)
         p.has_agent = probe["has_agent"]
         p.has_workspace = probe["has_workspace"]

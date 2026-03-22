@@ -44,7 +44,8 @@ def get_project_service(db: AsyncSession = Depends(get_db)) -> ProjectService:
 def _to_response(p: Project) -> ProjectResponse:
     # workspace_scanned 来自磁盘 config，与 has_workspace（web/ 探测）解耦
     base = ProjectResponse.model_validate(p)
-    scanned = pfs.is_workspace_config_scanned(p.path)
+    # 轻量级项目无路径，无需扫描
+    scanned = pfs.is_workspace_config_scanned(p.path) if p.path else False
     return base.model_copy(update={"workspace_scanned": scanned})
 
 
@@ -78,7 +79,10 @@ async def create_project(
     body: ProjectCreate,
     service: ProjectService = Depends(get_project_service),
 ):
+    """创建项目（可选 path，为空时创建轻量级项目）"""
     try:
+        if not body.name:
+            raise ValueError("项目名称为必填项")
         p = await service.create(body)
         return _to_response(p)
     except ValueError as e:
