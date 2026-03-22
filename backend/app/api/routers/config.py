@@ -42,20 +42,8 @@ class ModelsConfigUpdate(BaseModel):
 
 def get_config_file_path() -> Path:
     """获取配置文件路径"""
-    # 优先使用打包版本的配置路径
-    user_dir = Path.home() / ".open_adventure"
-    user_env = user_dir / ".env"
-
-    if user_env.exists():
-        return user_env
-
-    # 开发环境配置路径
-    dev_env = Path(__file__).parent.parent.parent.parent / ".env"
-    if dev_env.exists():
-        return dev_env
-
-    # 如果都不存在，返回打包版本路径（会在后续创建）
-    return user_env
+    from app.core.path_resolver import get_env_path
+    return get_env_path()
 
 
 def parse_env_file(file_path: Path) -> Dict[str, str]:
@@ -272,7 +260,8 @@ def get_models_config_path() -> Path:
 
 def get_default_models_path() -> Path:
     """获取默认模型配置文件路径"""
-    return Path(__file__).parent.parent.parent / "config" / "default_models.json"
+    from app.core.path_resolver import get_config_path
+    return get_config_path("default_models.json")
 
 
 @router.get("/models")

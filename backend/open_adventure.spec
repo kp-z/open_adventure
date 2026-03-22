@@ -94,6 +94,30 @@ if alembic_dir.exists():
 else:
     print("⚠️  警告: alembic 目录不存在")
 
+# 收集 marketplace 目录（内置插件）
+marketplace_dir = project_root / 'marketplace'
+if marketplace_dir.exists():
+    marketplace_count = 0
+    for root, dirs, files in os.walk(marketplace_dir):
+        for file in files:
+            if file == '__pycache__' or file.startswith('.'):
+                continue
+            src = Path(root) / file
+            dst = Path('marketplace') / src.relative_to(marketplace_dir).parent
+            datas.append((str(src), str(dst)))
+            marketplace_count += 1
+    print(f"✓ 收集 marketplace 文件: {marketplace_count} 个")
+else:
+    print("⚠️  警告: marketplace 目录不存在")
+
+# 收集测试配置文件
+test_config = app_dir / 'testing' / 'test_config.yaml'
+if test_config.exists():
+    datas.append((str(test_config), 'app/testing'))
+    print(f"✓ 收集测试配置: test_config.yaml")
+else:
+    print("⚠️  警告: test_config.yaml 不存在")
+
 # 隐藏导入（确保所有运行时需要的模块都被包含）
 hiddenimports = [
     # App 模块
@@ -124,6 +148,10 @@ hiddenimports = [
     'app.api.routers.settings',
     'app.api.routers.microverse',
     'app.api.routers.tasks_ws',
+    'app.api.routers.projects',
+    'app.api.routers.testing',
+    'app.api.routers.logs',
+    'app.api.routers.localfs',
     'app.api.dashboard',
     'app.api.auth',
     'app.api.terminal',
@@ -137,6 +165,7 @@ hiddenimports = [
     'app.core.exceptions',
     'app.core.utils',
     'app.core.tag_definitions',
+    'app.core.path_resolver',
     'app.config',
     'app.config.settings',
     'app.models',
@@ -153,6 +182,7 @@ hiddenimports = [
     'app.models.project_path',
     'app.models.plugin',
     'app.models.microverse',
+    'app.models.project',
     'app.repositories',
     'app.repositories.base',
     'app.repositories.skill_repository',
@@ -164,6 +194,7 @@ hiddenimports = [
     'app.repositories.executions_repo',
     'app.repositories.plugin_repository',
     'app.repositories.project_path_repository',
+    'app.repositories.project_repository',
     'app.services',
     'app.services.skill_service',
     'app.services.agent_service',
@@ -196,9 +227,21 @@ hiddenimports = [
     'app.services.prompt_optimizer_service',
     'app.services.tag_classifier',
     'app.services.websocket_manager',
+    'app.services.project_service',
+    'app.services.project_filesystem_service',
+    'app.services.workspace_process_service',
+    'app.services.screenshot_service',
     'app.adapters',
     'app.adapters.claude',
     'app.schemas',
+    'app.testing',
+    'app.testing.models',
+    'app.testing.test_runner',
+    'app.testing.test_tree',
+    'app.middleware',
+    'app.middleware.access_guard',
+    'app.database',
+    'app.database.migration',
 
     # Uvicorn 和 FastAPI
     'uvicorn',

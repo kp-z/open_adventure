@@ -250,6 +250,7 @@
 
   .app-shell {
     min-height: var(--app-h);
+    max-height: var(--app-h);
   }
 
   .safe-fixed-top {

@@ -76,6 +76,7 @@ export default function ProjectWorkspace() {
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesSessionRef = useRef<string | null>(null);
 
   // Agent 详情状态
   const [agentDetail, setAgentDetail] = useState<Agent | null>(null);
@@ -95,7 +96,14 @@ export default function ProjectWorkspace() {
   // 处理发送消息
   const handleSendMessage = useCallback(async () => {
     if (!inputMessage.trim() || !project?.agent_id || isStreaming) return;
-    
+
+    // 确保有 activeSessionId
+    let currentSessionId = activeSessionId;
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID();
+      setActiveSessionId(currentSessionId);
+    }
+
     const userMessage = inputMessage.trim();
     setInputMessage("");
     setMessages(prev => [...prev, {
@@ -118,7 +126,7 @@ export default function ProjectWorkspace() {
     
     try {
       const response = await fetch(
-        `/api/agents/${project.agent_id}/test-stream?prompt=${encodeURIComponent(userMessage)}`,
+        `/api/agents/${project.agent_id}/test-stream?prompt=${encodeURIComponent(userMessage)}&session_id=${currentSessionId}`,
         {
           method: 'POST',
           headers: {
@@ -158,6 +166,7 @@ export default function ProjectWorkspace() {
               if (data.type === 'log' && data.message) {
                 // 流式日志：累积到 streaming_logs
                 setMessages(prev => {
+                  if (prev.length === 0) return prev;
                   const newMessages = [...prev];
                   const last = newMessages[newMessages.length - 1];
                   const logs = last.streaming_logs || [];
@@ -171,6 +180,7 @@ export default function ProjectWorkspace() {
                 // AI 开始回复，清空日志
                 assistantContent += data.text;
                 setMessages(prev => {
+                  if (prev.length === 0) return prev;
                   const newMessages = [...prev];
                   const last = newMessages[newMessages.length - 1];
                   newMessages[newMessages.length - 1] = {
@@ -184,6 +194,30 @@ export default function ProjectWorkspace() {
                 // 完成：读取 AI 最终输出并渲染 Markdown
                 if (data.data?.output) {
                   assistantContent = data.data.output;
+                  const contentType = data.data.content_type || 'conversation';
+                  const messageId = `agent-${Date.now()}`;
+                  
+                  // 如果是 Plan 或 Report，自动保存到文件
+                  let filePath: string | undefined;
+                  if ((contentType === 'plan' || contentType === 'report') && activeSessionId) {
+                    try {
+                      const saveRes = await fetch(`/api/agents/${project.agent_id}/plans/save`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          session_id: activeSessionId,
+                          message_id: messageId,
+                          content: assistantContent,
+                          content_type: contentType
+                        })
+                      });
+                      const saveData = await saveRes.json();
+                      filePath = saveData.file_path;
+                    } catch (err) {
+                      console.error('Failed to save plan file:', err);
+                    }
+                  }
+                  
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const last = newMessages[newMessages.length - 1];
@@ -191,8 +225,9 @@ export default function ProjectWorkspace() {
                       ...last,
                       content: assistantContent,
                       status: 'success',
-                      content_type: data.data.content_type || 'conversation',
+                      content_type: contentType,
                       streaming_logs: undefined,
+                      file_path: filePath,
                     };
                     return newMessages;
                   });
@@ -243,7 +278,7 @@ export default function ProjectWorkspace() {
     } finally {
       setIsStreaming(false);
     }
-  }, [inputMessage, project?.agent_id, isStreaming, addNotification]);
+  }, [inputMessage, project?.agent_id, isStreaming, activeSessionId, addNotification]);
 
   // 获取 Agent 详情
   useEffect(() => {
@@ -266,9 +301,10 @@ export default function ProjectWorkspace() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // 保存消息到 localStorage（每条消息后）
+  // 保存消息到 localStorage（仅当 messages 属于当前 session 时）
   useEffect(() => {
-    if (activeSessionId && messages.length > 0 && project?.agent_id) {
+    if (activeSessionId && messages.length > 0 && project?.agent_id
+        && messagesSessionRef.current === activeSessionId) {
       const cacheKey = `agent-chat-${project.agent_id}-${activeSessionId}`;
       localStorage.setItem(cacheKey, JSON.stringify({
         messages,
@@ -279,6 +315,10 @@ export default function ProjectWorkspace() {
 
   // 从 localStorage 或 API 恢复消息（组件挂载或切换 session）
   useEffect(() => {
+    // 立即清除旧消息，防止残留
+    setMessages([]);
+    messagesSessionRef.current = activeSessionId;
+
     const loadChatHistory = async (sessionId: string) => {
       try {
         const res = await fetch(`/api/executions/session/${sessionId}`);
@@ -830,10 +870,16 @@ export default function ProjectWorkspace() {
 
         {/* Agent 侧边栏 */}
         {collabOpen && project?.agent_id && (
-          <div className="w-96 shrink-0 border-l border-white/10 bg-[#0f111a] flex flex-col">
+          <div className="w-96 shrink-0 border-l border-white/10 bg-[#0f111a] flex flex-col min-h-0 overflow-hidden">
             {/* Session Tabs */}
             <div className="flex items-center gap-1 px-2 py-1 border-b border-white/10 overflow-x-auto">
-              {sessions.map((s, idx) => (
+              {sessions.map((s, idx) => {
+                const created = new Date(s.created_at);
+                const isToday = new Date().toDateString() === created.toDateString();
+                const timeLabel = isToday
+                  ? created.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+                  : `${String(created.getMonth() + 1).padStart(2, '0')}/${String(created.getDate()).padStart(2, '0')} ${created.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+                return (
                 <button
                   key={s.session_id}
                   onClick={() => setActiveSessionId(s.session_id)}
@@ -842,12 +888,13 @@ export default function ProjectWorkspace() {
                       ? 'bg-indigo-500/20 text-indigo-300 border-b-2 border-indigo-500'
                       : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
-                  title={`Session ${idx + 1} - ${s.message_count} 条消息`}
+                  title={`${timeLabel} - ${s.message_count} 条消息`}
                 >
-                  Session {idx + 1}
+                  {timeLabel}
                   {s.message_count > 0 && ` (${s.message_count})`}
                 </button>
-              ))}
+                );
+              })}
               <button
                 onClick={() => void createSession()}
                 className="px-2 py-1 text-xs text-gray-400 hover:text-white flex items-center gap-1"
@@ -941,7 +988,7 @@ export default function ProjectWorkspace() {
             )}
             
             {/* 消息列表 */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
               {messages.length === 0 ? (
                 <div className="h-full flex items-center justify-center text-gray-500 text-sm text-center">
                   <div>
@@ -953,7 +1000,12 @@ export default function ProjectWorkspace() {
               ) : (
                 <>
                   {messages.map((msg) => (
-                    <MessageBubble key={msg.id} message={msg} />
+                    <MessageBubble 
+                      key={msg.id} 
+                      message={msg}
+                      agentId={project?.agent_id}
+                      sessionId={activeSessionId || undefined}
+                    />
                   ))}
                   <div ref={messagesEndRef} />
                 </>
@@ -980,6 +1032,11 @@ export default function ProjectWorkspace() {
                 <button
                   onClick={() => {
                     if (activeSessionId && confirm('确定清空当前对话？这将清除所有历史消息。')) {
+                      // 清除 localStorage 缓存
+                      if (project?.agent_id) {
+                        localStorage.removeItem(`agent-chat-${project.agent_id}-${activeSessionId}`);
+                      }
+                      setMessages([]);
                       void clearSession(activeSessionId);
                     }
                   }}

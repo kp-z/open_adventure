@@ -22,7 +22,8 @@ class AgentTestService:
     async def create_agent_test_execution(
         self,
         agent_id: int,
-        test_input: str
+        test_input: str,
+        session_id: Optional[str] = None
     ) -> Execution:
         """
         创建 Agent 测试执行记录
@@ -30,10 +31,29 @@ class AgentTestService:
         Args:
             agent_id: Agent ID
             test_input: 测试输入
+            session_id: 可选的会话 ID（用于持久化对话）
 
         Returns:
             Execution: 执行记录
         """
+        import uuid
+
+        # 如果提供了 session_id，先查找现有 Execution
+        if session_id and session_id.strip():
+            result = await self.db.execute(
+                select(Execution).where(
+                    Execution.session_id == session_id,
+                    Execution.agent_id == agent_id
+                )
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                logger.info(f"Reusing existing execution {existing.id} for session {session_id}")
+                return existing
+        else:
+            # 生成新的 session_id
+            session_id = str(uuid.uuid4())
+        
         # 创建一个临时 Task
         task = Task(
             title=f"Agent Test #{agent_id}",
@@ -51,14 +71,18 @@ class AgentTestService:
             agent_id=agent_id,
             test_input=test_input,
             status=ExecutionStatus.PENDING,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            session_id=session_id,
+            is_background=True,
+            chat_history='[]',
+            last_activity_at=datetime.utcnow()
         )
 
         self.db.add(execution)
         await self.db.commit()
         await self.db.refresh(execution)
 
-        logger.info(f"Created agent test execution {execution.id} for agent {agent_id}")
+        logger.info(f"Created agent test execution {execution.id} for agent {agent_id} with session {session_id}")
         return execution
 
     async def execute_agent_test(

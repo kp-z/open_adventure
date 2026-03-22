@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LoadingScreen } from '../components/LoadingScreen';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, Typography } from '@mui/material';
 
 // localStorage 缓存键
 const CACHE_KEY = 'microverse_game_loaded';
@@ -41,8 +40,6 @@ export default function Microverse() {
   const [loadingText, setLoadingText] = useState('正在启动游戏模式...');
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingLogs, setLoadingLogs] = useState<string[]>([]); // 加载日志
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [gameVersion, setGameVersion] = useState<string>(''); // 游戏版本号，用于缓存破坏
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -189,12 +186,10 @@ export default function Microverse() {
       // 设置游戏版本号（用于 iframe src 的缓存破坏）
       setGameVersion(newVersion.exportTime);
 
-      // 如果有缓存版本且与当前版本不匹配
+      // 如果有缓存版本且与当前版本不匹配，静默更新
       if (cachedVersion && cachedVersion !== newVersion.exportTime) {
-        console.log('[Microverse] 检测到新版本，提示更新');
-        setVersionInfo(newVersion);
-        setShowUpdateDialog(true);
-        // 清除游戏缓存标记，强制重新加载
+        console.log('[Microverse] 检测到新版本，静默更新缓存');
+        localStorage.setItem(VERSION_KEY, newVersion.exportTime);
         setGameCached(false);
       } else {
         // 更新缓存版本
@@ -204,24 +199,6 @@ export default function Microverse() {
       console.warn('[Microverse] 版本检查失败，使用时间戳作为版本:', error);
       setGameVersion(Date.now().toString());
     }
-  };
-
-  // 处理刷新页面
-  const handleRefreshPage = () => {
-    // 清除所有缓存
-    setGameCached(false);
-    localStorage.removeItem(VERSION_KEY);
-    // 刷新页面
-    window.location.reload();
-  };
-
-  // 处理稍后提醒
-  const handleDismiss = () => {
-    // 更新版本号，下次不再提示
-    if (versionInfo) {
-      localStorage.setItem(VERSION_KEY, versionInfo.exportTime);
-    }
-    setShowUpdateDialog(false);
   };
 
   useEffect(() => {
@@ -408,69 +385,6 @@ export default function Microverse() {
         overflow: 'hidden',
       }}
     >
-      {/* 版本更新提示对话框 */}
-      <Dialog
-        open={showUpdateDialog}
-        onClose={handleDismiss}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: '#1a1d2e',
-            color: '#fff',
-            borderRadius: 2,
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-          }
-        }}
-      >
-        <DialogTitle sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-          🎮 游戏版本更新
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            检测到 Microverse 游戏有新版本可用！
-          </Typography>
-          {versionInfo?.message && (
-            <Typography variant="body2" sx={{ mb: 2, color: 'rgba(255, 255, 255, 0.7)' }}>
-              更新内容：{versionInfo.message}
-            </Typography>
-          )}
-          {versionInfo?.gitCommit && (
-            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-              版本：{versionInfo.gitCommit}
-            </Typography>
-          )}
-          <Typography variant="body2" sx={{ mt: 2, color: 'rgba(255, 255, 255, 0.6)' }}>
-            建议立即刷新页面以获得最佳游戏体验。
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', p: 2 }}>
-          <Button
-            onClick={handleDismiss}
-            sx={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.05)',
-              }
-            }}
-          >
-            稍后提醒
-          </Button>
-          <Button
-            onClick={handleRefreshPage}
-            variant="contained"
-            sx={{
-              bgcolor: '#3b82f6',
-              '&:hover': {
-                bgcolor: '#2563eb',
-              }
-            }}
-          >
-            立即刷新
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* 加载界面 */}
       {isLoading && (
         <LoadingScreen

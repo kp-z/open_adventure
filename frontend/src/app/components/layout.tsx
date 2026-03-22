@@ -408,7 +408,10 @@ const LayoutContent = () => {
 
   // 检测是否为移动端，移动端默认隐藏侧边栏
   const [isMobile, setIsMobile] = React.useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => {
+    const saved = localStorage.getItem('sidebar-open');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [showNotifications, setShowNotifications] = React.useState(false);
   const searchInputRef = React.useRef<HTMLInputElement>(null);
@@ -512,6 +515,14 @@ const LayoutContent = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []); // 空依赖数组，仅在组件挂载时执行
 
+  // 持久化侧边栏折叠状态到 localStorage
+  React.useEffect(() => {
+    // 移动端不持久化（移动端始终强制折叠）
+    if (!isMobile) {
+      localStorage.setItem('sidebar-open', String(isSidebarOpen));
+    }
+  }, [isSidebarOpen, isMobile]);
+
   // 检查是否是 Terminal 页面
   const isTerminalPage = location.pathname === '/terminal';
   
@@ -541,19 +552,19 @@ const LayoutContent = () => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // 如果需要访问密码且尚未验证（优先于初始化，避免初始化失败时无法输入密码）
+  if (accessChecked && accessRequired && !accessGranted) {
+    return <AccessPasswordGate onSuccess={() => setAccessGranted(true)} />;
+  }
+
   // 如果未初始化或正在加载，显示初始化界面
   if (!isInitialized || isLoading) {
     return <InitializationScreen />;
   }
 
-  // 如果需要访问密码且尚未验证（等待检查完成后再判断，避免闪烁）
-  if (accessChecked && accessRequired && !accessGranted) {
-    return <AccessPasswordGate onSuccess={() => setAccessGranted(true)} />;
-  }
-
   return (
     <div
-      className={`app-shell min-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} bg-[#0f111a]`}
+      className={`app-shell min-h-[var(--app-h)] max-h-[var(--app-h)] safe-area-left safe-area-right flex text-white transition-colors duration-500 ${isTerminalPage ? 'overflow-visible' : 'overflow-hidden'} bg-[#0f111a]`}
     >
       {/* 桌面端侧边栏 / 游戏模式悬浮 Logo */}
       <aside
@@ -841,7 +852,7 @@ const LayoutContent = () => {
         )}
 
         {/* Scrollable Page Content - 移动端添加底部间距（为浮动导航栏留空间） */}
-        <div className={`flex-1 overflow-y-auto relative safe-area-top ${isMicroverse || isTerminalPage || isWorkspacePage ? '' : 'p-4 md:p-8'} ${isMicroverse ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
+        <div className={`flex-1 ${isWorkspacePage ? 'overflow-hidden' : 'overflow-y-auto'} relative safe-area-top ${isMicroverse || isTerminalPage || isWorkspacePage ? '' : 'p-4 md:p-8'} ${isMicroverse || isWorkspacePage ? '' : 'pb-24 md:pb-4'} safe-area-bottom`}>
           <div className={isTerminalPage || isMicroverse || isWorkspacePage ? 'h-full' : ''}>
             {/* 游戏模式：始终挂载，通过 CSS 控制显示，避免 hidden/0 尺寸导致 WebGL 画布重新初始化 */}
             <div className={`${isMicroverse ? '' : 'hidden'} h-full`}>

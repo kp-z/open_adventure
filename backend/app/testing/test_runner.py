@@ -18,7 +18,8 @@ class TestRunner:
     """测试执行引擎"""
 
     def __init__(self):
-        self.project_root = Path(__file__).parent.parent.parent.parent
+        from app.core.path_resolver import get_project_root
+        self.project_root = get_project_root()
 
     async def run_test_node(
         self,

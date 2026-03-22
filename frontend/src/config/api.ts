@@ -14,6 +14,17 @@ declare global {
   }
 }
 
+// 判断是否为本地/局域网地址（直连后端 38080）
+const isPrivateHost = (hostname: string): boolean => {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
+  );
+};
+
 // 自动检测 API 地址
 const getDefaultApiBaseUrl = () => {
   // 优先使用运行时配置（二进制版本）
@@ -26,18 +37,19 @@ const getDefaultApiBaseUrl = () => {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // 云端部署：使用当前主机地址
-  // 本地开发：使用 localhost
-  const protocol = window.location.protocol;
   const hostname = window.location.hostname;
 
-  // 如果是 localhost 或 127.0.0.1，使用 localhost:38080
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:38080/api';
+  // 本地/局域网：直连后端 38080
+  if (isPrivateHost(hostname)) {
+    const protocol = window.location.protocol;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:38080/api';
+    }
+    return `${protocol}//${hostname}:38080/api`;
   }
 
-  // 否则使用当前主机的 38080 端口
-  return `${protocol}//${hostname}:38080/api`;
+  // 外网域名（ngrok/cloudflare/公网部署）：使用相对路径，同源请求，无需指定端口
+  return '/api';
 };
 
 const getDefaultWsBaseUrl = () => {
@@ -51,18 +63,20 @@ const getDefaultWsBaseUrl = () => {
     return import.meta.env.VITE_WS_BASE_URL;
   }
 
-  // 云端部署：使用当前主机地址
-  // 本地开发：使用 localhost
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const hostname = window.location.hostname;
 
-  // 如果是 localhost 或 127.0.0.1，使用 localhost:38080
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'ws://localhost:38080/api';
+  // 本地/局域网：直连后端 38080
+  if (isPrivateHost(hostname)) {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'ws://localhost:38080/api';
+    }
+    return `${wsProtocol}//${hostname}:38080/api`;
   }
 
-  // 否则使用当前主机的 38080 端口
-  return `${protocol}//${hostname}:38080/api`;
+  // 外网域名：使用当前页面的 host（含端口，如有），走 443/80
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${wsProtocol}//${window.location.host}/api`;
 };
 
 // 从环境变量读取配置，如果没有则自动检测

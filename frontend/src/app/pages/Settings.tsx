@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Plus,
   Palette,
+  Gamepad2,
 } from 'lucide-react';
 import { useMode } from '../contexts/ModeContext';
 import { useTranslation } from '../hooks/useTranslation';
@@ -873,6 +874,44 @@ const Settings = () => {
                       >
                         <Trash2 size={18} />
                         {isClearing ? '清除中...' : '清除所有缓存'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* 游戏资源管理 */}
+              <section className="space-y-4 pt-8 border-t border-white/10">
+                <div>
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <Gamepad2 size={20} className={false ? 'text-yellow-500' : 'text-blue-500'} />
+                    游戏资源管理
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-2">
+                    管理 Microverse 游戏的资源缓存
+                  </p>
+                </div>
+
+                <div className="bg-white/5 rounded-2xl border border-white/10 p-6 space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`p-3 rounded-xl ${false ? 'bg-yellow-500/10' : 'bg-blue-500/10'}`}>
+                      <Gamepad2 size={24} className={false ? 'text-yellow-500' : 'text-blue-500'} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-lg mb-2">Microverse 游戏资源</h3>
+                      <p className="text-sm text-gray-400 mb-4">
+                        强制刷新游戏资源缓存，重新拉取最新版本的游戏文件。适用于游戏更新后未自动加载新版本的情况。
+                      </p>
+                      <button
+                        onClick={() => {
+                          localStorage.removeItem('microverse_game_loaded');
+                          localStorage.removeItem('microverse_version');
+                          window.location.reload();
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all bg-blue-500 hover:bg-blue-600 text-white"
+                      >
+                        <RotateCcw size={18} />
+                        刷新游戏资源
                       </button>
                     </div>
                   </div>

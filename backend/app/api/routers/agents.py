@@ -28,6 +28,9 @@ from datetime import datetime
 import time
 from app.schemas.agent import (
     AgentCreate,
+    SavePlanRequest,
+    UpdatePlanRequest,
+    SavePlanResponse,
     AgentUpdate,
     AgentResponse,
     AgentListResponse,
@@ -824,6 +827,7 @@ async def stop_agent(
 async def test_agent_stream(
     agent_id: int,
     prompt: str = Query(..., description="测试提示"),
+    session_id: Optional[str] = Query(None, description="会话 ID（用于持久化对话）"),
     service: AgentService = Depends(get_agent_service),
     db: AsyncSession = Depends(get_db)
 ):
@@ -831,6 +835,10 @@ async def test_agent_stream(
     运行子代理进行测试，实时流式输出日志
 
     返回 SSE (Server-Sent Events) 格式的流
+    
+    参数:
+    - prompt: 用户输入的测试提示
+    - session_id: 可选的会话 ID，用于持久化对话历史
     """
     import os
     import time
@@ -841,11 +849,12 @@ async def test_agent_stream(
     agent = await service.get_agent(agent_id)
     cli_path = settings.claude_cli_path
 
-    # 创建 Execution 记录
+    # 创建或获取 Execution 记录
     agent_test_service = AgentTestService(db)
     execution = await agent_test_service.create_agent_test_execution(
         agent_id=agent_id,
-        test_input=prompt
+        test_input=prompt,
+        session_id=session_id
     )
     execution_id = execution.id
 
@@ -863,12 +872,19 @@ async def test_agent_stream(
             # 发送开始日志
             yield f"data: {json.dumps({'type': 'log', 'message': f'开始执行 Agent: {agent.name}'})}\n\n"
 
-            # 构建带有子代理配置的提示
-            system_context = ""
-            if agent.system_prompt:
-                system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
+            # 判断是否有历史对话（决定用 --session-id 还是 --resume）
+            has_history = bool(execution.chat_history and json.loads(execution.chat_history))
 
-            full_prompt = f"""You are acting as the subagent "{agent.name}".
+            if has_history:
+                # 后续对话：只发用户消息，CLI 通过 --resume 恢复上下文
+                full_prompt = prompt
+            else:
+                # 首次对话：包含完整角色设定
+                system_context = ""
+                if agent.system_prompt:
+                    system_context = f"\n\n[Agent System Prompt]\n{agent.system_prompt}\n\n"
+
+                full_prompt = f"""You are acting as the subagent "{agent.name}".
 Description: {agent.description}
 {system_context}
 User Request: {prompt}
@@ -882,6 +898,22 @@ Please respond according to your role and capabilities."""
                 "--disable-slash-commands",
                 "--setting-sources", "user"
             ]
+
+            # 首次用 --session-id 创建 session，后续用 --resume 恢复
+            # 通过检查 CLI session 文件判断是否已有 CLI session
+            if session_id:
+                import os
+                home_dir = os.path.expanduser('~')
+                # Claude CLI 按 cwd 路径命名项目目录（/ 替换为 -）
+                project_dir_name = home_dir.replace('/', '-')
+                cli_session_file = os.path.join(
+                    home_dir, '.claude', 'projects', project_dir_name,
+                    f'{session_id}.jsonl'
+                )
+                if os.path.exists(cli_session_file):
+                    cmd.extend(["--resume", session_id])
+                else:
+                    cmd.extend(["--session-id", session_id])
 
             # 如果指定了模型，添加模型参数
             if agent.model and agent.model != "inherit":
@@ -981,10 +1013,36 @@ Please respond according to your role and capabilities."""
                     
                     content_type = detect_content_type(result_data['output'])
                     
-                    # 更新为成功状态
+                    # 加载现有历史
+                    chat_history = json.loads(execution.chat_history) if execution.chat_history else []
+                    
+                    # 追加用户消息
+                    user_message = {
+                        "id": f"user-{int(time.time() * 1000)}",
+                        "role": "user",
+                        "content": prompt,
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "status": "success"
+                    }
+                    chat_history.append(user_message)
+                    
+                    # 追加 AI 回复
+                    assistant_message = {
+                        "id": f"agent-{int(time.time() * 1000)}",
+                        "role": "agent",
+                        "content": result_data['output'],
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "status": "success",
+                        "content_type": content_type
+                    }
+                    chat_history.append(assistant_message)
+                    
+                    # 更新为成功状态并保存历史
                     execution.status = ExecutionStatus.SUCCEEDED
                     execution.test_output = result_data['output']
                     execution.finished_at = datetime.utcnow()
+                    execution.chat_history = json.dumps(chat_history, ensure_ascii=False)
+                    execution.last_activity_at = datetime.utcnow()
                     await db.commit()
 
                     yield f"data: {json.dumps({'type': 'complete', 'data': {'success': True, 'output': result_data['output'], 'duration': result_data['duration'], 'model': model_name, 'content_type': content_type}})}\n\n"
@@ -2290,3 +2348,113 @@ async def clear_session(
     await db.commit()
     
     return {"success": True, "session_id": session_id}
+
+
+@router.post("/{agent_id}/plans/save", response_model=SavePlanResponse)
+async def save_agent_plan(
+    agent_id: int,
+    request: SavePlanRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    保存 Agent Plan/Report 到文件
+    
+    Args:
+        agent_id: Agent ID
+        request: 保存请求（session_id, message_id, content, content_type）
+    
+    Returns:
+        SavePlanResponse: 保存结果（file_path, file_url）
+    """
+    from pathlib import Path
+    from app.core.path_resolver import get_plans_dir
+
+    # 构建文件路径
+    base_dir = get_plans_dir()
+    agent_dir = base_dir / str(agent_id) / request.session_id
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 文件名
+    filename = f"{request.content_type}-{request.message_id}.md"
+    file_path = agent_dir / filename
+    
+    # 写入文件
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(request.content)
+    
+    logger.info(f"Saved {request.content_type} for agent {agent_id} to {file_path}")
+    
+    return SavePlanResponse(
+        success=True,
+        file_path=str(file_path),
+        file_url=f"/api/agents/{agent_id}/plans/{request.session_id}/{filename}"
+    )
+
+
+@router.get("/{agent_id}/plans/{session_id}/{filename}")
+async def get_agent_plan(
+    agent_id: int,
+    session_id: str,
+    filename: str
+):
+    """
+    读取 Plan/Report 文件
+    
+    Args:
+        agent_id: Agent ID
+        session_id: Session ID
+        filename: 文件名
+    
+    Returns:
+        文件内容（text/markdown）
+    """
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    from app.core.path_resolver import get_plans_dir
+
+    # 获取 Plan 目录
+    base_dir = get_plans_dir()
+    file_path = base_dir / str(agent_id) / session_id / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(file_path, media_type="text/markdown")
+
+
+@router.put("/{agent_id}/plans/{session_id}/{filename}")
+async def update_agent_plan(
+    agent_id: int,
+    session_id: str,
+    filename: str,
+    request: UpdatePlanRequest
+):
+    """
+    更新 Plan/Report 文件
+    
+    Args:
+        agent_id: Agent ID
+        session_id: Session ID
+        filename: 文件名
+        request: 更新请求（content）
+    
+    Returns:
+        成功状态和文件路径
+    """
+    from pathlib import Path
+    from app.core.path_resolver import get_plans_dir
+
+    # 获取 Plan 目录
+    base_dir = get_plans_dir()
+    file_path = base_dir / str(agent_id) / session_id / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # 写入更新的内容
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(request.content)
+    
+    logger.info(f"Updated plan file {file_path}")
+    
+    return {"success": True, "file_path": str(file_path)}

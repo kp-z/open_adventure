@@ -35,6 +35,7 @@ import { CategoryFilter, type CategoryType } from '../components/CategoryFilter'
 import { motion, AnimatePresence } from 'motion/react';
 import { agentsApi } from '@/lib/api';
 import type { Agent, AgentScope } from '@/lib/api';
+import { API_CONFIG } from '@/config/api';
 import { getAgentAvatarUrl, getAgentGradient, getAgentInitials } from '../../imports/avatars';
 import {
   useAgentsQuery,
@@ -169,7 +170,7 @@ const Agents = () => {
   // 获取可用模型列表
   const fetchAvailableModels = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:38080/api/claude/health');
+      const response = await fetch(`${API_CONFIG.BASE_URL}/claude/health`);
       const health = await response.json();
       const models = health.model_info?.available_models || [];
       const available = new Set(

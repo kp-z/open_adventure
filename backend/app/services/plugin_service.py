@@ -22,12 +22,8 @@ class PluginService:
         self.git_adapter = GitAdapter()
         self.marketplace_dir = Path.home() / ".claude" / "plugins" / "marketplace-plugins"
         # 项目根目录是 backend 的父目录
-        # __file__ -> backend/app/services/plugin_service.py
-        # .parent -> backend/app/services/
-        # .parent -> backend/app/
-        # .parent -> backend/
-        # .parent -> project root
-        self.project_marketplace_dir = Path(__file__).resolve().parent.parent.parent.parent / "marketplace"
+        from app.core.path_resolver import get_marketplace_dir
+        self.project_marketplace_dir = get_marketplace_dir()
 
     async def list_plugins(
         self,

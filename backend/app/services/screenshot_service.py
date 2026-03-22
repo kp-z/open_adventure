@@ -14,7 +14,8 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # 缩略图存储目录
-THUMBNAILS_DIR = Path(__file__).parent.parent.parent / "static" / "thumbnails"
+from app.core.path_resolver import get_thumbnails_dir
+THUMBNAILS_DIR = get_thumbnails_dir()
 
 
 class ScreenshotService:

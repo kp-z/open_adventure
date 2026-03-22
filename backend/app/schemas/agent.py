@@ -268,3 +268,23 @@ class AgentFileContent(BaseModel):
     content: str = Field(..., description="完整的 Markdown 内容（YAML frontmatter + body）")
     frontmatter: dict = Field(default_factory=dict, description="解析后的 frontmatter")
     body: str = Field("", description="系统提示（Markdown body）")
+
+
+class SavePlanRequest(BaseModel):
+    """保存 Agent Plan/Report 请求"""
+    session_id: str = Field(..., description="会话 ID")
+    message_id: str = Field(..., description="消息 ID")
+    content: str = Field(..., description="Markdown 内容")
+    content_type: Literal["plan", "report", "conversation"] = Field(..., description="内容类型")
+
+
+class UpdatePlanRequest(BaseModel):
+    """更新 Plan/Report 请求"""
+    content: str = Field(..., description="更新后的 Markdown 内容")
+
+
+class SavePlanResponse(BaseModel):
+    """保存 Plan 响应"""
+    success: bool
+    file_path: str
+    file_url: str

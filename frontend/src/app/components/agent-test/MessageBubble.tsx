@@ -7,19 +7,16 @@ import rehypeHighlight from 'rehype-highlight';
 import { ChevronDown, ChevronUp, FileText, X, Loader2 } from 'lucide-react';
 import { ChatMessage } from './types';
 import { looksLikeMarkdown, markdownPlainPreview } from '@/lib/markdownDetect';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '../ui/dialog';
+import { PlanEditorDialog } from './PlanEditorDialog';
 import 'highlight.js/styles/github-dark.css';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  agentId?: number;
+  sessionId?: string;
 }
 
-export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ message }) {
+export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ message, agentId, sessionId }) {
   const isUser = message.role === 'user';
   const [isExpanded, setIsExpanded] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -170,58 +167,16 @@ export const MessageBubble = memo<MessageBubbleProps>(function MessageBubble({ m
         </div>
       </div>
 
-      {/* Markdown 全量弹窗 */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col bg-[#0f111a] border border-white/20">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-400" />
-              {message.content_type === 'plan' ? '完整计划' :
-               message.content_type === 'report' ? '完整报告' :
-               '详细内容'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <div className="prose prose-sm prose-invert max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
-                components={{
-                  p: ({ children }) => <p className="mb-3 last:mb-0 text-gray-200">{children}</p>,
-                  h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 text-white border-b border-white/10 pb-2">{children}</h1>,
-                  h2: ({ children }) => <h2 className="text-xl font-bold mb-3 mt-6 text-white">{children}</h2>,
-                  h3: ({ children }) => <h3 className="text-lg font-bold mb-2 mt-4 text-white">{children}</h3>,
-                  code: ({ inline, children, ...props }: any) =>
-                    inline ? (
-                      <code className="px-1.5 py-0.5 rounded bg-white/20 text-blue-300" {...props}>
-                        {children}
-                      </code>
-                    ) : (
-                      <code className="block p-4 rounded-lg bg-gray-900/90 text-gray-100 overflow-x-auto border border-white/10 my-3" {...props}>
-                        {children}
-                      </code>
-                    ),
-                  a: ({ children, ...props }) => (
-                    <a className="underline text-blue-300 hover:text-blue-200" {...props}>
-                      {children}
-                    </a>
-                  ),
-                  ul: ({ children }) => <ul className="list-disc list-inside mb-3 text-gray-200">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal list-inside mb-3 text-gray-200">{children}</ol>,
-                  li: ({ children }) => <li className="mb-1 text-gray-200">{children}</li>,
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-blue-400/50 pl-4 py-2 my-3 bg-white/5 text-gray-300 italic">
-                      {children}
-                    </blockquote>
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Plan/Report 编辑器弹窗 */}
+      {agentId && sessionId && (
+        <PlanEditorDialog
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+          message={message}
+          agentId={agentId}
+          sessionId={sessionId}
+        />
+      )}
     </>
   );
 });

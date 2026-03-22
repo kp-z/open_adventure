@@ -15,9 +15,8 @@ class TestTreeManager:
 
     def __init__(self, config_path: str = None):
         if config_path is None:
-            # 自动查找配置文件
-            current_file = Path(__file__)
-            config_path = current_file.parent / "test_config.yaml"
+            from app.core.path_resolver import get_test_config_path
+            config_path = get_test_config_path()
         self.config_path = Path(config_path)
 
     async def load_tree(self, db: AsyncSession) -> List[TestNode]:

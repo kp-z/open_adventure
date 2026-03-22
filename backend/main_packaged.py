@@ -100,6 +100,27 @@ def init_database():
     FRONTEND_DIR = user_frontend
     os.environ["FRONTEND_DIST_DIR"] = str(user_frontend)
 
+    # 设置用户数据根目录环境变量
+    os.environ["OPEN_ADVENTURE_HOME"] = str(user_dir)
+
+    # 复制 marketplace 目录到持久化目录
+    if getattr(sys, 'frozen', False):
+        src_marketplace = BASE_DIR / "marketplace"
+        dst_marketplace = user_dir / "marketplace"
+        if src_marketplace.exists():
+            # 检查是否需要更新（简单比较：目标不存在或源目录有变化）
+            if not dst_marketplace.exists():
+                shutil.copytree(src_marketplace, dst_marketplace)
+                print(f"✓ Marketplace 已复制: {dst_marketplace}")
+            else:
+                # 增量更新：覆盖已有文件
+                shutil.copytree(src_marketplace, dst_marketplace, dirs_exist_ok=True)
+                print(f"✓ Marketplace 已更新: {dst_marketplace}")
+
+    # 创建 plans 和 thumbnails 目录
+    (user_dir / "plans").mkdir(parents=True, exist_ok=True)
+    (user_dir / "thumbnails").mkdir(parents=True, exist_ok=True)
+
     # 初始化配置文件
     user_env = user_dir / ".env"
     if not user_env.exists():
@@ -451,6 +472,8 @@ window.__RUNTIME_CONFIG__ = {{
             host=host,
             port=port,
             log_level="info",
+            ws_ping_interval=10,  # 每 10s 发 WS 协议级 ping（Cloudflare Tunnel 保活）
+            ws_ping_timeout=30,   # 30s 无 pong 则关闭连接
         )
     except Exception as e:
         print(f"❌ 启动失败: {e}", flush=True)

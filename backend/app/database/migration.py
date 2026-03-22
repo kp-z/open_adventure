@@ -17,16 +17,16 @@ logger = logging.getLogger(__name__)
 
 def get_alembic_config() -> Config:
     """获取 Alembic 配置对象"""
-    # 获取 backend 目录的绝对路径
-    backend_dir = Path(__file__).parent.parent.parent
-    alembic_ini = backend_dir / "alembic.ini"
+    from app.core.path_resolver import get_alembic_ini, get_alembic_dir
+
+    alembic_ini = get_alembic_ini()
 
     if not alembic_ini.exists():
         raise FileNotFoundError(f"Alembic config not found: {alembic_ini}")
 
     config = Config(str(alembic_ini))
     # 设置 script_location 为绝对路径
-    config.set_main_option("script_location", str(backend_dir / "alembic"))
+    config.set_main_option("script_location", str(get_alembic_dir()))
 
     return config
 

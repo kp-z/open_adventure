@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { agentsApi, type Agent } from '@/lib/api';
+import { API_CONFIG } from '@/config/api';
 
 interface RealAgentsContextType {
   agents: Agent[];
@@ -96,7 +97,7 @@ export const RealAgentsProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const fetchAvailableModels = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:38080/api/claude/health');
+      const response = await fetch(`${API_CONFIG.BASE_URL}/claude/health`);
       const health = await response.json();
       const models = health.model_info?.available_models || [];
       const available = new Set(

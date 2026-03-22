@@ -13,4 +13,6 @@ if __name__ == "__main__":
         port=38080,
         reload=is_dev,  # 只在开发环境启用 reload
         log_level="info",
+        ws_ping_interval=10,  # 每 10s 发 WS 协议级 ping（Cloudflare Tunnel 保活）
+        ws_ping_timeout=30,   # 30s 无 pong 则关闭连接
     )

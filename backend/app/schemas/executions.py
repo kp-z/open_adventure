@@ -48,6 +48,11 @@ class ExecutionResponse(BaseModel):
     terminal_cwd: Optional[str] = None
     terminal_output: Optional[str] = None
     task: Optional[TaskResponse] = None
+    
+    # Agent Session 字段
+    chat_history: Optional[str] = None
+    is_background: Optional[bool] = None
+    last_activity_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 

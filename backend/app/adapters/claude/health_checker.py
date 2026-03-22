@@ -32,7 +32,8 @@ class ClaudeHealthChecker:
             List[Dict]: 默认模型列表
         """
         try:
-            config_file = Path(__file__).parent.parent.parent / "config" / "default_models.json"
+            from app.core.path_resolver import get_config_path
+            config_file = get_config_path("default_models.json")
             if config_file.exists():
                 with open(config_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)

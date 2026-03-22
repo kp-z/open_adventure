@@ -54,7 +54,8 @@ export interface TerminalInstance {
   reconnectAttempts: number;
   maxReconnectAttempts: number;
   heartbeatInterval?: ReturnType<typeof setInterval>; // 心跳定时器
-  lastHeartbeat: number; // 最后心跳时间
+  lastHeartbeat: number; // 最后心跳发送时间
+  lastPongReceived?: number; // 最后收到 pong 的时间（用于 zombie 检测）
   useTmux: boolean; // 是否使用 tmux
   tmuxSessionName?: string; // tmux 会话名称
   tmuxAlive: boolean; // tmux 会话是否存活
@@ -560,6 +561,15 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
       // 启动心跳保活机制
       terminal.heartbeatInterval = setInterval(() => {
         if (terminal.ws.readyState === WebSocket.OPEN) {
+          // Zombie 检测：若上次 ping 发出后 45s 仍无 pong，说明连接已死
+          if (terminal.lastPongReceived !== undefined) {
+            const timeSinceLastPong = Date.now() - terminal.lastPongReceived;
+            if (timeSinceLastPong > 45000) {
+              console.warn(`[TerminalContext] Zombie connection detected (${Math.round(timeSinceLastPong / 1000)}s since last pong), forcing reconnect: terminal=${id}`);
+              terminal.ws.close();
+              return;
+            }
+          }
           try {
             terminal.ws.send(JSON.stringify({ type: 'ping' }));
             terminal.lastHeartbeat = Date.now();
@@ -568,7 +578,7 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
             console.error(`[TerminalContext] Failed to send heartbeat: terminal=${id}`, error);
           }
         }
-      }, 30000); // 每30秒发送一次心跳
+      }, 15000); // 每15秒发送一次心跳（Cloudflare Tunnel 保活，100s 超时 / 15s 间隔 = 安全裕度）
 
       if (mode === 'restore' && restoreSessionId) {
         localStorage.setItem(`terminal_session_${id}`, restoreSessionId);
@@ -652,8 +662,9 @@ export const TerminalProvider: React.FC<TerminalProviderProps> = ({ children }) 
         }
 
         if (parsed?.type === 'pong') {
-          // 收到心跳响应，更新最后心跳时间
+          // 收到心跳响应，更新时间（用于 zombie 检测）
           terminal.lastHeartbeat = Date.now();
+          terminal.lastPongReceived = Date.now();
           console.log(`[TerminalContext] Heartbeat pong received: terminal=${id}`);
           return;
         }

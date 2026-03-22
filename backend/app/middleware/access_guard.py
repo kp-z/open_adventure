@@ -21,6 +21,9 @@ _EXEMPT_PREFIXES = (
     "/redoc",
 )
 
+# Hosts considered local (skip password check)
+_LOCAL_HOSTS = ("127.0.0.1", "::1")
+
 
 def _derive_token(password: str) -> str:
     """Derive a deterministic access token from the password."""
@@ -47,6 +50,11 @@ class AccessGuardMiddleware(BaseHTTPMiddleware):
 
         # Exempt specific API endpoints
         if any(path.startswith(prefix) for prefix in _EXEMPT_PREFIXES):
+            return await call_next(request)
+
+        # Localhost requests skip password check
+        client_host = request.client.host if request.client else None
+        if client_host in _LOCAL_HOSTS:
             return await call_next(request)
 
         # Validate Bearer token

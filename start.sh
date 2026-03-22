@@ -326,34 +326,34 @@ if [ "$NON_INTERACTIVE" = false ]; then
         case "$_ia_choice" in
             y|Y)
                 # 读取现有密码，避免每次重启都生成新密码
-                _EXISTING_PWD=$(grep '^ACCESS_PASSWORD=' "$SCRIPT_DIR/.env" 2>/dev/null | cut -d'=' -f2-)
+                _EXISTING_PWD=$(grep '^ACCESS_PASSWORD=' "$SCRIPT_DIR/backend/.env" 2>/dev/null | cut -d'=' -f2-)
                 if [ -n "$_EXISTING_PWD" ]; then
-                    echo "✅ Using existing password (found in .env)"
+                    echo "✅ Using existing password (found in backend/.env)"
                 else
                     # 生成随机 16 位密码
                     _EXISTING_PWD=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16 2>/dev/null || openssl rand -hex 8)
                     echo "✅ Generated new access password: $_EXISTING_PWD"
-                    echo "   (Saved to .env — share it with anyone who needs access)"
+                    echo "   (Saved to backend/.env — share it with anyone who needs access)"
                 fi
-                # 写入或更新 .env
-                if [ -f "$SCRIPT_DIR/.env" ]; then
-                    if grep -q '^ACCESS_PASSWORD=' "$SCRIPT_DIR/.env"; then
-                        sed -i.bak "s|^ACCESS_PASSWORD=.*|ACCESS_PASSWORD=$_EXISTING_PWD|" "$SCRIPT_DIR/.env"
-                        rm -f "$SCRIPT_DIR/.env.bak"
+                # 写入或更新 backend/.env
+                if [ -f "$SCRIPT_DIR/backend/.env" ]; then
+                    if grep -q '^ACCESS_PASSWORD=' "$SCRIPT_DIR/backend/.env"; then
+                        sed -i.bak "s|^ACCESS_PASSWORD=.*|ACCESS_PASSWORD=$_EXISTING_PWD|" "$SCRIPT_DIR/backend/.env"
+                        rm -f "$SCRIPT_DIR/backend/.env.bak"
                     else
-                        echo "ACCESS_PASSWORD=$_EXISTING_PWD" >> "$SCRIPT_DIR/.env"
+                        echo "ACCESS_PASSWORD=$_EXISTING_PWD" >> "$SCRIPT_DIR/backend/.env"
                     fi
                 else
-                    echo "ACCESS_PASSWORD=$_EXISTING_PWD" > "$SCRIPT_DIR/.env"
+                    echo "ACCESS_PASSWORD=$_EXISTING_PWD" > "$SCRIPT_DIR/backend/.env"
                 fi
                 echo ""
                 break
                 ;;
             n|N)
                 # 清空密码（禁用保护）
-                if [ -f "$SCRIPT_DIR/.env" ] && grep -q '^ACCESS_PASSWORD=' "$SCRIPT_DIR/.env"; then
-                    sed -i.bak "s|^ACCESS_PASSWORD=.*|ACCESS_PASSWORD=|" "$SCRIPT_DIR/.env"
-                    rm -f "$SCRIPT_DIR/.env.bak"
+                if [ -f "$SCRIPT_DIR/backend/.env" ] && grep -q '^ACCESS_PASSWORD=' "$SCRIPT_DIR/backend/.env"; then
+                    sed -i.bak "s|^ACCESS_PASSWORD=.*|ACCESS_PASSWORD=|" "$SCRIPT_DIR/backend/.env"
+                    rm -f "$SCRIPT_DIR/backend/.env.bak"
                 fi
                 echo "⏭️  Skipping password protection (local network only)"
                 echo ""
@@ -775,14 +775,14 @@ VENV_PYTHON="$SCRIPT_DIR/backend/venv/bin/python"
 # 根据操作系统选择启动方式
 if [ "$OS_TYPE" = "linux" ] && command -v setsid &> /dev/null; then
     # Linux: 使用 setsid 创建独立会话，避免终端关闭时进程被杀死
-    setsid "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+    setsid "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info', ws_ping_interval=10, ws_ping_timeout=30)" > ../docs/logs/backend.log 2>&1 &
 else
     # macOS 或不支持 setsid 的系统：直接后台运行
     if [ "$PREVENT_SLEEP" = true ] && [ "$OS_TYPE" = "macos" ]; then
         # macOS + 防休眠模式：使用 caffeinate 包裹后端进程
-        caffeinate -i "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+        caffeinate -i "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info', ws_ping_interval=10, ws_ping_timeout=30)" > ../docs/logs/backend.log 2>&1 &
     else
-        "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info')" > ../docs/logs/backend.log 2>&1 &
+        "$VENV_PYTHON" -c "import uvicorn; uvicorn.run('app.main:app', host='0.0.0.0', port=$BACKEND_PORT, reload=True, log_level='info', ws_ping_interval=10, ws_ping_timeout=30)" > ../docs/logs/backend.log 2>&1 &
     fi
 fi
 

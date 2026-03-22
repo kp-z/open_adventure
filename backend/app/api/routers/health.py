@@ -2,7 +2,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,17 +16,19 @@ router = APIRouter(tags=["system"])
 
 
 @router.get("/health")
-async def health_check() -> dict:
+async def health_check(request: Request) -> dict:
     """
     Health check endpoint
 
     Returns system health status.
     """
+    client_host = request.client.host if request.client else None
+    is_local = client_host in ("127.0.0.1", "::1")
     return {
         "status": "healthy",
         "app_name": settings.app_name,
         "version": settings.app_version,
-        "access_password_required": settings.internet_access_enabled,
+        "access_password_required": settings.internet_access_enabled and not is_local,
     }
 
 
